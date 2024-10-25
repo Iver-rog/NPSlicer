@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+baby_shark = "0.3.3"
+nalgebra-glm = "0.18.0"
+stl_io = "0.8.2"
+
