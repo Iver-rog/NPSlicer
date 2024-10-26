@@ -15,7 +15,7 @@ pub fn main() {
     let stl_data = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
 
     let overhangs = stl_data.faces.into_iter()
-        .filter(|tri| tri.normal[2] < -PI/6. )
+        .filter(|tri| tri.normal[2] < -PI/6.0 )
         .filter(|tri| stl_data.vertices[tri.vertices[0]][2] > 0.0 )
         .filter(|tri| stl_data.vertices[tri.vertices[1]][2] > 0.0 )
         .filter(|tri| stl_data.vertices[tri.vertices[2]][2] > 0.0 );
@@ -41,16 +41,16 @@ pub fn main() {
         .map(|(edge,_)| edge)
         .collect();
 
-    let result = Vec::new();
-    for next_edge in boundary_edges.iter() {
-      match next_edge {
-        None => break,
-        Some(edge) => {
-          if result.len() <= boundary_edges.len() + 1 {break}
-
-        }
-      }
-    }
+    //let result = Vec::new();
+    //for next_edge in boundary_edges.iter() {
+    //  match next_edge {
+    //    None => break,
+    //    Some(edge) => {
+    //      if result.len() <= boundary_edges.len() + 1 {break}
+    //
+    //    }
+    //  }
+    //}
         
 
     let out:Vec<Triangle> = overhangs.map(|tri|
@@ -72,6 +72,7 @@ pub fn main() {
         .open("../mesh/output2.stl")
         .expect("Failed to create output file");
     stl_io::write_stl(&mut file, out.iter()).unwrap();
+    println!("wrote stl file to disk");
 
 }
 #[derive(Clone, Hash, Eq, PartialEq)]
