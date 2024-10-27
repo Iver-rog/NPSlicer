@@ -4,8 +4,7 @@ use std::io::BufReader;
 use nalgebra_glm::equal_eps_vec;
 use stl_io::{self, Normal, Triangle, IndexedTriangle};
 use core::f32::consts::PI;
-use std::collections::{HashMap, HashSet};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, LinkedList};
 
 
 pub fn main() {
@@ -39,28 +38,28 @@ pub fn main() {
         }
     }
 
-    let boundary_edges: Vec<Edge> = edge_count.into_iter()
+    let boundary_edges: LinkedList<Edge> = edge_count.into_iter()
         .filter(|(_,only_1_ref)| *only_1_ref )
         .map(|(edge,_)| edge)
         .collect();
 
+    let first_edge = boundary_edges.front().unwrap();
     let mut edge_loops = Vec::new();
-    let mut used_edges: HashSet<Edge> = HashSet::new();
-    let mut current_vertex = boundary_edges[0].0;
+    let mut current_vertex = first_edge.0;
 
-    let mut i = 0;
-    while && i<100{
-    i += 1;
+    while ! boundary_edges.is_empty() {
         let mut edge_loop = Vec::new();
         for i in 0..10 {
             println!("{current_vertex}");
-            let next_edge = boundary_edges.iter()
-                .find(|edge|{
-                    !used_edges.contains(edge) &&
+            let (i,next_edge) = boundary_edges.iter()
+                .enumerate()
+                .find(|(i,edge)|{
                     (edge.0 == current_vertex || edge.1 == current_vertex)
-                });
+                }).unwrap();
+            println!("{next_edge:?}");
             if let Some(edge) = next_edge {
-                used_edges.insert(edge.clone());
+                
+                //used_edges.insert(edge.clone());
                 current_vertex = if edge.0 == current_vertex {edge.1} else {edge.0};
                 edge_loop.push(current_vertex);
             } else {
@@ -68,9 +67,10 @@ pub fn main() {
             };
         }
         edge_loops.push(edge_loop);
+        break;
     }
-    dbg!(boundary_edges.iter().filter());
-    dbg!(edge_loops);
+    //dbg!(boundary_edges.iter().filter());
+    //dbg!(edge_loops);
 
         
 
