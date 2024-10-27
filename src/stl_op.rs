@@ -1,8 +1,10 @@
 #![allow(unused)]
 use std::fs::{File, OpenOptions};
 use std::io::BufReader;
+use nalgebra_glm::equal_eps_vec;
 use stl_io::{self, Normal, Triangle, IndexedTriangle};
 use core::f32::consts::PI;
+use std::collections::{HashMap, HashSet};
 use std::collections::{HashMap, HashSet};
 
 
@@ -14,43 +16,62 @@ pub fn main() {
 
     let stl_data = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
 
-    let overhangs = stl_data.faces.into_iter()
+    let overhangs = stl_data.faces.iter()
         .filter(|tri| tri.normal[2] < -PI/6.0 )
         .filter(|tri| stl_data.vertices[tri.vertices[0]][2] > 0.0 )
         .filter(|tri| stl_data.vertices[tri.vertices[1]][2] > 0.0 )
         .filter(|tri| stl_data.vertices[tri.vertices[2]][2] > 0.0 );
 
     // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
-
-    let mut edge_count: HashMap<Edge, u32> = HashMap::new(); 
+    let mut edge_count: HashMap<Edge, bool> = HashMap::new(); 
 
     for tri in overhangs.clone(){
         let [v1, v2, v3] = tri.vertices;
         let edges = [
             Edge::new(v1,v2),
             Edge::new(v2,v3),
-            Edge::new(v3,v1),
+            Edge::new(v3,v1)
         ];
-        for edge in edges {
-            *edge_count.entry(edge).or_insert( 0 ) +=1;
+        for edge in edges { 
+            edge_count.entry(edge)
+                .and_modify(|only_1_ref| *only_1_ref = false)
+                .or_insert(true);
         }
     }
-    let boundary_edges: Vec<Edge> = edge_count
-        .into_iter()
-        .filter(|(_,count)| *count == 1 )
+
+    let boundary_edges: Vec<Edge> = edge_count.into_iter()
+        .filter(|(_,only_1_ref)| *only_1_ref )
         .map(|(edge,_)| edge)
         .collect();
 
-    //let result = Vec::new();
-    //for next_edge in boundary_edges.iter() {
-    //  match next_edge {
-    //    None => break,
-    //    Some(edge) => {
-    //      if result.len() <= boundary_edges.len() + 1 {break}
-    //
-    //    }
-    //  }
-    //}
+    let mut edge_loops = Vec::new();
+    let mut used_edges: HashSet<Edge> = HashSet::new();
+    let mut current_vertex = boundary_edges[0].0;
+
+    let mut i = 0;
+    while && i<100{
+    i += 1;
+        let mut edge_loop = Vec::new();
+        for i in 0..10 {
+            println!("{current_vertex}");
+            let next_edge = boundary_edges.iter()
+                .find(|edge|{
+                    !used_edges.contains(edge) &&
+                    (edge.0 == current_vertex || edge.1 == current_vertex)
+                });
+            if let Some(edge) = next_edge {
+                used_edges.insert(edge.clone());
+                current_vertex = if edge.0 == current_vertex {edge.1} else {edge.0};
+                edge_loop.push(current_vertex);
+            } else {
+                break;
+            };
+        }
+        edge_loops.push(edge_loop);
+    }
+    dbg!(boundary_edges.iter().filter());
+    dbg!(edge_loops);
+
         
 
     let out:Vec<Triangle> = overhangs.map(|tri|
@@ -75,7 +96,7 @@ pub fn main() {
     println!("wrote stl file to disk");
 
 }
-#[derive(Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct Edge(usize,usize);
 impl Edge {
     fn new(v1:usize, v2:usize) -> Self {
