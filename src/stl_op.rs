@@ -5,7 +5,6 @@ use nalgebra_glm::equal_eps_vec;
 use stl_io::{self, Normal, Triangle, IndexedTriangle};
 use core::f32::consts::PI;
 use std::collections::{HashMap, HashSet};
-use std::collections::{HashMap, HashSet};
 
 
 pub fn main() {
@@ -46,14 +45,21 @@ pub fn main() {
 
     let mut edge_loops = Vec::new();
     let mut used_edges: HashSet<Edge> = HashSet::new();
-    let mut current_vertex = boundary_edges[0].0;
+    let mut current_vertex = boundary_edges[0].1;
+    println!("starting vertex: {current_vertex}");
 
     let mut i = 0;
-    while && i<100{
-    i += 1;
+    while i < boundary_edges.len() {
+    //for _ in (0..boundary_edges.len()) {
         let mut edge_loop = Vec::new();
-        for i in 0..10 {
-            println!("{current_vertex}");
+        let starting_vertex = boundary_edges.iter()
+            .filter(|edge|used_edges.contains(edge))
+            .next();
+            //.unwrap().0;
+        println!("starting loop at vertex {starting_vertex:?}");
+        loop{
+            i+=1;
+            println!("i = {i} looking for {current_vertex}");
             let next_edge = boundary_edges.iter()
                 .find(|edge|{
                     !used_edges.contains(edge) &&
@@ -69,8 +75,8 @@ pub fn main() {
         }
         edge_loops.push(edge_loop);
     }
-    dbg!(boundary_edges.iter().filter());
-    dbg!(edge_loops);
+    //dbg!(boundary_edges);
+    //dbg!(edge_loops);
 
         
 
