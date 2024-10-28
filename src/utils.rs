@@ -13,7 +13,7 @@ pub fn show(){
         .exec();
 }
 
-pub fn write_loops_to_file(loops:Vec<Vec<usize>>,stl:&stl_io::IndexedMesh)->Result<(),io::Error>{
+pub fn write_loops_to_file(loops:&Vec<Vec<usize>>,stl:&stl_io::IndexedMesh)->Result<(),io::Error>{
     // Write vertex data to a python file that can be displayed in blender
     let file = File::create("../tmp/edge_loops.py")
         .expect("could not create edge_loops.py file");

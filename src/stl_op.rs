@@ -5,7 +5,7 @@ use std::io::BufReader;
 use std::f32::consts::PI;
 use std::collections::{HashMap, LinkedList};
 use nalgebra_glm::equal_eps_vec;
-use stl_io::{self, Normal, Triangle, IndexedTriangle};
+use stl_io::{self, Normal, Triangle, IndexedTriangle, Vector};
 
 pub fn main() {
     let file_path = "../mesh/bunny2.stl";
@@ -17,13 +17,20 @@ pub fn main() {
 
     let overhangs: Vec<IndexedTriangle> = stl_data.faces.clone().into_iter()
         .filter(|tri| tri.normal[2] < -PI/6.0 )
-        .filter(|tri| stl_data.vertices[tri.vertices[0]][2] > 0.0 )
-        .filter(|tri| stl_data.vertices[tri.vertices[1]][2] > 0.0 )
-        .filter(|tri| stl_data.vertices[tri.vertices[2]][2] > 0.0 )
+        .filter(|tri|{ !(
+            stl_data.vertices[tri.vertices[0]][2] < 0.0 &&
+            stl_data.vertices[tri.vertices[1]][2] < 0.0 &&
+            stl_data.vertices[tri.vertices[2]][2] < 0.0 
+            )})
         .collect();
 
     let edge_perimeters = extract_perimeters(overhangs.clone());
-    utils::write_loops_to_file(edge_perimeters,&stl_data);
+    //utils::write_loops_to_file(&edge_perimeters,&stl_data);
+
+    let large_edge_loops:Vec<Vec<usize>> = edge_perimeters.into_iter()
+        .filter(|edge_loop| area(edge_loop,&stl_data.vertices) > 20.0 )
+        .collect();
+    utils::write_loops_to_file(&large_edge_loops,&stl_data);
 
     let out:Vec<Triangle> = overhangs.into_iter()
         .map(|tri|
@@ -108,4 +115,35 @@ fn extract_perimeters(triangles: Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
         edge_loops.push(edge_loop);
     }
     return edge_loops
+}
+
+fn area(point_index:&Vec<usize>, points: &Vec<Vector<f32>>) -> f32 {
+    // computes the area of a polygon projected onto the xy-plane using Green's theorem
+    let point_index_offset_by_one = point_index.iter()
+        .skip(1)
+        .chain( point_index.iter() );
+
+    return 0.5 * point_index.iter()
+        .zip(point_index_offset_by_one)
+        .map(|(p1,p2)|{
+            let x1 = points[*p1][0];
+            let y1 = points[*p1][1];
+            let x2 = points[*p2][0];
+            let y2 = points[*p2][1];
+            return x1*y2 - x2*y1
+        })
+        .sum::<f32>()
+        .abs()
+}
+#[test]
+fn test_area_function(){
+    // computes the area of a square centered on the origin with edges = 2
+    let point_index = vec![0,1,2,3];
+    let points = vec![
+        Vector::new([ 1.0,  1.0, 0.0]),
+        Vector::new([-1.0,  1.0, 0.0]),
+        Vector::new([-1.0, -1.0, 0.0]),
+        Vector::new([ 1.0, -1.0, 0.0])
+    ];
+    assert_eq!(area(&point_index, &points),4.0)
 }
