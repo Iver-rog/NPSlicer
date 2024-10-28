@@ -1,11 +1,11 @@
 #![allow(unused)]
+use crate::*;
 use std::fs::{File, OpenOptions};
 use std::io::BufReader;
+use std::f32::consts::PI;
+use std::collections::{HashMap, LinkedList};
 use nalgebra_glm::equal_eps_vec;
 use stl_io::{self, Normal, Triangle, IndexedTriangle};
-use core::f32::consts::PI;
-use std::collections::{HashMap, HashSet, LinkedList};
-
 
 pub fn main() {
     let file_path = "../mesh/bunny2.stl";
@@ -15,66 +15,18 @@ pub fn main() {
 
     let stl_data = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
 
-    let overhangs = stl_data.faces.iter()
+    let overhangs: Vec<IndexedTriangle> = stl_data.faces.clone().into_iter()
         .filter(|tri| tri.normal[2] < -PI/6.0 )
         .filter(|tri| stl_data.vertices[tri.vertices[0]][2] > 0.0 )
         .filter(|tri| stl_data.vertices[tri.vertices[1]][2] > 0.0 )
-        .filter(|tri| stl_data.vertices[tri.vertices[2]][2] > 0.0 );
-
-    // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
-    let mut edge_count: HashMap<Edge, bool> = HashMap::new(); 
-
-    for tri in overhangs.clone(){
-        let [v1, v2, v3] = tri.vertices;
-        let edges = [
-            Edge::new(v1,v2),
-            Edge::new(v2,v3),
-            Edge::new(v3,v1)
-        ];
-        for edge in edges { 
-            edge_count.entry(edge)
-                .and_modify(|only_1_ref| *only_1_ref = false)
-                .or_insert(true);
-        }
-    }
-
-    let boundary_edges: LinkedList<Edge> = edge_count.into_iter()
-        .filter(|(_,only_1_ref)| *only_1_ref )
-        .map(|(edge,_)| edge)
+        .filter(|tri| stl_data.vertices[tri.vertices[2]][2] > 0.0 )
         .collect();
 
-    let first_edge = boundary_edges.front().unwrap();
-    let mut edge_loops = Vec::new();
-    let mut current_vertex = first_edge.0;
+    let edge_perimeters = extract_perimeters(overhangs.clone());
+    utils::write_loops_to_file(edge_perimeters,&stl_data);
 
-    while ! boundary_edges.is_empty() {
-        let mut edge_loop = Vec::new();
-        for i in 0..10 {
-            println!("{current_vertex}");
-            let (i,next_edge) = boundary_edges.iter()
-                .enumerate()
-                .find(|(i,edge)|{
-                    (edge.0 == current_vertex || edge.1 == current_vertex)
-                }).unwrap();
-            println!("{next_edge:?}");
-            if let Some(edge) = next_edge {
-                
-                //used_edges.insert(edge.clone());
-                current_vertex = if edge.0 == current_vertex {edge.1} else {edge.0};
-                edge_loop.push(current_vertex);
-            } else {
-                break;
-            };
-        }
-        edge_loops.push(edge_loop);
-        break;
-    }
-    //dbg!(boundary_edges.iter().filter());
-    //dbg!(edge_loops);
-
-        
-
-    let out:Vec<Triangle> = overhangs.map(|tri|
+    let out:Vec<Triangle> = overhangs.into_iter()
+        .map(|tri|
           Triangle {
             normal: tri.normal,
             vertices: [
@@ -109,63 +61,51 @@ impl Edge {
 }
 
 
-fn extract_perimeter(triangles: &[IndexedTriangle]) -> Vec<usize> {
-    // Count how many times each edge appears
-    let mut edge_count: HashMap<Edge, u32> = HashMap::new();
-    
-    // For each triangle, count its edges
-    for triangle in triangles {
-        let [v1, v2, v3] = triangle.vertices;
-        let edges = [
-            Edge::new(v1, v2),
-            Edge::new(v2, v3),
-            Edge::new(v3, v1),
-        ];
-        
-        for edge in edges {
-            *edge_count.entry(edge).or_insert(0) += 1;
-        }
-    }
-    
-    // Collect boundary edges (those that appear only once)
-    let boundary_edges: Vec<Edge> = edge_count
-        .into_iter()
-        .filter(|(_, count)| *count == 1)
-        .map(|(edge, _)| edge)
-        .collect();
-    
-    // Sort boundary edges into a continuous chain
-    let mut result = Vec::new();
-    if boundary_edges.is_empty() {
-        return result;
-    }
-    
-    let mut current_vertex = boundary_edges[0].0;
-    let mut used_edges: HashSet<Edge> = HashSet::new();
-    result.push(current_vertex);
-    
-    while !boundary_edges.is_empty() && result.len() <= boundary_edges.len() + 1 {
-        let next_edge = boundary_edges.iter()
-            .find(|edge| {
-                !used_edges.contains(edge) && 
-                (edge.0 == current_vertex || edge.1 == current_vertex)
-            });
-        
-        if let Some(edge) = next_edge {
-            used_edges.insert(edge.clone());
-            current_vertex = if edge.0 == current_vertex { edge.1 } else { edge.0 };
-            result.push(current_vertex);
-        } else {
-            break;
-        }
-    }
-    
-    result
-}
+fn extract_perimeters(triangles: Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
+    // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
+    let mut edge_count: HashMap<Edge, bool> = HashMap::new(); 
 
-// Helper function to convert vertex indices back to actual 3D points
-fn get_perimeter_points(perimeter_indices: &[usize], vertices: &[[f32; 3]]) -> Vec<[f32; 3]> {
-    perimeter_indices.iter()
-        .map(|&idx| vertices[idx])
-        .collect()
+    for tri in triangles{
+        let [v1, v2, v3] = tri.vertices;
+        let edges = [
+            Edge::new(v1,v2),
+            Edge::new(v2,v3),
+            Edge::new(v3,v1)
+        ];
+        for edge in edges { 
+            edge_count.entry(edge)
+                .and_modify(|only_1_ref| *only_1_ref = false)
+                .or_insert(true);
+        }
+    }
+
+    let mut boundary_edges: LinkedList<Edge> = edge_count.into_iter()
+        .filter(|(_,only_1_ref)| *only_1_ref )
+        .map(|(edge,_)| edge)
+        .collect();
+
+    let mut edge_loops = Vec::new();
+
+    while ! boundary_edges.is_empty() {
+        let first_edge = boundary_edges.pop_front().expect("boundary edges is empty");
+        let starting_vertex = first_edge.0;
+        let mut next_vertex = first_edge.1;
+        let mut edge_loop = vec![starting_vertex];
+
+        while next_vertex != starting_vertex {
+            edge_loop.push(next_vertex);
+            let (i,edge) = boundary_edges.iter()
+                .enumerate()
+                .find(|(_,edge)|{
+                    edge.0 == next_vertex || edge.1 == next_vertex
+                })
+                .expect("next vertex could not be found");
+            next_vertex = if next_vertex != edge.0 {edge.0} else {edge.1};
+            let mut list_remainder = boundary_edges.split_off(i);
+            list_remainder.pop_front();
+            boundary_edges.append(&mut list_remainder);
+        }
+        edge_loops.push(edge_loop);
+    }
+    return edge_loops
 }

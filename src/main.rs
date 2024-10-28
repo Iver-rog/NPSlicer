@@ -5,5 +5,5 @@ mod utils;
 fn main(){
     //shark::main();
     stl_op::main();
-    //utils::show();
+    utils::show();
 }
