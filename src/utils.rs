@@ -2,6 +2,7 @@
 use std::{os::unix::process::CommandExt, process::Command};
 use std::fs::File;
 use std::io::{self, prelude::*, BufWriter};
+use stl_io::IndexedTriangle;
 
 
 pub fn show(){
@@ -69,4 +70,10 @@ pub fn write_loops_to_file(loops:&Vec<Vec<usize>>,stl:&stl_io::IndexedMesh)->Res
 }
 
 
+pub fn print_component_info(components: &[Vec<IndexedTriangle>]) {
+    println!("Found {} separate mesh components:", components.len());
+    for (i, component) in components.iter().enumerate() {
+        println!("Component {} contains {} triangles", i + 1, component.len());
+    }
+}
 

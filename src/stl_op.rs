@@ -3,8 +3,7 @@ use crate::*;
 use std::fs::{File, OpenOptions};
 use std::io::BufReader;
 use std::f32::consts::PI;
-use std::collections::{HashMap, HashSet, LinkedList};
-use nalgebra_glm::equal_eps_vec;
+use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, Triangle, IndexedTriangle, Vector};
 
 pub fn main() {
@@ -14,7 +13,7 @@ pub fn main() {
     let mut reader = BufReader::new(file);
 
     let stl_data = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    let edge_to_tri = edges_to_triangles_map(&stl_data);
+    //let edge_to_tri = edges_to_triangles_map(&stl_data);
 
     let overhangs: Vec<IndexedTriangle> = stl_data.faces.clone().into_iter()
         .filter(|tri| tri.normal[2] < -PI/6.0 )
@@ -25,8 +24,13 @@ pub fn main() {
             )})
         .collect();
 
-    let edge_perimeters = extract_perimeters(overhangs.clone());
-    //utils::write_loops_to_file(&edge_perimeters,&stl_data);
+    let overhang_regions = find_connected_components(&overhangs);
+    utils::print_component_info(&overhang_regions);
+
+    let mut edge_perimeters:Vec<Vec<usize>> = Vec::new();
+    for region in overhang_regions {
+        edge_perimeters.push( extract_perimeter(region) );
+    }
 
     let large_edge_loops:Vec<Vec<usize>> = edge_perimeters.into_iter()
         .filter(|edge_loop| area(edge_loop,&stl_data.vertices) > 20.0 )
@@ -92,7 +96,7 @@ impl Edge {
 }
 
 
-fn extract_perimeters(triangles: Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
+fn extract_perimeter(triangles: Vec<IndexedTriangle>) -> Vec<usize> {
     // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
     let mut edge_count: HashMap<Edge, bool> = HashMap::new(); 
 
@@ -115,71 +119,29 @@ fn extract_perimeters(triangles: Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
         .map(|(edge,_)| edge)
         .collect();
 
-    let mut edge_loops = Vec::new();
+    let first_edge = boundary_edges.pop_front().expect("boundary edges is empty");
+    let starting_vertex = first_edge.0;
+    let mut next_vertex = first_edge.1;
+    let mut edge_loop = vec![starting_vertex];
 
-    while ! boundary_edges.is_empty() {
-        let first_edge = boundary_edges.pop_front().expect("boundary edges is empty");
-        let starting_vertex = first_edge.0;
-        let mut next_vertex = first_edge.1;
-        let mut edge_loop = vec![starting_vertex];
-
-        while next_vertex != starting_vertex {
-            edge_loop.push(next_vertex);
-            let (i,edge) = boundary_edges.iter()
-                .enumerate()
-                .find(|(_,edge)|{
-                    edge.0 == next_vertex || edge.1 == next_vertex
-                })
-                .expect("next vertex could not be found");
-            next_vertex = if next_vertex != edge.0 {edge.0} else {edge.1};
-            let mut list_remainder = boundary_edges.split_off(i);
-            list_remainder.pop_front();
-            boundary_edges.append(&mut list_remainder);
-        }
-        edge_loops.push(edge_loop);
+    while next_vertex != starting_vertex {
+        edge_loop.push(next_vertex);
+        let (i,edge) = boundary_edges.iter()
+            .enumerate()
+            .find(|(_,edge)|{
+                edge.0 == next_vertex || edge.1 == next_vertex
+            })
+            .expect("next vertex could not be found");
+        next_vertex = if next_vertex != edge.0 {edge.0} else {edge.1};
+        let mut list_remainder = boundary_edges.split_off(i);
+        list_remainder.pop_front();
+        boundary_edges.append(&mut list_remainder);
     }
-    return edge_loops
-}
-fn find_connected_tris <'a>(
-    triangles: &[IndexedTriangle], 
-    edge_to_tris: HashMap<Edge,[&'a IndexedTriangle;2]>, 
-    ) -> Vec<Vec<&'a IndexedTriangle>> {
-
-    let mut islands: Vec<Vec<Triangle>> = Vec::new();
-    let mut unvisited: HashSet<usize> = (0..triangles.len()).collect();
-
-    let mut triangle_adjacency: Vec<Vec<usize>> = vec![Vec::new();triangles.len()];
-
-    for tri in triangles{
-    }
-
-    todo!()
-}
-fn neighbouring_tris<'a>(
-    tri:&IndexedTriangle, 
-    edge_to_tris: HashMap<Edge,[&'a IndexedTriangle;3]>
-    ) -> Result<[&'a IndexedTriangle;3],()>
-    {
-    let [v1, v2, v3] = tri.vertices;
-    let edges = [
-        Edge::new(v1,v2),
-        Edge::new(v2,v3),
-        Edge::new(v3,v1)
-    ];
-    let mut neighbours = edges.into_iter()
-        .map(|edge|{
-            let tris = *edge_to_tris.get(&edge).unwrap();
-            return if tris[0] == tri {tris[1]} else { tris[0] }
-        });
-    return Ok([
-        neighbours.next().unwrap(),
-        neighbours.next().unwrap(),
-        neighbours.next().unwrap()
-    ])
+    return edge_loop
 }
 
 fn area(point_index:&Vec<usize>, points: &Vec<Vector<f32>>) -> f32 {
-    // computes the area of a polygon projected onto the xy-plane using Green's theorem
+    // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
     let point_index_offset_by_one = point_index.iter()
         .skip(1)
         .chain( point_index.iter() );
@@ -207,4 +169,57 @@ fn test_area_function(){
         Vector::new([ 1.0, -1.0, 0.0])
     ];
     assert_eq!(area(&point_index, &points),4.0)
+}
+fn find_connected_components(triangles: &[IndexedTriangle]) -> Vec<Vec<IndexedTriangle>> {
+    let mut components: Vec<Vec<IndexedTriangle>> = Vec::new();
+    let mut unvisited: HashSet<usize> = (0..triangles.len()).collect();
+    
+    // Build adjacency information
+    let mut edge_to_triangles: HashMap<Edge, Vec<usize>> = HashMap::new();
+    
+    // Map edges to the triangles that contain them
+    for (triangle_idx, triangle) in triangles.iter().enumerate() {
+        let [v1, v2, v3] = triangle.vertices;
+        let edges = [
+            Edge::new(v1, v2),
+            Edge::new(v2, v3),
+            Edge::new(v3, v1),
+        ];
+        for edge in edges {
+            edge_to_triangles
+                .entry(edge)
+                .or_insert_with(Vec::new)
+                .push(triangle_idx);
+        }
+    }
+    // Build triangle adjacency list
+    let mut triangle_adjacency: Vec<Vec<usize>> = vec![Vec::new(); triangles.len()];
+    
+    for triangle_indices in edge_to_triangles.values() {
+        if triangle_indices.len() == 2 {
+            triangle_adjacency[triangle_indices[0]].push(triangle_indices[1]);
+            triangle_adjacency[triangle_indices[1]].push(triangle_indices[0]);
+        }
+    }
+    // Find connected components using BFS
+    while let Some(&start) = unvisited.iter().next() {
+        let mut component = Vec::new();
+        let mut queue = VecDeque::new();
+        
+        queue.push_back(start);
+        unvisited.remove(&start);
+        
+        while let Some(current) = queue.pop_front() {
+            component.push(triangles[current].clone());
+            
+            // Add unvisited neighbors to queue
+            for &neighbor in &triangle_adjacency[current] {
+                if unvisited.remove(&neighbor) {
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+        components.push(component);
+    }
+    return components
 }
