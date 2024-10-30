@@ -3,9 +3,9 @@ use crate::*;
 use std::fs::{File, OpenOptions};
 use std::io::BufReader;
 use std::f32::consts::PI;
-use std::collections::{HashMap, LinkedList};
+use std::collections::{HashMap, HashSet, LinkedList};
 use nalgebra_glm::equal_eps_vec;
-use stl_io::{self, Normal, Triangle, IndexedTriangle, Vector};
+use stl_io::{self, Triangle, IndexedTriangle, Vector};
 
 pub fn main() {
     let file_path = "../mesh/bunny2.stl";
@@ -14,6 +14,7 @@ pub fn main() {
     let mut reader = BufReader::new(file);
 
     let stl_data = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
+    let edge_to_tri = edges_to_triangles_map(&stl_data);
 
     let overhangs: Vec<IndexedTriangle> = stl_data.faces.clone().into_iter()
         .filter(|tri| tri.normal[2] < -PI/6.0 )
@@ -54,6 +55,29 @@ pub fn main() {
     stl_io::write_stl(&mut file, out.iter()).unwrap();
     println!("wrote stl file to disk");
 
+}
+fn edges_to_triangles_map<'a>( stl_data:&'a stl_io::IndexedMesh ) -> HashMap<Edge,[&'a IndexedTriangle;2]>{
+    let mut edge_to_tri_ndx: HashMap<Edge,(&IndexedTriangle,Option<&IndexedTriangle>)>
+        = HashMap::with_capacity(stl_data.faces.len()*2);
+
+    for tri in stl_data.faces.iter() {
+        let [v1, v2, v3] = tri.vertices;
+        let edges = [
+            Edge::new(v1,v2),
+            Edge::new(v2,v3),
+            Edge::new(v3,v1)
+        ];
+        for edge in edges { 
+            let entry = edge_to_tri_ndx.entry(edge)
+                .or_insert((&tri,None));
+            entry.1 = Some(&tri);
+        }
+    }
+    let mut edge_to_tri = HashMap::with_capacity(stl_data.faces.len());
+    for (key,val) in edge_to_tri_ndx.into_iter() {
+        edge_to_tri.insert( key, [val.0, val.1.expect("Non manifold mesh")] );
+    }
+    return edge_to_tri
 }
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct Edge(usize,usize);
@@ -115,6 +139,43 @@ fn extract_perimeters(triangles: Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
         edge_loops.push(edge_loop);
     }
     return edge_loops
+}
+fn find_connected_tris <'a>(
+    triangles: &[IndexedTriangle], 
+    edge_to_tris: HashMap<Edge,[&'a IndexedTriangle;2]>, 
+    ) -> Vec<Vec<&'a IndexedTriangle>> {
+
+    let mut islands: Vec<Vec<Triangle>> = Vec::new();
+    let mut unvisited: HashSet<usize> = (0..triangles.len()).collect();
+
+    let mut triangle_adjacency: Vec<Vec<usize>> = vec![Vec::new();triangles.len()];
+
+    for tri in triangles{
+    }
+
+    todo!()
+}
+fn neighbouring_tris<'a>(
+    tri:&IndexedTriangle, 
+    edge_to_tris: HashMap<Edge,[&'a IndexedTriangle;3]>
+    ) -> Result<[&'a IndexedTriangle;3],()>
+    {
+    let [v1, v2, v3] = tri.vertices;
+    let edges = [
+        Edge::new(v1,v2),
+        Edge::new(v2,v3),
+        Edge::new(v3,v1)
+    ];
+    let mut neighbours = edges.into_iter()
+        .map(|edge|{
+            let tris = *edge_to_tris.get(&edge).unwrap();
+            return if tris[0] == tri {tris[1]} else { tris[0] }
+        });
+    return Ok([
+        neighbours.next().unwrap(),
+        neighbours.next().unwrap(),
+        neighbours.next().unwrap()
+    ])
 }
 
 fn area(point_index:&Vec<usize>, points: &Vec<Vector<f32>>) -> f32 {

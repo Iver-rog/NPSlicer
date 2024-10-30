@@ -3,5 +3,5 @@ mod utils;
 
 fn main(){
     stl_op::main();
-    utils::show();
+    //utils::show();
 }
