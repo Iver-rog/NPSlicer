@@ -1,12 +1,13 @@
 #![allow(unused)]
 use crate::*;
+use utils::Blender;
 use std::fs::{File, OpenOptions};
 use std::io::BufReader;
 use std::f32::consts::PI;
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, Triangle, IndexedTriangle, Vector};
 
-pub fn main() {
+pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
     let file_path = "../mesh/bunny2.stl";
 
     let file = File::open(file_path).expect("Failed to open STL file");
@@ -23,6 +24,7 @@ pub fn main() {
             stl_data.vertices[tri.vertices[2]][2] < 0.0 
             )})
         .collect();
+    blender.save_mesh(&overhangs, &stl_data.vertices,"overhangs".to_string());
 
     let overhang_regions = find_connected_components(&overhangs);
     utils::print_component_info(&overhang_regions);
@@ -35,31 +37,21 @@ pub fn main() {
     let large_edge_loops:Vec<Vec<usize>> = edge_perimeters.into_iter()
         .filter(|edge_loop| area(edge_loop,&stl_data.vertices) > 20.0 )
         .collect();
-    utils::write_loops_to_file(&large_edge_loops,&stl_data);
+    for edge_loop in large_edge_loops.clone() {
+        blender.write_loops_to_file(&edge_loop,&stl_data);
+    }
 
-    let out:Vec<Triangle> = overhangs.into_iter()
-        .map(|tri|
-          Triangle {
-            normal: tri.normal,
-            vertices: [
-              stl_data.vertices[tri.vertices[0]],
-              stl_data.vertices[tri.vertices[1]],
-              stl_data.vertices[tri.vertices[2]],
-            ]
-          }
-        )
-        .collect();
+    let mut edge_loops_points = Vec::new();
+    for edge_loop in large_edge_loops {
+        let edge_loop_points:Vec<Vector<f32>> = edge_loop.into_iter()
+            .map(|ndx| stl_data.vertices[ndx])
+            .collect();
+        edge_loops_points.push(edge_loop_points);
+    }
 
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open("../mesh/output2.stl")
-        .expect("Failed to create output file");
-    stl_io::write_stl(&mut file, out.iter()).unwrap();
-    println!("wrote stl file to disk");
-
+    return edge_loops_points
 }
+
 fn edges_to_triangles_map<'a>( stl_data:&'a stl_io::IndexedMesh ) -> HashMap<Edge,[&'a IndexedTriangle;2]>{
     let mut edge_to_tri_ndx: HashMap<Edge,(&IndexedTriangle,Option<&IndexedTriangle>)>
         = HashMap::with_capacity(stl_data.faces.len()*2);

@@ -3,7 +3,9 @@ import os
 import sys
 
 sys.path.insert(1, '/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp')
-import edge_loops
+import layer_gen_data
+
+
 
 def clear_scene():
     """Remove all objects from the scene"""
@@ -39,8 +41,8 @@ def import_stl(filepath, color):
 # ================= edge loops =====================
 
 def import_edge_loops():
-    points = edge_loops.get_points()
-    lines = edge_loops.get_lines()
+    points = layer_gen_data.get_points()
+    lines = layer_gen_data.get_lines()
     edge_loop_collection = bpy.data.collections.new("Edge loops")
     bpy.context.collection.children.link(edge_loop_collection)
 
