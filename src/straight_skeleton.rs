@@ -26,7 +26,7 @@ pub struct Edge {
 #[derive(Debug)]
 pub struct StraightSkeleton {
     pub vertices: Vec<Point2<f32>>,
-    pub edges: Vec<(usize, usize)>,
+    pub edges: Vec<[usize;2]>,
 }
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct Event {
@@ -251,8 +251,8 @@ impl SkeletonBuilder {
         // Add new skeleton vertex and edges
         let new_vertex_idx = self.result.vertices.len();
         self.result.vertices.push(new_position);
-        self.result.edges.push((vertex_idx, new_vertex_idx));
-        self.result.edges.push((next_idx, new_vertex_idx));
+        self.result.edges.push([vertex_idx, new_vertex_idx]);
+        self.result.edges.push([next_idx, new_vertex_idx]);
         // Update active vertices
         self.active_vertices.remove(&vertex_idx);
         self.active_vertices.remove(&next_idx);

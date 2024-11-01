@@ -1,7 +1,7 @@
 #![allow(unused)]
 use crate::*;
 use utils::Blender;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::BufReader;
 use std::f32::consts::PI;
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
@@ -38,7 +38,7 @@ pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
         .filter(|edge_loop| area(edge_loop,&stl_data.vertices) > 20.0 )
         .collect();
     for edge_loop in large_edge_loops.clone() {
-        blender.write_loops_to_file(&edge_loop,&stl_data);
+        blender.edge_loop(&edge_loop,&stl_data);
     }
 
     let mut edge_loops_points = Vec::new();

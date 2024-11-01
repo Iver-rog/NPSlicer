@@ -101,7 +101,7 @@ impl <'a> Blender<'a> {
         return Ok(())
     }
 
-    pub fn write_loops_to_file(&mut self, edge_loop:&Vec<usize>,stl:&stl_io::IndexedMesh){
+    pub fn edge_loop(&mut self, edge_loop:&Vec<usize>,stl:&stl_io::IndexedMesh){
         let points: Vec<[f32;3]>= edge_loop.clone().into_iter()
             .map(|index| { [
                 stl.vertices[index][0],
@@ -117,7 +117,7 @@ impl <'a> Blender<'a> {
         self.line_objects.push( (points, edges) );
     }
 
-    pub fn write_lines_to_file(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
+    pub fn line_body(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
         let points3d = points.clone().into_iter().map(|[p1,p2]|[p1,p2,0.0]).collect();
         self.line_objects.push((points3d,edges.clone()));
     }

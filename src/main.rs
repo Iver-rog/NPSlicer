@@ -22,13 +22,13 @@ fn main(){
     println!("Points: {} | edges: {} | larges point index:{}",
         skeleton.vertices.len(),
         skeleton.edges.len(),
-        skeleton.edges.iter().map(|(p1,p2)| max(p1,p2)).max().unwrap()
+        skeleton.edges.iter().map(|[p1,p2]| max(p1,p2)).max().unwrap()
         );
 
-    //utils::write_lines_to_file(
-    //    &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
-    //    skeleton.edges.clone()
-    //    );
+    blender.line_body(
+        &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
+        skeleton.edges.clone()
+        );
 
     let points = profile.iter()
         .chain( skeleton.vertices.iter() )
@@ -40,13 +40,13 @@ fn main(){
     //    .map(|x| [x[0],x[1]])
     //    .collect::<Vec<[f32;2]>>();
 
-    //let mut edges: Vec<(usize,usize)>= (0..profile.len())
-    //    .map(|(i)| (i,i+1) )
-    //    .collect();
-    let mut skeleton_edges = skeleton.edges.clone().into_iter().map(|(p1,p2)| [p1,p2]).collect();
-    let mut edges = Vec::new();
+    let mut edges: Vec<[usize;2]>= (0..profile.len())
+        .map(|i| [i,i+1] )
+        .collect();
+
+    //let mut edges = Vec::new();
     edges.push([profile.len(),0]);
-    edges.append( &mut skeleton_edges );
+    edges.append( &mut skeleton.edges.clone() );
 
     println!("Points: {} | edges: {} | larges point index:{}",
         points.len(),
@@ -54,38 +54,11 @@ fn main(){
         edges.iter().map(|[p1,p2]| max(p1,p2)).max().unwrap()
         );
 
-    blender.write_lines_to_file(
+    blender.line_body(
         &points,
         edges
         );
+
     blender.show();
 }
 
-fn main2() {
-    let blender = Blender::new();
-
-    //straight_skeleton_test_square()
-}
-
-
-
-//fn straight_skeleton_test_square(blender:Blender){
-//
-//    let points = vec![
-//        Point2::new(0.0, 0.0),
-//        Point2::new(1.0, 0.0),
-//        Point2::new(1.0, 1.0),
-//        Point2::new(0.0, 1.0),
-//    ];
-//    let edges = vec![(0,1),(1,2),(2,3),(3,0)];
-//    let weights = vec![1.0, 1.0, 1.0, 1.0];
-//    let skeleton = straight_skeleton::create_weighted_skeleton(&points, &weights).unwrap();
-//    dbg!(&skeleton);
-//
-//    //utils::write_lines_to_file(&points.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(), edges);
-//    blender.write_lines_to_file(
-//        &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
-//        skeleton.edges
-//        );
-//    blender.show();
-//}
