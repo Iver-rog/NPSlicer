@@ -2,7 +2,10 @@ import bpy
 import os
 import sys
 
-sys.path.insert(1, '/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp')
+# temporary directory for storing rust programs output data
+tmp = '/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp'
+
+sys.path.insert(1, tmp)
 import layer_gen_data
 
 
@@ -37,6 +40,53 @@ def import_stl(filepath, color):
     except Exception as e:
         print(f"Error importing STL: {str(e)}")
         return False
+
+
+def import_stl_files( collection_name='STL_Imports', color=(1.0,0.2,0.2,1.0)):
+    directory = layer_gen_data.get_mesh_dir()
+    """
+    Import all STL files from a specified directory into a new or existing collection.
+    
+    :param directory: Path to the directory containing STL files
+    :param collection_name: Name of the collection to import STL files into
+    """
+    # Create the collection if it doesn't exist
+    if collection_name not in bpy.data.collections:
+        new_collection = bpy.data.collections.new(collection_name)
+        bpy.context.scene.collection.children.link(new_collection)
+    else:
+        new_collection = bpy.data.collections[collection_name]
+    
+    # Get a list of all STL files in the directory
+    stl_files = [f for f in os.listdir(directory) if f.lower().endswith('.stl')]
+    
+    # Import each STL file
+    for stl_file in stl_files:
+        full_path = os.path.join(directory, stl_file)
+        
+        # Import the STL file
+        bpy.ops.wm.stl_import(filepath=full_path)
+        
+        # Get the imported object (the last imported object)
+        imported_object = bpy.context.selected_objects[0]
+
+        bpy.context.object.color = color
+        
+        # Move the object to the specified collection
+        # First, unlink from the current collection
+        for collection in bpy.data.collections:
+            if imported_object.name in collection.objects:
+                collection.objects.unlink(imported_object)
+        
+        # Link to the new collection
+        new_collection.objects.link(imported_object)
+        
+        # Optional: Center the object to the world origin
+        bpy.ops.object.select_all(action='DESELECT')
+        imported_object.select_set(True)
+        bpy.context.view_layer.objects.active = imported_object
+        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+    
 
 # ================= edge loops =====================
 
@@ -82,10 +132,15 @@ clear_scene()
 
 # Import your STL file
 input = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/mesh/bunny.stl"
-output = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/mesh/output2.stl"
-
 import_stl(input, (1,1,1,0.4))
-import_stl(output, (1,0.08,0.08,1))
+
+# import_stls((1,1,1,0.4))
+
+import_stl_files()
+
 import_edge_loops()
+
+# import_stls((1,1,1,0.4))
+
 
 

@@ -81,6 +81,7 @@ impl <'a> Blender<'a> {
             .expect("could not create layer_gen_data.py file");
         let mut f = BufWriter::new(file);
 
+        // ============ Line bodies ==============
         writeln!(f,"def get_points():")?;
         writeln!(f,"    return [")?;
         for (i,line_object) in self.line_objects.iter().enumerate() {
@@ -88,7 +89,7 @@ impl <'a> Blender<'a> {
             if i != self.line_objects.len()-1 { writeln!(f,",")?; } 
             else { writeln!(f,"")?; }
         }
-        //writeln!(f,"        ]")?;
+
         writeln!(f,"    ]")?;
         writeln!(f,"def get_lines():")?;
         writeln!(f,"    return [")?;
@@ -98,6 +99,12 @@ impl <'a> Blender<'a> {
             else { writeln!(f,"")?; }
         }
         writeln!(f,"    ]")?;
+
+        // ============ mesh directory ==============
+        writeln!(f,"def get_mesh_dir():")?;
+        let mesh_path = self.mesh_path.to_str().unwrap();
+        println!("mesh path: {mesh_path}");
+        writeln!(f,"    return '{mesh_path}' ")?;
         return Ok(())
     }
 
@@ -112,7 +119,7 @@ impl <'a> Blender<'a> {
         let mut edges:Vec<[usize;2]> = (0..points.len()-1)
             .map(|i| [i, i+1])
             .collect();
-        edges.push([edges.len()-1,0]);
+        edges.push([edges.len(),0]);
 
         self.line_objects.push( (points, edges) );
     }
@@ -158,7 +165,6 @@ fn write_lines<W: ?Sized + Write>(f:&mut io::BufWriter<W>, edges:Vec<[usize;2]>)
         if i != edges.len()-1 { writeln!(f,",")?; }
         else { writeln!(f,"")?; }
     }
-
     write!(f,"        ]")?;
     return Ok(())
 }

@@ -54,10 +54,7 @@ fn main(){
         edges.iter().map(|[p1,p2]| max(p1,p2)).max().unwrap()
         );
 
-    blender.line_body(
-        &points,
-        edges
-        );
+    blender.line_body(&points, edges);
 
     blender.show();
 }

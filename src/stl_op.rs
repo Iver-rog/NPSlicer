@@ -16,18 +16,23 @@ pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
     let stl_data = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
     //let edge_to_tri = edges_to_triangles_map(&stl_data);
 
-    let overhangs: Vec<IndexedTriangle> = stl_data.faces.clone().into_iter()
+    let overhangs: Vec<IndexedTriangle> = stl_data.faces.iter()
         .filter(|tri| tri.normal[2] < -PI/6.0 )
         .filter(|tri|{ !(
             stl_data.vertices[tri.vertices[0]][2] < 0.0 &&
             stl_data.vertices[tri.vertices[1]][2] < 0.0 &&
             stl_data.vertices[tri.vertices[2]][2] < 0.0 
             )})
+        .map(|tri| tri.clone() )
         .collect();
     blender.save_mesh(&overhangs, &stl_data.vertices,"overhangs".to_string());
 
     let overhang_regions = find_connected_components(&overhangs);
     utils::print_component_info(&overhang_regions);
+    for (i,islands) in overhang_regions.iter().enumerate(){
+        let filename = format!("overhang_island{i}");
+        blender.save_mesh(&islands, &stl_data.vertices,filename);
+    }
 
     let mut edge_perimeters:Vec<Vec<usize>> = Vec::new();
     for region in overhang_regions {
