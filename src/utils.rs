@@ -5,7 +5,9 @@ use std::path::Path;
 use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
 use stl_io::{IndexedTriangle, Triangle, Vector};
+use crate::medial_axis;
 
+#[derive(Debug)]
 pub struct Blender<'a> {
     tmp_path:Box<Path>,
     mesh_path:Box<Path>,
@@ -61,7 +63,6 @@ impl <'a> Blender<'a> {
             .expect("Failed to create output file");
 
         stl_io::write_stl(&mut file, out.iter()).unwrap();
-        println!("wrote stl file to disk");
     }
 
     pub fn show(self){
@@ -124,9 +125,32 @@ impl <'a> Blender<'a> {
         self.line_objects.push( (points, edges) );
     }
 
+    pub fn edge_loop_points(&mut self, edge_loop:&Vec<[f32;3]>){
+        let points: Vec<[f32;3]>= edge_loop.clone().into_iter()
+            .map(|[x,y,z]| { [ x, y, z ] } )
+            .collect();
+        let mut edges:Vec<[usize;2]> = (0..points.len()-1)
+            .map(|i| [i, i+1])
+            .collect();
+        edges.push([edges.len(),0]);
+
+        self.line_objects.push( (points, edges) );
+    }
     pub fn line_body(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
         let points3d = points.clone().into_iter().map(|[p1,p2]|[p1,p2,0.0]).collect();
         self.line_objects.push((points3d,edges.clone()));
+    }
+    pub fn line_body_points(&mut self, edges:&Vec<[[f32;2];2]>) {
+        let points3d: Vec<[f32;3]> = edges.iter().flatten()
+            .map(|[ x, y ]| [*x, *y, 0.0] )
+            .collect();
+
+        let mut edges_as_ref = (0..edges.len())
+            .into_iter()
+            .map(|i| [2*i ,2*i+1] )
+            .collect();
+
+        self.line_objects.push((points3d,edges_as_ref));
     }
 }
 
