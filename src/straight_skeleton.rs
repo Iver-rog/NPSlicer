@@ -32,7 +32,7 @@ pub struct StraightSkeleton {
 struct Event {
     time: OrderedFloat<f32>,
     vertex_idx: usize,
-    next_vert_indx: usize,
+    //next_vert_indx: usize,
     event_type: EventType,
 }
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

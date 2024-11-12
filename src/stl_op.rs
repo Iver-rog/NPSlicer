@@ -3,16 +3,9 @@ use crate::*;
 use utils::Blender;
 use std::fs::File;
 use std::io::BufReader;
-<<<<<<< HEAD
-use nalgebra_glm::equal_eps_vec;
-use stl_io::{self, Normal, Triangle, IndexedTriangle};
-use core::f32::consts::PI;
-use std::collections::{HashMap, HashSet};
-=======
 use std::f32::consts::PI;
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, Triangle, IndexedTriangle, Vector};
->>>>>>> linked_list
 
 pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
     let file_path = "../mesh/bunny2.stl";
@@ -81,78 +74,11 @@ fn edges_to_triangles_map<'a>( stl_data:&'a stl_io::IndexedMesh ) -> HashMap<Edg
             entry.1 = Some(&tri);
         }
     }
-<<<<<<< HEAD
-
-    let boundary_edges: Vec<Edge> = edge_count.into_iter()
-        .filter(|(_,only_1_ref)| *only_1_ref )
-        .map(|(edge,_)| edge)
-        .collect();
-
-    let mut edge_loops = Vec::new();
-    let mut used_edges: HashSet<Edge> = HashSet::new();
-    let mut current_vertex = boundary_edges[0].1;
-    println!("starting vertex: {current_vertex}");
-
-    let mut i = 0;
-    while i < boundary_edges.len() {
-    //for _ in (0..boundary_edges.len()) {
-        let mut edge_loop = Vec::new();
-        let starting_vertex = boundary_edges.iter()
-            .filter(|edge|used_edges.contains(edge))
-            .next();
-            //.unwrap().0;
-        println!("starting loop at vertex {starting_vertex:?}");
-        loop{
-            i+=1;
-            println!("i = {i} looking for {current_vertex}");
-            let next_edge = boundary_edges.iter()
-                .find(|edge|{
-                    !used_edges.contains(edge) &&
-                    (edge.0 == current_vertex || edge.1 == current_vertex)
-                });
-            if let Some(edge) = next_edge {
-                used_edges.insert(edge.clone());
-                current_vertex = if edge.0 == current_vertex {edge.1} else {edge.0};
-                edge_loop.push(current_vertex);
-            } else {
-                break;
-            };
-        }
-        edge_loops.push(edge_loop);
-    }
-    //dbg!(boundary_edges);
-    //dbg!(edge_loops);
-
-        
-
-    let out:Vec<Triangle> = overhangs.map(|tri|
-          Triangle {
-            normal: tri.normal,
-            vertices: [
-              stl_data.vertices[tri.vertices[0]],
-              stl_data.vertices[tri.vertices[1]],
-              stl_data.vertices[tri.vertices[2]],
-            ]
-          }
-        )
-        .collect();
-
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open("../mesh/output2.stl")
-        .expect("Failed to create output file");
-    stl_io::write_stl(&mut file, out.iter()).unwrap();
-    println!("wrote stl file to disk");
-
-=======
     let mut edge_to_tri = HashMap::with_capacity(stl_data.faces.len());
     for (key,val) in edge_to_tri_ndx.into_iter() {
         edge_to_tri.insert( key, [val.0, val.1.expect("Non manifold mesh")] );
     }
     return edge_to_tri
->>>>>>> linked_list
 }
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct Edge(usize,usize);
