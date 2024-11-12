@@ -32,15 +32,17 @@ pub struct StraightSkeleton {
 struct Event {
     time: OrderedFloat<f32>,
     vertex_idx: usize,
+    next_vert_indx: usize,
     event_type: EventType,
 }
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum EventType {
-    Edge,
-    Split,
-    Vertex,
+    Edge,  // A edge shrinks to zero lenght
+    Split, // A region is split into two parts
+    Vertex,// A region disapears/colapses into a vertex
 }
 
+#[derive(Debug)]
 pub struct SkeletonBuilder {
     vertices: Vec<Vertex>,
     edges: Vec<Edge>,
@@ -67,7 +69,7 @@ impl SkeletonBuilder {
             events: PriorityQueue::new(),
             active_vertices: HashSet::new(),
             result: StraightSkeleton {
-                vertices: Vec::new(),
+                vertices: points.iter().map(|p| p.clone()).collect(),
                 edges: Vec::new(),
             },
         };
@@ -82,8 +84,8 @@ impl SkeletonBuilder {
             let next = (i + 1) % points.len();
 
             let v1 = Vector2::new(
-                points[i].x - points[prev].x,
-                points[i].y - points[prev].y,
+                points[prev].x - points[i].x,
+                points[prev].y - points[i].y,
             ).normalize();
             let v2 = Vector2::new(
                 points[next].x - points[i].x,
@@ -126,21 +128,25 @@ impl SkeletonBuilder {
     }
 
     fn initialize_events(&mut self) -> Result<(), SkeletonError> {
+        dbg!(&self);
         for i in 0..self.vertices.len() {
             let vertex = &self.vertices[i];
             
             // Edge events
             let next_idx = (i + 1) % self.vertices.len();
             let edge_event = self.compute_edge_event(i, next_idx)?;
+            dbg!(&edge_event);
             if let Some(event) = edge_event {
                 self.events.push(event.clone(), -event.time);
             }
             // Split events
             let split_events = self.compute_split_events(i)?;
+            dbg!(&split_events);
             for event in split_events {
                 self.events.push(event.clone(), -event.time);
             }
         }
+        dbg!(&self.events);
         Ok(())
     }
 
