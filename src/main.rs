@@ -9,8 +9,8 @@ use std::cmp::max;
 
 fn main(){
     let mut blender = Blender::new();
-    //pipe_line();
-    straight_skeleton(&mut blender);
+     pipe_line(&mut blender);
+    //straight_skeleton(&mut blender);
     //medial_axis(&mut blender);
 
     blender.show();
@@ -23,29 +23,29 @@ fn straight_skeleton(blender:&mut Blender) {
     //    Point2::new(1.0,1.0),
     //    Point2::new(1.0,0.0),
     //];
-    let vertices = vec![
-        Point2::new(0.0,0.0),
-        Point2::new(1.0,0.0),
-        Point2::new(1.0,1.0),
-        Point2::new(0.0,1.0),
-    ];
     //let vertices = vec![
-    //    Point2::new(40., 52.0),
-    //    Point2::new(62.5,42.5),
-    //    Point2::new(50.0,32.5),
-    //    Point2::new(63.5,25.0),
-    //    Point2::new(63.5,10.),
-    //    Point2::new(25.0,40.),
-    //    Point2::new(20.0,20.0),
-    //    Point2::new(10.0,50.)
+    //    Point2::new(0.0,0.0),
+    //    Point2::new(2.0,0.0),
+    //    Point2::new(2.0,1.0),
+    //    Point2::new(0.0,1.0),
     //];
+    let vertices = vec![
+        Point2::new(40., 52.0),
+        Point2::new(62.5,42.5),
+        Point2::new(50.0,32.5),
+        Point2::new(63.5,25.0),
+        Point2::new(63.5,10.),
+        Point2::new(25.0,40.),
+        Point2::new(20.0,20.0),
+        Point2::new(10.0,50.)
+    ];
     let weights:Vec<f32> = vertices.iter().map(|x| 1.0 ).collect();
     let skeleton = straight_skeleton::create_weighted_skeleton(&vertices, &weights).unwrap();
     let vertices_as_f32:Vec<[f32;3]> = vertices.clone().into_iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
     let mut skel_points:Vec<[f32;2]> = skeleton.vertices.iter()
         .map(|x| [x[0],x[1]])
-        .filter(|[p1,p2]| p1 != p2)
+        //.filter(|[p1,p2]| p1 != p2)
         .collect::<Vec<[f32;2]>>();
     println!("skel_points: {skel_points:?}");
 
@@ -55,14 +55,13 @@ fn straight_skeleton(blender:&mut Blender) {
         .collect();
     println!("skel_edges: {skel_edges:?}");
 
-    //blender.edge_loop_points(&vertices_as_f32);
+    blender.edge_loop_points(&vertices_as_f32);
     
     blender.line_body(
         //&skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
         &skel_points,
         skel_edges
         );
-    dbg!(&blender);
 }
 
 fn medial_axis(blender:&mut Blender) {
@@ -86,9 +85,8 @@ fn medial_axis(blender:&mut Blender) {
     blender.line_body_points(&skeleton);
 }
 
-fn pipe_line(){
-    let mut blender = Blender::new();
-    let profiles = stl_op::main(&mut blender);
+fn pipe_line(blender:&mut Blender){
+    let profiles = stl_op::main(blender);
     let first_profile = profiles.iter().next().unwrap();
 
     let profile:Vec<Point2<f32>> = first_profile.to_owned().iter()
@@ -132,7 +130,7 @@ fn pipe_line(){
     edges.push([profile.len(),0]);
     edges.append( &mut skeleton.edges.clone() );
 
-    println!("Points: {} | edges: {} | larges point index:{}",
+   println!("Points: {} | edges: {} | larges point index:{}",
         points.len(),
         edges.len(),
         edges.iter().map(|[p1,p2]| max(p1,p2)).max().unwrap()
@@ -140,6 +138,5 @@ fn pipe_line(){
 
     blender.line_body(&points, edges);
 
-    blender.show();
 }
 
