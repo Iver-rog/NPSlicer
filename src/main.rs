@@ -9,8 +9,8 @@ use std::cmp::max;
 
 fn main(){
     let mut blender = Blender::new();
-     pipe_line(&mut blender);
-    //straight_skeleton(&mut blender);
+     //pipe_line(&mut blender);
+    straight_skeleton(&mut blender);
     //medial_axis(&mut blender);
 
     blender.show();
@@ -40,7 +40,7 @@ fn straight_skeleton(blender:&mut Blender) {
         Point2::new(10.0,50.)
     ];
     let weights:Vec<f32> = vertices.iter().map(|x| 1.0 ).collect();
-    let skeleton = straight_skeleton::create_weighted_skeleton(&vertices, &weights).unwrap();
+    let skeleton = straight_skeleton::create_weighted_skeleton(vertices.clone(), &weights).unwrap();
     let vertices_as_f32:Vec<[f32;3]> = vertices.clone().into_iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
     let mut skel_points:Vec<[f32;2]> = skeleton.vertices.iter()
@@ -98,7 +98,7 @@ fn pipe_line(blender:&mut Blender){
     println!("profile points: {}",
         profile.len(),
         );
-    let skeleton = straight_skeleton::create_weighted_skeleton(&profile,&weights).unwrap();
+    let skeleton = straight_skeleton::create_weighted_skeleton(profile.clone(),&weights).unwrap();
 
     println!("Points: {} | edges: {} | larges point index:{}",
         skeleton.vertices.len(),
