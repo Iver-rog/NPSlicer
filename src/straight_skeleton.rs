@@ -1,10 +1,9 @@
-#![allow(unused)]
 use nalgebra::{Point2, Vector2};
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use thiserror::Error;
-use std::hash::{Hash,Hasher};
+use std::hash::Hash;
 
 #[derive(Debug, Error)]
 pub enum SkeletonError {
@@ -29,7 +28,6 @@ pub struct VertexData {
 pub struct Edge {
     pub start: usize,
     pub end: usize,
-    pub weight: f32,
 }
 #[derive(Debug)]
 pub struct StraightSkeleton {
@@ -76,8 +74,6 @@ impl SkeletonBuilder {
 
         //builder.initialize_polygon(weights)?;
         for i in 0..points.len() {
-            let prev = (i + points.len() - 1) % points.len();
-            let next = (i + 1) % points.len();
             let next_ndx = (i + 1) % points.len();
             let prev_ndx = if i == 0 {points.len()-1} else { i-1 };
 
@@ -89,7 +85,7 @@ impl SkeletonBuilder {
             edges.push(Edge {
                 start: i,
                 end: next_ndx,
-                weight: weights[i],
+                //weight: weights[i],
             });
             active_vertices.insert(i);
 
@@ -115,95 +111,38 @@ impl SkeletonBuilder {
         //initialize events 
         let mut event_que: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
         for vertex in builder.vert_refs.iter() { 
-            let vertex_position = builder.vert_data[vertex.ndx].cooridnates;
             let next_idx = vertex.next_ndx;
 
             // Edge events
             let edge_event = compute_edge_event(&vertex, builder.vert_data[vertex.ndx].clone(),builder.vert_data[next_idx].clone())?;
-            dbg!(&edge_event);
             if let Some(event) = edge_event {
                 event_que.push(event.clone(), -event.time);
             }
             // Split events
             let split_events = builder.compute_split_events(vertex)?;
-            dbg!(&split_events);
             for event in split_events {
                 event_que.push(event.clone(), -event.time);
             }
         }
         builder.events = event_que;
 
-        dbg!(&builder);
         Ok(builder)
     }
     fn position(&self, vertex:&Vertex) -> Point2<f32> {
         self.vert_data[vertex.ndx].cooridnates
     }
 
-    //fn initialize_polygon(&mut self, weights: &[f32]) -> Result<(), SkeletonError> {
-    //    // Initialize vertices and edges
-    //    let points = &self.vert_data;
-    //    dbg!(&points);
-    //    for i in 0..points.len() {
-    //        let prev = (i + points.len() - 1) % points.len();
-    //        let next = (i + 1) % points.len();
-    //        let next_ndx = (i + 1) % points.len();
-    //        let prev_ndx = if i == 0 {points.len()-1} else { i-1 };
-    //
-    //        self.vert_refs.push(Vertex {
-    //            ndx: i,
-    //            next_ndx,
-    //            prev_ndx,
-    //        });
-    //        self.edges.push(Edge {
-    //            start: i,
-    //            end: next_ndx,
-    //            weight: weights[i],
-    //        });
-    //        self.active_vertices.insert(i);
-    //    }
-    //    // Initialize events
-    //    self.initialize_events()?;
-    //    Ok(())
-    //}
-
-
-    fn initialize_events(&mut self) -> Result<(), SkeletonError> {
-        dbg!(&self);
-        for vertex in self.vert_refs.iter() { 
-            let vertex_position = &self.vert_data[vertex.ndx].cooridnates;
-            let next_idx = vertex.next_ndx;
-
-            // Edge events
-            let edge_event = compute_edge_event(vertex, self.vert_data[vertex.ndx].clone(), self.vert_data[vertex.next_ndx].clone())?;
-            dbg!(&edge_event);
-            if let Some(event) = edge_event {
-                self.events.push(event.clone(), -event.time);
-            }
-            // Split events
-            let split_events = self.compute_split_events(vertex)?;
-            dbg!(&split_events);
-            for event in split_events {
-                self.events.push(event.clone(), -event.time);
-            }
-        }
-        Ok(())
-    }
-    fn find_events(&mut self, vertex:Vertex) -> Result<(), SkeletonError> {
-        let vertex_position = &self.vert_data[vertex.ndx].cooridnates;
-        let next_idx = vertex.next_ndx;
+    fn find_events(&mut self, vertex:Vertex, current_time: OrderedFloat<f32>) -> Result<(), SkeletonError> {
 
         // Edge events
         let edge_event = compute_edge_event(&vertex, self.vert_data[vertex.ndx].clone(), self.vert_data[vertex.next_ndx].clone())?;
-        dbg!(&edge_event);
         if let Some(event) = edge_event {
-            self.events.push(event.clone(), -event.time);
+            self.events.push(event.clone(), -(current_time+event.time));
         }
         // Split events
         let split_events = self.compute_split_events(&vertex)?;
-        dbg!(&split_events);
         for event in split_events {
-            self.events.push(event.clone(), -event.time);
+            self.events.push(event.clone(), -(current_time+event.time));
         }
         Ok(())
     }
@@ -212,7 +151,7 @@ impl SkeletonBuilder {
         let mut events = Vec::new();
         //let vertex = &self.vert_data[vertex.ndx];
 
-        for (edge_idx, edge) in self.edges.iter().enumerate() {
+        for edge in self.edges.iter() {
             if edge.start != vertex.ndx && edge.end != vertex.ndx {
                 let v1 = &self.vert_data[edge.start].cooridnates;
                 let v2 = &self.vert_data[edge.end].cooridnates;
@@ -253,7 +192,7 @@ impl SkeletonBuilder {
         while let Some((event, _)) = self.events.pop() {
             match event.event_type {
                 EventType::Edge => self.handle_edge_event(event)?,
-                EventType::Split => (),// self.handle_split_event(event)?,
+                EventType::Split => {self.handle_split_event(event)?; },
                 EventType::Vertex => todo!(),//self.handle_vertex_event(event)?,
             }
             if self.active_vertices.len() < 3 {
@@ -273,22 +212,22 @@ impl SkeletonBuilder {
         Ok(result)
     }
     fn handle_edge_event(&mut self, event: Event) -> Result<(), SkeletonError> {
-        let vertex = event.vertex;
-        let vertex_ndx = vertex.ndx;
-        let next_ndx = vertex.next_ndx;
-        let prev_ndx = vertex.prev_ndx;
+        let vertex_ndx = event.vertex.ndx;
+        let next_ndx = event.vertex.next_ndx;
+        let prev_ndx = event.vertex.prev_ndx;
 
         if !self.active_vertices.contains(&vertex_ndx) || !self.active_vertices.contains(&next_ndx) {
             return Ok(());
         }
+
         // Calculate new vertex position
         let vertex = &self.vert_data[vertex_ndx];
         let time = event.time.0;
         let new_position = vertex.cooridnates + vertex.bisector * time;
         // Add new skeleton vertex and edges
         let new_vertex_ndx = self.vert_data.len();
-        self.edges.push(Edge{start:vertex_ndx, end:new_vertex_ndx, weight:1.0});
-        self.edges.push(Edge{start:next_ndx, end:new_vertex_ndx, weight:1.0});
+        self.edges.push(Edge{start:vertex_ndx, end:new_vertex_ndx});
+        self.edges.push(Edge{start:next_ndx, end:new_vertex_ndx});
         // Update active vertices
         self.active_vertices.remove(&vertex_ndx);
         self.active_vertices.remove(&next_ndx);
@@ -306,80 +245,125 @@ impl SkeletonBuilder {
         self.vert_refs.push(new_vertex);
 
         //find events for the new vertex
-        self.find_events(new_vertex);
+        self.find_events(new_vertex,event.time);
 
+        println!("\x1b[033mInfo:\x1b[0m Edge Event for vertex: {vertex_ndx} at: {new_position}");
         Ok(())
     }
 
-    //fn handle_split_event(&mut self, event: Event) -> Result<(), SkeletonError> {
-    //    // Implementation of split event handling
-    //    // This would involve splitting an edge and creating new events
-    //    let vertex = event.vertex_idx;
-    //    let time = event.time.0;
-    //
-    //    // Check if the vertex is still active
-    //    if !self.active_vertices.contains(&vertex.ndx) {
-    //        return Ok(());
-    //    }
-    //
-    //    // Calculate the position where the split occurs
-    //    let vertex = &self.vertices[vertex.ndx];
-    //    let split_position = self.position(vertex) + self.bisector(vertex)? * time;
-    //
-    //    // Find the edge that is being split
-    //    let mut split_edge_idx = None;
-    //    let mut split_point = None;
-    //
-    //    for (idx, edge) in self.edges.iter().enumerate() {
-    //        if edge.start != vertex.ndx && edge.end != vertex.ndx {
-    //            let v1 = &self.vertices[edge.start];
-    //            let v2 = &self.vertices[edge.end];
-    //
-    //            // Check if the split position lies on this edge
-    //            if let Some(t) = self.point_on_edge(&split_position, &v1, &v2)? {
-    //                if t > 0.0 && t < 1.0 {
-    //                    split_edge_idx = Some(idx);
-    //                    split_point = Some(t);
-    //                    break;
-    //                }
-    //            }
-    //        }
-    //    }
-    //    let vertex_idx = event.vertex_idx.ndx;
-    //    let time = event.time.0;
-    //
-    //    // Check if the vertex is still active
-    //    if !self.active_vertices.contains(&vertex_idx) {
-    //        return Ok(());
-    //    }
-    //
-    //    // Calculate the position where the split occurs
-    //    let vertex = &self.vertices[vertex_idx];
-    //    let vertex_position = &self.vertices[vertex_idx];
-    //    let vertex_bisector = &self.vertices[vertex_idx];
-    //    let split_position = vertex.position + vertex.bisector * time;
-    //
-    //    // Find the edge that is being split
-    //    let mut split_edge_idx = None;
-    //    let mut split_point = None;
-    //
-    //    for (idx, edge) in self.edges.iter().enumerate() {
-    //        if edge.start != vertex_idx && edge.end != vertex_idx {
-    //            let v1 = &self.vertices[edge.start];
-    //            let v2 = &self.vertices[edge.end];
-    //
-    //            // Check if the split position lies on this edge
-    //            if let Some(t) = self.point_on_edge(&split_position, &v1.position, &v2.position)? {
-    //                if t > 0.0 && t < 1.0 {
-    //                    split_edge_idx = Some(idx);
-    //                    split_point = Some(t);
-    //                    break;
-    //                }
-    //            }
-    //        }
-    //    }
-    //    Ok(())
-    //}
+    fn handle_split_event(&mut self, event: Event) -> Result<(), SkeletonError> {
+        // This involves splitting an edge and creating new events
+        let vertex = event.vertex;
+        let time = event.time.0;
+
+        // Check if the vertex is still active
+        if !self.active_vertices.contains(&vertex.ndx) {
+            return Ok(());
+        }
+
+        // Calculate the position where the split occurs
+        let vertex_data = &self.vert_data[vertex.ndx];
+        let split_position = vertex_data.cooridnates + vertex_data.bisector * time;
+
+        // ======== Find the edge that is being split ========
+        let mut split_edge_idx = None;
+
+       for vert in self.vert_refs.iter()
+           .filter(|vert| !self.active_vertices.contains(&vert.ndx) ){
+                let v1 = &self.vert_data[vert.ndx].cooridnates;
+                let v2 = &self.vert_data[vert.next_ndx].cooridnates;
+                // Check if the split position lies on this edge
+                if let Some(t) = self.point_on_edge(&split_position, &v1, &v2)? {
+                    if t > 0.0 && t < 1.0 {
+                        split_edge_idx = Some(vert.clone());
+                        break;
+                    }
+                }
+            }
+
+        match split_edge_idx {
+            None => (),
+            Some(vert) => {
+                self.active_vertices.remove(&vertex.ndx);
+
+                let splitting_vert = &self.vert_data[vertex.ndx];
+                let new_point_coordinates = splitting_vert.cooridnates + splitting_vert.bisector * time;
+                println!("\x1b[033mInfo:\x1b[0m Split Event for vertex: {} at: {}",vertex.ndx,new_point_coordinates);
+                println!("time: {time}");
+                println!("bisector: {:?}",splitting_vert.bisector);
+
+                // ============= First edge loop ================
+                let edge_start = self.vert_refs[vert.ndx];
+                let edge_start_data = &self.vert_data[edge_start.ndx];
+                let edge_start_possition = edge_start_data.cooridnates + edge_start_data.bisector * time;
+
+                // splitting vertex's neighbour forming a close loop with edge_start vertex:
+                let s_vert_start = &self.vert_data[vertex.next_ndx];
+                let s_vert_start_possition = s_vert_start.cooridnates + s_vert_start.bisector * time;
+
+                //assert!(edge_start != edge_end_neighbour); // make sure the remaining region is not a triangle (3 verts)
+
+                dbg!(s_vert_start.cooridnates);
+                dbg!(edge_start_data.cooridnates);
+                dbg!(new_point_coordinates);
+                // add new vertex to vertex list
+                self.vert_data.push( VertexData{
+                    cooridnates: new_point_coordinates,
+                    bisector: bisector(new_point_coordinates, s_vert_start_possition, edge_start_possition)?
+                    });
+
+                // add new vertex to vert_ref list
+                let new_vertex_index = self.vert_refs.len()-1;
+                self.vert_refs.push( Vertex{
+                    ndx: new_vertex_index,
+                    next_ndx: edge_start.ndx,
+                    prev_ndx: vertex.next_ndx,
+                    });
+                // update the neigbouring vertices refrences
+                self.vert_refs[edge_start.ndx].next_ndx = new_vertex_index;
+                self.vert_refs[vertex.next_ndx].prev_ndx = new_vertex_index;
+
+                let edge_end = self.vert_refs[vert.next_ndx];
+                let edge_end_data = &self.vert_data[vert.next_ndx];
+                let edge_end_possition = edge_end_data.cooridnates + edge_end_data.bisector * time;
+
+                // ============= Secound edge loop ================
+                // splitting vertex's neighbour forming a close loop with edge_start vertex:
+                let s_vert_end = &self.vert_data[vertex.prev_ndx];
+                let s_vert_end_possition = s_vert_end.cooridnates + s_vert_end.bisector * time;
+
+                self.vert_data.push( VertexData{
+                    cooridnates: new_point_coordinates,
+                    bisector: bisector(new_point_coordinates, edge_end_possition, s_vert_end_possition )?
+                    });
+                // add new vertex to vert_ref list
+                let new_vertex_index = self.vert_refs.len()-1;
+                self.vert_refs.push( Vertex{
+                    ndx: new_vertex_index,
+                    next_ndx: edge_end.ndx,
+                    prev_ndx: vertex.prev_ndx,
+                    });
+                // update the neigbouring vertices refrences
+                self.vert_refs[edge_end.ndx].prev_ndx = new_vertex_index;
+                self.vert_refs[vertex.prev_ndx].next_ndx = new_vertex_index;
+
+                // Find new events for the new verices
+                // ToDo: it might also be nessesary to find events for the previous vertices
+                let first_new_vertex = self.vert_refs.len()-2;
+                self.edges.push(Edge{start:vertex.ndx,end:first_new_vertex});
+                let secound_new_vertex = self.vert_refs.len()-1;
+
+                self.find_events(self.vert_refs[first_new_vertex], event.time)?;
+                self.find_events(self.vert_refs[secound_new_vertex], event.time)?;
+                // Debug printing
+                dbg!(self.vert_refs[first_new_vertex]);
+                dbg!(self.vert_refs[secound_new_vertex]);
+                },
+            }
+
+
+        Ok(())
+    }
     //
     //fn handle_vertex_event(&mut self, event: Event) -> Result<(), SkeletonError> {
     //    println!("vertex_event");
@@ -475,25 +459,25 @@ impl SkeletonBuilder {
     //}
     //   // Helper methods for the new implementations
     //
-    //fn point_on_edge(
-    //    &self,
-    //    point: &Point2<f32>,
-    //    edge_start: &Point2<f32>,
-    //    edge_end: &Point2<f32>,
-    //) -> Result<Option<f32>, SkeletonError> {
-    //    let edge_vec = edge_end - edge_start;
-    //    let point_vec = point - edge_start;
-    //
-    //    let edge_length_sq = edge_vec.norm_squared();
-    //    if edge_length_sq < 1e-5 {
-    //        return Err(SkeletonError::ComputationError(
-    //            "Edge length too small".to_string(),
-    //        ));
-    //    }
-    //
-    //    let t = edge_vec.dot(&point_vec) / edge_length_sq;
-    //    Ok(Some(t))
-    //}
+    fn point_on_edge(
+        &self,
+        point: &Point2<f32>,
+        edge_start: &Point2<f32>,
+        edge_end: &Point2<f32>,
+    ) -> Result<Option<f32>, SkeletonError> {
+        let edge_vec = edge_end - edge_start;
+        let point_vec = point - edge_start;
+
+        let edge_length_sq = edge_vec.norm_squared();
+        if edge_length_sq < 1e-5 {
+            return Err(SkeletonError::ComputationError(
+                "Edge length too small".to_string(),
+            ));
+        }
+
+        let t = edge_vec.dot(&point_vec) / edge_length_sq;
+        Ok(Some(t))
+    }
     //
     //fn compute_new_events_after_split(
     //    &self,
@@ -624,7 +608,7 @@ fn compute_intersection_time(
     let t = (dx * (-v2.y) - (-v2.x) * dy) / det;
     Ok(t)
 }
-fn bisector(
+pub fn bisector(
     current_point: Point2<f32>,
     next_point: Point2<f32>,
     prev_point: Point2<f32>,
@@ -638,13 +622,16 @@ fn bisector(
         next_point.y - current_point.y,
     ).normalize();
 
-    let angle = v1.angle(&v2);
-    if angle.abs() < 1e-5 || (std::f32::consts::PI - angle).abs() < 1e-5 {
-        return Err(SkeletonError::ComputationError(
-            "Cannot compute bisector for parallel or antiparallel edges".to_string(),
-        ));
+    //let angle = v1.angle(&v2);
+    //if angle.abs() < 1e-5 || (std::f32::consts::PI - angle).abs() < 1e-5 {
+    //    return Err(SkeletonError::ComputationError(
+    //        "Cannot compute bisector for parallel or antiparallel edges".to_string(),
+    //    ));
+    //}
+    let mut bisector = v1 + v2;
+    if (next_point.x - prev_point.x) < 0.0 || (next_point.y - prev_point.y) < 0.0 {
+        bisector = - bisector
     }
-    let bisector = (v1 + v2).normalize();
     Ok(bisector)
 }
 

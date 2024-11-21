@@ -5,7 +5,6 @@ use std::path::Path;
 use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
 use stl_io::{IndexedTriangle, Triangle, Vector};
-use crate::medial_axis;
 
 #[derive(Debug)]
 pub struct Blender<'a> {
