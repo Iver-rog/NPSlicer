@@ -12,7 +12,7 @@ The code in this repo can be buildt with either the nix package manager or rust'
 ### On Linux with the nix package manager:  
 On a Linux system with the nix package manager installed and the experimental cli enabled, the code can be run directly using the following command:
 ```console
-nix run https://github.com/Iver-rog/NPSlicer
+$ nix run github:Iver-rog/NPSlicer
 ```
 
 ### On other opperating systems using cargo:
@@ -23,9 +23,9 @@ The [rust toolchan and cargo](https://www.rust-lang.org/tools/install) must be i
 
 First clone the repo:
 ```console
-git clone https://github.com/Iver-rog/NPSlicer
+$ git clone https://github.com/Iver-rog/NPSlicer
 ```
 Then build and run the binary using cargo inside the newly downloaded project:
 ```console
-cargo run
+$ cargo run
 ```
