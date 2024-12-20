@@ -25,7 +25,7 @@ impl Edge {
     fn length(&self) -> f64 {
         self.vector().magnitude()
     }
-
+1
     fn distance_to_point(&self, point: &Point2<f64>) -> f64 {
         let edge_vec = self.vector();
         let point_vec = point - self.start;
