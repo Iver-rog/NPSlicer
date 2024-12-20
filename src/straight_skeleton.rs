@@ -622,14 +622,17 @@ pub fn bisector(
         next_point.y - current_point.y,
     ).normalize();
 
+    // check if edges are parallel
     //let angle = v1.angle(&v2);
     //if angle.abs() < 1e-5 || (std::f32::consts::PI - angle).abs() < 1e-5 {
     //    return Err(SkeletonError::ComputationError(
     //        "Cannot compute bisector for parallel or antiparallel edges".to_string(),
     //    ));
     //}
+
     let mut bisector = v1 + v2;
-    if (next_point.x - prev_point.x) < 0.0 || (next_point.y - prev_point.y) < 0.0 {
+    // check if the point lies on a reflex angle
+    if (-v1).perp(&v2) < 0.0 {
         bisector = - bisector
     }
     Ok(bisector)
