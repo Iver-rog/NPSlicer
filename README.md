@@ -25,7 +25,7 @@ First clone the repo:
 ```console
 $ git clone https://github.com/Iver-rog/NPSlicer
 ```
-Then build and run the binary using cargo inside the newly downloaded project:
+Then build and run the binary using cargo inside the src directory of the newly downloaded project:
 ```console
 $ cargo run
 ```
