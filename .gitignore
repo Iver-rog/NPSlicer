@@ -2,3 +2,4 @@ mesh
 .direnv
 target
 tmp
+.vscode
