@@ -146,19 +146,20 @@ impl SkeletonBuilder {
             self.nodes[vertex.next_ndx].bisector()
             )?;
         if let Some(event) = edge_event {
-            self.events.push(event.clone(), -(current_time+event.time));
+            let time = current_time+event.time;
+            self.events.push(event, -time);
         }
         // Split events
         let split_events = self.compute_split_events(&vertex)?;
         for event in split_events {
-            self.events.push(event.clone(), -(current_time+event.time));
+            let time = current_time+event.time;
+            self.events.push(event, -time);
         }
         Ok(())
     }
 
     fn compute_split_events<'a>(&'a self, node: &'a Node) -> Result<Vec<Event>, SkeletonError> {
         let mut events = Vec::new();
-        //let vertex = &self.vert_data[vertex.ndx];
 
         for edge in self.edges.iter() {
             if edge.start != node.ndx && edge.end != node.ndx {
