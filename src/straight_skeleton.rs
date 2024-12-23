@@ -1,4 +1,4 @@
-use nalgebra::{Point2, Vector2};
+use nalgebra::{Point2, Vector2, Matrix2};
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
 use std::{collections::HashSet, usize};
@@ -11,7 +11,7 @@ pub enum SkeletonError {
     InvalidPolygon(String),
     #[error("Computation error: {0}")]
     ComputationError(String),
-}
+    }
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Node {
     pub ndx: usize,
@@ -150,6 +150,11 @@ impl SkeletonBuilder {
             self.events.push(event, -time);
         }
         // Split events
+
+        // Chech if edge is a reflex angle
+        if vertex.bisector().magnitude() < 1.0 {
+            return Ok(())
+        }
         let split_events = self.compute_split_events(&vertex)?;
         for event in split_events {
             let time = current_time+event.time;
@@ -161,12 +166,56 @@ impl SkeletonBuilder {
     fn compute_split_events<'a>(&'a self, node: &'a Node) -> Result<Vec<Event>, SkeletonError> {
         let mut events = Vec::new();
 
-        for edge in self.edges.iter() {
-            if edge.start != node.ndx && edge.end != node.ndx {
-                let v1 = &self.vertices[self.nodes[edge.start].vertex_ndx];
-                let v2 = &self.vertices[self.nodes[edge.end].vertex_ndx];
+        // Looking for splitt candidates
+        for edge_start in self.nodes.iter()
+            .filter(|e| e.ndx != node.ndx && e.next_ndx != node.ndx)
+            .filter(|n| self.active_nodes.contains(&n.ndx)) 
+            {
+                let edge_end = self.nodes[edge_start.next_ndx];
+                // vector pointing in the direction of the tested edge
+                let edge_vec = self.vertices[edge_end.vertex_ndx] 
+                    + edge_end.bisector() 
+                    - self.vertices[edge_start.vertex_ndx]
+                    - edge_start.bisector();
 
-                if let Some(t) = self.compute_split_time(&node, &v1, &v2)? {
+                // vector pointing form the splitting vertex to its next vertex
+                let edge_left = self.vertices[node.vertex_ndx]
+                    - self.vertices[self.nodes[node.next_ndx].vertex_ndx];
+                // vector pointing to the splitting vertex from its previous vertex
+                let edge_right = self.vertices[self.nodes[node.prev_ndx].vertex_ndx]
+                    - self.vertices[node.vertex_ndx];
+
+                // a potential b is at the intersection of between our own bisector and the bisector of the
+		            // angle between the tested edge and any one of our own edges.
+
+				        // we choose the "less parallel" edge (in order to exclude a potentially parallel edge)
+                let leftdot = (edge_left.normalize().dot(&edge_vec.normalize())).abs();
+                let rightdot = (edge_right.normalize().dot(&edge_vec.normalize())).abs();
+                let self_edge =  if leftdot < rightdot { edge_left }else{ edge_right };
+                let other_edge = if leftdot > rightdot { edge_left }else{ edge_right };
+
+                let i = intersect(
+                    self.vertices[edge_start.vertex_ndx],
+                    edge_vec,
+                    self.vertices[node.vertex_ndx],
+                    self_edge
+                    );
+
+                if (i-self.vertices[node.vertex_ndx]).magnitude() > 1e-5{
+                    println!("{i}");
+                }else{
+                    println!("skiping. value = {}",(i-self.vertices[node.vertex_ndx]).magnitude())
+                }
+
+
+
+
+
+
+                let e_start = &self.vertices[self.nodes[edge_start.ndx].vertex_ndx];
+                let e_end = &self.vertices[self.nodes[edge_start.next_ndx].vertex_ndx];
+
+                if let Some(t) = self.compute_split_time(&node, e_start, e_end)? {
                     events.push(Event {
                         time: OrderedFloat(t),
                         node: *node,
@@ -174,7 +223,6 @@ impl SkeletonBuilder {
                     });
                 }
             }
-        }
         Ok(events)
     }
 
@@ -652,6 +700,15 @@ pub fn bisector(
         bisector = - bisector
     }
     Ok(bisector)
+}
+pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32>) -> Point2<f32> {
+    // calculate the intersection of two lines represented as a vector(v) and a point(p)
+    let u = p2 - p1;
+    let mut v = Matrix2::from_columns(&[v1,-v2]);
+
+    assert!(v.try_inverse_mut()); // panic if v is not invertable
+    let s = v*u;
+    return p1 + v1 * s[0];
 }
 
 // Example usage
