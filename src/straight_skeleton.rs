@@ -720,28 +720,18 @@ pub fn bisector(
     next_point: Point2<f32>,
     prev_point: Point2<f32>,
 ) -> Result<Vector2<f32>, SkeletonError> {
-    let v1 = Vector2::new(
-        prev_point.x - current_point.x,
-        prev_point.y - current_point.y,
-    ).normalize();
-    let v2 = Vector2::new(
-        next_point.x - current_point.x,
-        next_point.y - current_point.y,
-    ).normalize();
+    let v1 = (next_point - current_point).normalize();
+    let v2 = (prev_point - current_point).normalize();
 
-    // check if edges are parallel
-    //let angle = v1.angle(&v2);
-    //if angle.abs() < 1e-5 || (std::f32::consts::PI - angle).abs() < 1e-5 {
-    //    return Err(SkeletonError::ComputationError(
-    //        "Cannot compute bisector for parallel or antiparallel edges".to_string(),
-    //    ));
-    //}
+    let d = v1 + v2;
+    let mut a = Matrix2::from_columns(&[d,-v1]);
+    let t = Vector2::new(-v1[1], v1[0]);
+    assert!(a.try_inverse_mut());
 
-    let mut bisector = v1 + v2;
-    // check if the point lies on a reflex angle
-    if (-v1).perp(&v2) < 0.0 {
-        bisector = - bisector
-    }
+    let s = a * t;
+
+    let bisector = d * s[0];
+
     Ok(bisector)
 }
 pub fn is_reflex(
