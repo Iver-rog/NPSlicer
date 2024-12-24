@@ -46,7 +46,7 @@ fn straight_skeleton(blender:&mut Blender) {
     let weights:Vec<f32> = vertices.iter().map(|x| 1.0 ).collect();
     let vertices_as_f32:Vec<[f32;3]> = vertices.clone().into_iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
-    match straight_skeleton::create_weighted_skeleton(vertices.clone(), &weights){
+    match straight_skeleton::create_skeleton(vertices.clone(), &weights){
         Ok(skeleton) =>{
             let mut skel_points:Vec<[f32;2]> = skeleton.vertices.iter()
                 .map(|x| [x[0],x[1]])
@@ -87,7 +87,7 @@ fn pipe_line(blender:&mut Blender){
     println!("profile points: {}",
         profile.len(),
         );
-    let skeleton = straight_skeleton::create_weighted_skeleton(profile.clone(),&weights).unwrap();
+    let skeleton = straight_skeleton::create_skeleton(profile.clone(),&weights).unwrap();
 
     println!("Points: {} | edges: {} | larges point index:{}",
         skeleton.vertices.len(),

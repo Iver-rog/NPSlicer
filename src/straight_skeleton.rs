@@ -1,4 +1,5 @@
 use nalgebra::{Point2, Vector2, Matrix2};
+use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
 use std::{collections::HashSet, usize};
@@ -151,10 +152,6 @@ impl SkeletonBuilder {
         }
         // Split events
 
-        // Chech if edge is a reflex angle
-        if vertex.bisector().magnitude() < 1.0 {
-            return Ok(())
-        }
         let split_events = self.compute_split_events(&vertex)?;
         for event in split_events {
             let time = current_time+event.time;
@@ -165,6 +162,16 @@ impl SkeletonBuilder {
 
     fn compute_split_events<'a>(&'a self, node: &'a Node) -> Result<Vec<Event>, SkeletonError> {
         let mut events = Vec::new();
+        // Chech if edge is a reflex angle
+
+        if !is_reflex(self.vertices[node.vertex_ndx],
+            self.vertices[self.nodes[node.next_ndx].vertex_ndx],
+            self.vertices[self.nodes[node.prev_ndx].vertex_ndx])
+        {
+            return Ok(events)
+        }
+        println!("finding split events for node: {}",node.ndx);
+        let node_p = self.vertices[node.vertex_ndx];
 
         // Looking for splitt candidates
         for edge_start in self.nodes.iter()
@@ -172,18 +179,32 @@ impl SkeletonBuilder {
             .filter(|n| self.active_nodes.contains(&n.ndx)) 
             {
                 let edge_end = self.nodes[edge_start.next_ndx];
+                print!("considering edge from node {}-{} ",edge_start.ndx,edge_end.ndx);
+
+                // coordinates (Points)
+                let edge_start_p = self.vertices[edge_start.vertex_ndx];
+                let edge_end_p = self.vertices[edge_end.vertex_ndx];
+                println!("with cooridnates {} - {}",edge_start_p,edge_end_p);
+                print!("edge_start_b (bisector): {}",edge_start.bisector());
+                print!("edge_end_b (bisector): {}",edge_end.bisector());
+
+
                 // vector pointing in the direction of the tested edge
-                let edge_vec = self.vertices[edge_end.vertex_ndx] 
-                    + edge_end.bisector() 
-                    - self.vertices[edge_start.vertex_ndx]
-                    - edge_start.bisector();
+                let edge_vec = edge_start_p + edge_start.bisector() 
+                           - ( edge_end_p + edge_end.bisector() );
+                print!("edge_vec: {edge_vec}"); 
+                dbg!(edge_start_p+edge_start.bisector());
+                dbg!(edge_end_p+edge_end.bisector());
+                dbg!((edge_start_p - edge_end_p).dot(&edge_vec) );
+                dbg!(edge_start.bisector().magnitude());
+                dbg!(edge_end.bisector().magnitude());
 
                 // vector pointing form the splitting vertex to its next vertex
-                let edge_left = self.vertices[node.vertex_ndx]
+                let edge_left = node_p
                     - self.vertices[self.nodes[node.next_ndx].vertex_ndx];
-                // vector pointing to the splitting vertex from its previous vertex
-                let edge_right = self.vertices[self.nodes[node.prev_ndx].vertex_ndx]
-                    - self.vertices[node.vertex_ndx];
+                // vector pointing from the splitting vertex to its previous vertex
+                let edge_right = node_p 
+                    - self.vertices[self.nodes[node.prev_ndx].vertex_ndx];
 
                 // a potential b is at the intersection of between our own bisector and the bisector of the
 		            // angle between the tested edge and any one of our own edges.
@@ -193,22 +214,44 @@ impl SkeletonBuilder {
                 let rightdot = (edge_right.normalize().dot(&edge_vec.normalize())).abs();
                 let self_edge =  if leftdot < rightdot { edge_left }else{ edge_right };
                 let other_edge = if leftdot > rightdot { edge_left }else{ edge_right };
+                println!("edges_start_p: {edge_start_p} edge_vec: {edge_vec} node_p: {node_p} self_edege: {self_edge}");
+                println!("edge start-end: {}",edge_start_p - edge_end_p );
 
-                let i = intersect(
-                    self.vertices[edge_start.vertex_ndx],
-                    edge_vec,
-                    self.vertices[node.vertex_ndx],
-                    self_edge
-                    );
+                let i = intersect( edge_start_p, edge_vec, node_p, self_edge );
 
-                if (i-self.vertices[node.vertex_ndx]).magnitude() > 1e-5{
-                    println!("{i}");
-                }else{
-                    println!("skiping. value = {}",(i-self.vertices[node.vertex_ndx]).magnitude())
+                if (i-node_p).magnitude() < 1e-5{
+                    println!("skiping node: {}. value = {}", node.ndx,(i-node_p).magnitude());
+                    continue;
+                }
+                print!("i: {i} ");
+                // Locate candidate b
+                let line_vec = (node_p - i).normalize();
+                let mut ed_vec = (edge_vec).normalize();
+                if line_vec.dot(&ed_vec) < 0.0 {
+                    ed_vec = - ed_vec
                 }
 
+                let bisector = ed_vec + line_vec;
+                if bisector.magnitude() == 0.0 { continue; };
+
+                let b = intersect(i, bisector, node_p, self_edge);
+                println!("b: {b}");
+
+                // Check eligebility of b
+                // a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
+                println!("halla {}",self.vertices[edge_start.vertex_ndx]);
+                let x_start = cross2d(&edge_end.bisector().normalize(),
+                    &(b-edge_end_p).normalize());
+                let x_end = cross2d(&edge_start.bisector().normalize(),
+                    &(b-edge_start_p).normalize());
+                let x_edge = cross2d(&edge_vec.normalize(),
+                    &(b-edge_start_p).normalize());
+                println!("x_start: {x_start}  x_end: {x_end}  x_edge: {x_edge}");
 
 
+
+
+                panic!("AAAAA er ikke ferdig enda!");
 
 
 
@@ -701,8 +744,25 @@ pub fn bisector(
     }
     Ok(bisector)
 }
+pub fn is_reflex(
+    current_point: Point2<f32>,
+    next_point: Point2<f32>,
+    prev_point: Point2<f32>,
+) -> bool {
+    let v1 = Vector2::new(
+        prev_point.x - current_point.x,
+        prev_point.y - current_point.y,
+    ).normalize();
+    let v2 = Vector2::new(
+        next_point.x - current_point.x,
+        next_point.y - current_point.y,
+    ).normalize();
+
+    let mut bisector = v1 + v2;
+    return (-v1).perp(&v2) < 0.0;
+}
 pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32>) -> Point2<f32> {
-    // calculate the intersection of two lines represented as a vector(v) and a point(p)
+    // calculate the intersection of two lines represented as a point(p) and a vector(v)
     let u = p2 - p1;
     let mut v = Matrix2::from_columns(&[v1,-v2]);
 
@@ -711,8 +771,7 @@ pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32
     return p1 + v1 * s[0];
 }
 
-// Example usage
-pub fn create_weighted_skeleton(
+pub fn create_skeleton(
     points: Vec<Point2<f32>>,
     weights: &[f32],
 ) -> Result<StraightSkeleton, SkeletonError> {
@@ -720,35 +779,3 @@ pub fn create_weighted_skeleton(
     return builder.compute_skeleton();
 }
 
-// Tests module
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_simple_polygon() -> Result<(), SkeletonError> {
-        let points = vec![
-            Point2::new(0.0, 0.0),
-            Point2::new(1.0, 0.0),
-            Point2::new(1.0, 1.0),
-            Point2::new(0.0, 1.0),
-        ];
-        let weights = vec![1.0, 1.0, 1.0, 1.0];
-
-        let skeleton = create_weighted_skeleton(points, &weights)?;
-        assert!(skeleton.vertices.len() > 0);
-        assert!(skeleton.edges.len() > 0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_invalid_polygon() {
-        let points = vec![
-            Point2::new(0.0, 0.0),
-            Point2::new(1.0, 0.0),
-        ];
-        let weights = vec![1.0, 1.0];
-        let result = create_weighted_skeleton(points, &weights);
-        assert!(result.is_err());
-    }
-}

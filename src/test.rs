@@ -33,3 +33,26 @@ fn intersect_test(){
     let v2 = Vector2::new(0.,1.);
     assert_eq!(Point2::new(2.,2.), straight_skeleton::intersect(p1, v1, p2, v2));
 }
+#[test]
+fn is_reflex_test(){
+    let prev_point = Point2::new(-1.0, 0.0);
+    let current_point = Point2::new(0.0, 1.0);
+    let next_point = Point2::new(1.0, 0.0);
+    assert!(straight_skeleton::is_reflex(current_point, next_point, prev_point));
+
+    let current_point = Point2::new(0.0, -1.0);
+    assert!( ! straight_skeleton::is_reflex(current_point, next_point, prev_point) );
+
+    assert!( straight_skeleton::is_reflex(current_point, prev_point, next_point) );
+}
+
+#[test]
+fn test_invalid_polygon() {
+    let points = vec![
+        Point2::new(0.0, 0.0),
+        Point2::new(1.0, 0.0),
+    ];
+    let weights = vec![1.0, 1.0];
+    let result = straight_skeleton::create_skeleton(points, &weights);
+    assert!(result.is_err());
+}
