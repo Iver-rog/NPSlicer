@@ -2,7 +2,7 @@ use nalgebra::{Point2, Vector2, Matrix2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
-use std::{collections::HashSet, usize};
+use std::{collections::HashSet, f32::EPSILON, io::Split};
 use thiserror::Error;
 use std::hash::Hash;
 
@@ -26,7 +26,7 @@ impl Node {
         Vector2::new(*self.bisector[0],*self.bisector[1])
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Edge {
     pub start: usize,
     pub end: usize,
@@ -45,8 +45,13 @@ struct Event {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum EventType {
     Edge,  // A edge shrinks to zero lenght
-    Split, // A region is split into two parts
+    Split(SplitEvent), // A region is split into two parts
     Vertex,// A region disapears/colapses into a vertex
+}
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct SplitEvent{
+    b: [OrderedFloat<f32>;2],
+    edge: Edge, 
 }
 
 #[derive(Debug)]
@@ -170,7 +175,7 @@ impl SkeletonBuilder {
         {
             return Ok(events)
         }
-        println!("finding split events for node: {}",node.ndx);
+        println!("\x1b[033mFinding split events for node: {}  {}\x1b[0m",node.ndx, self.vertices[node.vertex_ndx]);
         let node_p = self.vertices[node.vertex_ndx];
 
         // Looking for splitt candidates
@@ -179,25 +184,16 @@ impl SkeletonBuilder {
             .filter(|n| self.active_nodes.contains(&n.ndx)) 
             {
                 let edge_end = self.nodes[edge_start.next_ndx];
-                print!("considering edge from node {}-{} ",edge_start.ndx,edge_end.ndx);
+                print!("  considering edge from node {}-{} ",edge_start.ndx,edge_end.ndx);
 
                 // coordinates (Points)
                 let edge_start_p = self.vertices[edge_start.vertex_ndx];
                 let edge_end_p = self.vertices[edge_end.vertex_ndx];
-                println!("with cooridnates {} - {}",edge_start_p,edge_end_p);
-                print!("edge_start_b (bisector): {}",edge_start.bisector());
-                print!("edge_end_b (bisector): {}",edge_end.bisector());
-
+                println!("  with cooridnates {} - {}",edge_start_p,edge_end_p);
 
                 // vector pointing in the direction of the tested edge
                 let edge_vec = edge_start_p + edge_start.bisector() 
                            - ( edge_end_p + edge_end.bisector() );
-                print!("edge_vec: {edge_vec}"); 
-                dbg!(edge_start_p+edge_start.bisector());
-                dbg!(edge_end_p+edge_end.bisector());
-                dbg!((edge_start_p - edge_end_p).dot(&edge_vec) );
-                dbg!(edge_start.bisector().magnitude());
-                dbg!(edge_end.bisector().magnitude());
 
                 // vector pointing form the splitting vertex to its next vertex
                 let edge_left = node_p
@@ -206,24 +202,21 @@ impl SkeletonBuilder {
                 let edge_right = node_p 
                     - self.vertices[self.nodes[node.prev_ndx].vertex_ndx];
 
-                // a potential b is at the intersection of between our own bisector and the bisector of the
-		            // angle between the tested edge and any one of our own edges.
+                // a potential b is at the intersection of between our own bisector and the 
+		            // bisector of the angle between the tested edge and any one of our own edges.
 
 				        // we choose the "less parallel" edge (in order to exclude a potentially parallel edge)
                 let leftdot = (edge_left.normalize().dot(&edge_vec.normalize())).abs();
                 let rightdot = (edge_right.normalize().dot(&edge_vec.normalize())).abs();
                 let self_edge =  if leftdot < rightdot { edge_left }else{ edge_right };
                 let other_edge = if leftdot > rightdot { edge_left }else{ edge_right };
-                println!("edges_start_p: {edge_start_p} edge_vec: {edge_vec} node_p: {node_p} self_edege: {self_edge}");
-                println!("edge start-end: {}",edge_start_p - edge_end_p );
 
                 let i = intersect( edge_start_p, edge_vec, node_p, self_edge );
 
                 if (i-node_p).magnitude() < 1e-5{
-                    println!("skiping node: {}. value = {}", node.ndx,(i-node_p).magnitude());
+                    println!("  skiping node: {}. value = {}", node.ndx,(i-node_p).magnitude());
                     continue;
                 }
-                print!("i: {i} ");
                 // Locate candidate b
                 let line_vec = (node_p - i).normalize();
                 let mut ed_vec = (edge_vec).normalize();
@@ -234,37 +227,38 @@ impl SkeletonBuilder {
                 let bisector = ed_vec + line_vec;
                 if bisector.magnitude() == 0.0 { continue; };
 
-                let b = intersect(i, bisector, node_p, self_edge);
-                println!("b: {b}");
+                let b = intersect(i, bisector, node_p, node.bisector() );
 
                 // Check eligebility of b
                 // a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
-                println!("halla {}",self.vertices[edge_start.vertex_ndx]);
                 let x_start = cross2d(&edge_end.bisector().normalize(),
-                    &(b-edge_end_p).normalize());
+                    &(b-edge_end_p).normalize()) > -EPSILON;
                 let x_end = cross2d(&edge_start.bisector().normalize(),
-                    &(b-edge_start_p).normalize());
+                    &(b-edge_start_p).normalize()) < EPSILON;
                 let x_edge = cross2d(&edge_vec.normalize(),
-                    &(b-edge_start_p).normalize());
-                println!("x_start: {x_start}  x_end: {x_end}  x_edge: {x_edge}");
+                    &(b-edge_start_p).normalize()) < EPSILON;
+
+                if !(x_start && x_end && x_edge) {
+                    println!("  - discarding candidate b: {b}");
+                    continue;
+                };
+                println!("\x1b[032m  - found candidate b: {b}\x1b[0m");
 
 
+                let time = (node_p - b).magnitude() / node.bisector().magnitude();
+                let split = SplitEvent{
+                    b:[OrderedFloat(b[0]),OrderedFloat(b[1])],
+                    edge:Edge{
+                        start:edge_start.ndx,
+                        end:edge_end.ndx
+                    },
+                };
 
-
-                panic!("AAAAA er ikke ferdig enda!");
-
-
-
-                let e_start = &self.vertices[self.nodes[edge_start.ndx].vertex_ndx];
-                let e_end = &self.vertices[self.nodes[edge_start.next_ndx].vertex_ndx];
-
-                if let Some(t) = self.compute_split_time(&node, e_start, e_end)? {
-                    events.push(Event {
-                        time: OrderedFloat(t),
-                        node: *node,
-                        event_type: EventType::Split,
-                    });
-                }
+                events.push(Event {
+                    time: OrderedFloat(time),
+                    node: *node,
+                    event_type: EventType::Split(split),
+                });
             }
         Ok(events)
     }
@@ -293,7 +287,7 @@ impl SkeletonBuilder {
         while let Some((event, _)) = self.events.pop() {
             match event.event_type {
                 EventType::Edge => self.handle_edge_event(event)?,
-                EventType::Split => (),//{self.handle_split_event(event)?; },
+                EventType::Split(_) => {self.handle_split_event(event)?; },
                 EventType::Vertex => todo!(),//self.handle_vertex_event(event)?,
             }
             if self.active_nodes.len() < 3 {
@@ -355,6 +349,97 @@ impl SkeletonBuilder {
         self.find_events(new_vertex,event.time);
 
         println!("\x1b[033mEdge Event for node:{node_ndx} at: {new_position}\x1b[0m");
+        Ok(())
+    }
+    fn handle_split_event(&mut self, event: Event) -> Result<(), SkeletonError> {
+        let node = event.node;
+        let split = match event.event_type { 
+            EventType::Split(split) => (split),
+            _ => panic!()
+        };
+
+        if !(self.active_nodes.contains(&node.ndx) 
+            && self.active_nodes.contains(&split.edge.start) 
+            && self.active_nodes.contains(&split.edge.end))
+        {
+            return Ok(());
+        }
+        
+        let time = event.time.0;
+        let b = Point2::new(split.b[0].0, split.b[0].0);
+
+        self.vertices.push(b);
+        self.active_nodes.remove(&node.ndx);
+
+        let splitting_vert = &self.vertices[node.vertex_ndx];
+        println!("\x1b[033mSplit Event for node: {} at: {}\x1b[0m",node.ndx,b);
+
+        // ============= First edge loop ================
+        let edge_start = self.nodes[split.edge.start];
+        let edge_start_p = &self.vertices[edge_start.vertex_ndx];
+        let edge_start_possition = edge_start_p + edge_start.bisector() * time;
+
+        // splitting vertex's neighbour forming a close loop with edge_start vertex:
+        let s_vert_start = &self.nodes[node.next_ndx];
+        let s_vert_start_p = &self.vertices[node.vertex_ndx];
+        let s_vert_start_possition = s_vert_start_p + s_vert_start.bisector() * time;
+
+        //assert!(edge_start != edge_end_neighbour); // make sure the remaining region is not a triangle (3 verts)
+
+        dbg!(s_vert_start);
+        dbg!(edge_start_p);
+        // add new vertex to vertex lisShort-circuiting logical ANDt
+
+        // add new vertex to vert_ref list
+        let new_vertex_index = self.nodes.len()-1;
+        let bisect = bisector(b, s_vert_start_possition, edge_start_possition)?;
+        self.nodes.push( Node{
+            ndx: new_vertex_index,
+            next_ndx: edge_start.ndx,
+            prev_ndx: node.next_ndx,
+            bisector: [OrderedFloat(bisect[0]),OrderedFloat(bisect[1])],
+            vertex_ndx: self.vertices.len()-1
+            });
+        // update the neigbouring vertices refrences
+        self.nodes[edge_start.ndx].next_ndx = new_vertex_index;
+        self.nodes[node.next_ndx].prev_ndx = new_vertex_index;
+
+        let edge_end = self.nodes[split.edge.end];
+        let edge_end_p = &self.vertices[edge_end.vertex_ndx];
+        let edge_end_possition = edge_end_p + edge_end.bisector() * time;
+
+        // ============= Secound edge loop ================
+        // splitting vertex's neighbour forming a close loop with edge_start vertex:
+        let s_vert_end = &self.nodes[node.prev_ndx];
+        let s_vert_end_p = &self.vertices[s_vert_end.vertex_ndx];
+        let s_vert_end_possition = s_vert_end_p + s_vert_end.bisector() * time;
+
+        // add new vertex to vert_ref list
+        let new_vertex_index = self.nodes.len()-1;
+        let bisector = bisector(b, edge_end_possition, s_vert_end_possition )?;
+
+        self.nodes.push( Node{
+            ndx: new_vertex_index,
+            next_ndx: edge_end.ndx,
+            prev_ndx: node.prev_ndx,
+            bisector: [OrderedFloat(bisector[0]) , OrderedFloat(bisector[1])],
+            vertex_ndx: self.vertices.len()-1
+            });
+        // update the neigbouring vertices refrences
+        self.nodes[edge_end.ndx].prev_ndx = new_vertex_index;
+        self.nodes[node.prev_ndx].next_ndx = new_vertex_index;
+
+        // Find new events for the new verices
+        // ToDo: it might also be nessesary to find events for the previous vertices
+        let first_new_vertex = self.nodes.len()-2;
+        self.edges.push(Edge{start:node.ndx,end:first_new_vertex});
+        let secound_new_vertex = self.nodes.len()-1;
+
+        dbg!(self.nodes[first_new_vertex]);
+        dbg!(self.nodes[secound_new_vertex]);
+
+        //self.find_events(self.nodes[first_new_vertex], event.time)?;
+        //self.find_events(self.nodes[secound_new_vertex], event.time)?;
         Ok(())
     }
 
