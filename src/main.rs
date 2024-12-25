@@ -100,32 +100,5 @@ fn pipe_line(blender:&mut Blender){
         &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
         skeleton.edges.clone()
         );
-
-    let points = profile.iter()
-        .chain( skeleton.vertices.iter() )
-        .map(|x| [x[0],x[1]] )
-        .collect::<Vec<[f32;2]>>();
-
-    //let points = skeleton.vertices.iter()
-    //    .chain( profile.iter() )
-    //    .map(|x| [x[0],x[1]])
-    //    .collect::<Vec<[f32;2]>>();
-
-    let mut edges: Vec<[usize;2]>= (0..profile.len())
-        .map(|i| [i,i+1] )
-        .collect();
-
-    //let mut edges = Vec::new();
-    edges.push([profile.len(),0]);
-    edges.append( &mut skeleton.edges.clone() );
-
-   println!("Points: {} | edges: {} | larges point index:{}",
-        points.len(),
-        edges.len(),
-        edges.iter().map(|[p1,p2]| max(p1,p2)).max().unwrap()
-        );
-
-    blender.line_body(&points, edges);
-
 }
 
