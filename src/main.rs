@@ -11,8 +11,8 @@ mod test;
 
 fn main(){
     let mut blender = Blender::new();
-     //pipe_line(&mut blender);
-    straight_skeleton(&mut blender);
+    pipe_line(&mut blender);
+    //straight_skeleton(&mut blender);
 
     blender.show();
 }

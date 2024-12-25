@@ -39,9 +39,14 @@ pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
         edge_perimeters.push( extract_perimeter(region) );
     }
 
-    let large_edge_loops:Vec<Vec<usize>> = edge_perimeters.into_iter()
-        .filter(|edge_loop| area(edge_loop,&stl_data.vertices) > 20.0 )
+    let mut large_edge_loops:Vec<Vec<usize>> = edge_perimeters.into_iter()
+        .filter(|edge_loop| area(edge_loop,&stl_data.vertices).abs() > 20.0 )
         .collect();
+    for edge_loop in &mut large_edge_loops{
+        if area(&edge_loop,&stl_data.vertices) < 0.0{
+            edge_loop.reverse();
+        }
+    }
     for edge_loop in large_edge_loops.clone() {
         blender.edge_loop(&edge_loop,&stl_data);
     }
@@ -152,8 +157,7 @@ fn area(point_index:&Vec<usize>, points: &Vec<Vector<f32>>) -> f32 {
             let y2 = points[*p2][1];
             return x1*y2 - x2*y1
         })
-        .sum::<f32>()
-        .abs()
+        .sum::<f32>();
 }
 #[test]
 fn test_area_function(){
