@@ -394,18 +394,19 @@ impl SkeletonBuilder {
         // add new vertex to vertex lisShort-circuiting logical ANDt
 
         // add new vertex to vert_ref list
-        let new_vertex_index = self.nodes.len()-1;
+        let new_node_index = self.nodes.len();
         let bisect = bisector(b, s_vert_start_possition, edge_start_possition)?;
         self.nodes.push( Node{
-            ndx: new_vertex_index,
-            next_ndx: edge_start.ndx,
-            prev_ndx: node.next_ndx,
+            ndx: new_node_index,
+            next_ndx: node.next_ndx,
+            prev_ndx: edge_start.ndx,
             bisector: [OrderedFloat(bisect[0]),OrderedFloat(bisect[1])],
             vertex_ndx: self.vertices.len()-1
             });
         // update the neigbouring vertices refrences
-        self.nodes[edge_start.ndx].next_ndx = new_vertex_index;
-        self.nodes[node.next_ndx].prev_ndx = new_vertex_index;
+        self.nodes[edge_start.ndx].next_ndx = new_node_index;
+        self.nodes[node.next_ndx].prev_ndx = new_node_index;
+        self.active_nodes.insert(new_node_index);
 
         let edge_end = self.nodes[split.edge.end];
         let edge_end_p = &self.vertices[edge_end.vertex_ndx];
@@ -418,19 +419,20 @@ impl SkeletonBuilder {
         let s_vert_end_possition = s_vert_end_p + s_vert_end.bisector() * time;
 
         // add new vertex to vert_ref list
-        let new_vertex_index = self.nodes.len()-1;
+        let new_node_index = self.nodes.len();
         let bisector = bisector(b, edge_end_possition, s_vert_end_possition )?;
 
         self.nodes.push( Node{
-            ndx: new_vertex_index,
+            ndx: new_node_index,
             next_ndx: edge_end.ndx,
             prev_ndx: node.prev_ndx,
             bisector: [OrderedFloat(bisector[0]) , OrderedFloat(bisector[1])],
             vertex_ndx: self.vertices.len()-1
             });
         // update the neigbouring vertices refrences
-        self.nodes[edge_end.ndx].prev_ndx = new_vertex_index;
-        self.nodes[node.prev_ndx].next_ndx = new_vertex_index;
+        self.nodes[edge_end.ndx].prev_ndx = new_node_index;
+        self.nodes[node.prev_ndx].next_ndx = new_node_index;
+        self.active_nodes.insert(new_node_index);
 
         // Find new events for the new verices
         // ToDo: it might also be nessesary to find events for the previous vertices
@@ -441,8 +443,8 @@ impl SkeletonBuilder {
         dbg!(self.nodes[first_new_vertex]);
         dbg!(self.nodes[secound_new_vertex]);
 
-        //self.find_events(self.nodes[first_new_vertex], event.time)?;
-        //self.find_events(self.nodes[secound_new_vertex], event.time)?;
+        self.find_events(self.nodes[first_new_vertex], event.time)?;
+        self.find_events(self.nodes[secound_new_vertex], event.time)?;
         Ok(())
     }
 
