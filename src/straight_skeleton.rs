@@ -28,6 +28,87 @@ impl Node {
         Vector2::new(*self.bisector[0],*self.bisector[1])
     }
 }
+#[derive(Debug,Default)]
+pub struct Nodes {
+    pub nodes: Vec<Node>,
+    active_nodes: HashSet<usize>,
+}
+impl Nodes {
+    pub fn new(nodes:Vec<Node>) -> Self {
+        Nodes {
+        active_nodes: HashSet::from_iter(0..nodes.len()),
+        nodes,
+        }
+    }
+    fn next(&mut self,strat_node:Node) -> Node{
+        self.nodes[strat_node.next_ndx]
+    }
+    fn prev(&mut self,strat_node:Node) -> Node{
+        self.nodes[strat_node.prev_ndx]
+    }
+    fn len(& self) -> usize {
+        return self.nodes.len()-self.active_nodes.len();
+    }
+}
+pub struct NodesIntoIterator<'a>{
+    starting:usize,
+    nodes:&'a Nodes,
+    next_node:usize,
+    stop: bool,
+}
+pub struct NodesIntoBackwardsIterator<'a>{
+    starting:usize,
+    nodes:&'a Nodes,
+    prev_node:usize,
+    stop: bool,
+}
+impl <'a> Iterator for NodesIntoIterator<'a>{
+    type Item = Node;
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.stop {
+            let node = self.nodes.nodes[self.next_node];
+            if node.ndx == self.starting{
+                self.stop = true
+            }
+            self.next_node = node.next_ndx;
+            return Some(node)
+        }
+        None
+    }
+}
+impl <'a> Iterator for NodesIntoBackwardsIterator<'a>{
+    type Item = Node;
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.stop {
+            let node = self.nodes.nodes[self.prev_node];
+            if node.ndx == self.starting{
+                self.stop = true
+            }
+            self.prev_node = node.prev_ndx;
+            return Some(node)
+        }
+        None
+    }
+}
+impl Nodes {
+    pub fn iter(&self,starting_node:&Node) -> NodesIntoIterator {
+        NodesIntoIterator{
+            starting:starting_node.ndx,
+            nodes:&self,
+            next_node:starting_node.next_ndx,
+            stop: false,
+        }
+    }
+    pub fn back_iter(&self,starting_node:&Node) -> NodesIntoBackwardsIterator {
+        NodesIntoBackwardsIterator{
+            starting:starting_node.ndx,
+            nodes:&self,
+            prev_node:starting_node.prev_ndx,
+            stop: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Edge {
     pub start: usize,
@@ -795,6 +876,30 @@ impl Display for SkeletonBuilder{
                 event.0.node.ndx
                 )?,
         };
+        Ok(())
+    }
+} 
+
+impl Display for Nodes{
+    fn fmt(&self, b: &mut Formatter)->Result<(),fmt::Error> {
+
+        writeln!(b,"\x1b[1m|             Nodes            | Bisector  |");
+        writeln!(b,"\x1b[1;4m| ndx | next | prev | vert_ndx |  x  |  y  |\x1b[0m");
+        for node in self.nodes.iter() {
+            // Nodes
+            if self.active_nodes.contains(&node.ndx){
+                write!(b,"\x1b[036m")?;
+            }
+            write!(b,"| {:<4}| {:<4} | {:<4} | {:<4}     |{:+.2}|{:+.2}|",
+                node.ndx,
+                node.next_ndx,
+                node.prev_ndx,
+                node.vertex_ndx,
+                node.bisector[0],
+                node.bisector[1],
+                )?;
+            writeln!(b,"\x1b[0m  ")?;
+        }
         Ok(())
     }
 } 

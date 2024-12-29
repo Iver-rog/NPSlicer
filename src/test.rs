@@ -1,4 +1,6 @@
 use nalgebra::{coordinates, Point2, Vector2};
+use ordered_float::OrderedFloat;
+use std::collections::HashSet;
 use crate::straight_skeleton;
 
 #[test]
@@ -55,4 +57,66 @@ fn test_invalid_polygon() {
     let weights = vec![1.0, 1.0];
     let result = straight_skeleton::create_skeleton(points, &weights);
     assert!(result.is_err());
+}
+#[test]
+fn nodes_forwards_iterator_test(){
+    let node0 = straight_skeleton::Node{
+            ndx:0,
+            next_ndx:1,
+            prev_ndx:2,
+            bisector:[OrderedFloat::default(),OrderedFloat::default()],
+            vertex_ndx:0,
+        };
+    let node1 = straight_skeleton::Node{
+            ndx:1,
+            next_ndx:2,
+            prev_ndx:0,
+            bisector:[OrderedFloat::default(),OrderedFloat::default()],
+            vertex_ndx:0,
+        };
+    let node2 = straight_skeleton::Node{
+            ndx:2,
+            next_ndx:0,
+            prev_ndx:1,
+            bisector:[OrderedFloat::default(),OrderedFloat::default()],
+            vertex_ndx:0,
+        };
+    let nodes = straight_skeleton::Nodes::new(vec![node0,node1,node2]);
+    println!("{nodes}");
+        
+    let forward_iter:Vec<straight_skeleton::Node> = nodes.iter(&node0)
+        .into_iter()
+        .collect();
+    assert_eq!(vec![node1,node2,node0],forward_iter);
+}
+#[test]
+fn nodes_backwards_iterator_test(){
+    let node0 = straight_skeleton::Node{
+            ndx:0,
+            next_ndx:1,
+            prev_ndx:2,
+            bisector:[OrderedFloat::default(),OrderedFloat::default()],
+            vertex_ndx:0,
+        };
+    let node1 = straight_skeleton::Node{
+            ndx:1,
+            next_ndx:2,
+            prev_ndx:0,
+            bisector:[OrderedFloat::default(),OrderedFloat::default()],
+            vertex_ndx:0,
+        };
+    let node2 = straight_skeleton::Node{
+            ndx:2,
+            next_ndx:0,
+            prev_ndx:1,
+            bisector:[OrderedFloat::default(),OrderedFloat::default()],
+            vertex_ndx:0,
+        };
+    let nodes = straight_skeleton::Nodes::new(vec![node0,node1,node2]);
+    println!("{nodes}");
+        
+    let backwards_iter:Vec<straight_skeleton::Node> = nodes.back_iter(&node0)
+        .into_iter()
+        .collect();
+    assert_eq!(vec![node2,node1,node0],backwards_iter);
 }
