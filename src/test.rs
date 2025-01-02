@@ -81,7 +81,7 @@ fn nodes_forwards_iterator_test(){
             bisector:[OrderedFloat::default(),OrderedFloat::default()],
             vertex_ndx:0,
         };
-    let nodes = straight_skeleton::Nodes::new(vec![node0,node1,node2]);
+    let nodes = straight_skeleton::Nodes::from_closed_curve(vec![node0,node1,node2]);
     println!("{nodes}");
         
     let forward_iter:Vec<straight_skeleton::Node> = nodes.iter(&node0)
@@ -112,7 +112,7 @@ fn nodes_backwards_iterator_test(){
             bisector:[OrderedFloat::default(),OrderedFloat::default()],
             vertex_ndx:0,
         };
-    let nodes = straight_skeleton::Nodes::new(vec![node0,node1,node2]);
+    let nodes = straight_skeleton::Nodes::from_closed_curve(vec![node0,node1,node2]);
     println!("{nodes}");
         
     let backwards_iter:Vec<straight_skeleton::Node> = nodes.back_iter(&node0)
