@@ -1,6 +1,5 @@
-use nalgebra::{coordinates, Point2, Vector2};
+use nalgebra::{ Point2, Vector2};
 use ordered_float::OrderedFloat;
-use std::collections::HashSet;
 use crate::straight_skeleton;
 
 #[test]
@@ -119,4 +118,11 @@ fn nodes_backwards_iterator_test(){
         .into_iter()
         .collect();
     assert_eq!(vec![node2,node1,node0],backwards_iter);
+}
+#[test]
+fn is_point_on_edge_test(){
+    let p1 = Point2::new(1.0,1.0);
+    let e0 = Point2::new(0.0,0.0);
+    let e1 = Point2::new(4.0,4.0);
+    assert!(straight_skeleton::is_point_on_edge(&p1,&e0,&e1).unwrap())
 }
