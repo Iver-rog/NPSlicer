@@ -20,7 +20,6 @@
 
       in rec {
         packages = {
-          # replace hello-world with your package name
           layer-gen-rs = (rustPkgs.workspace.layer-gen-rs {});
           default = packages.layer-gen-rs;
         };
