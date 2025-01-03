@@ -1,14 +1,16 @@
+#![allow(unused)]
 mod stl_op;
 mod utils;
 use utils::Blender;
 mod straight_skeleton;
 use nalgebra::Point2;
-use std::cmp::max;
 
 #[cfg(test)]
 mod test;
 
 fn main(){
+    env_logger::init();
+
     let mut blender = Blender::new();
     pipe_line(&mut blender);
     //straight_skeleton(&mut blender);

@@ -6,6 +6,8 @@ use std::{collections::HashSet, f32::EPSILON, fmt::Formatter};
 use thiserror::Error;
 use std::hash::Hash;
 use std::fmt::{self, Display};
+use log::{debug, error, info, log_enabled, trace, Level};
+
 
 #[derive(Debug, Error)]
 pub enum SkeletonError {
@@ -331,7 +333,7 @@ impl SkeletonBuilder {
         {
             return Ok(events)
         }
-        println!("\x1b[033mFinding split events for node: {} at {}\x1b[0m",node.ndx, self.vertices[node.vertex_ndx]);
+        info!("\x1b[033mFinding split events for node: {} at {}\x1b[0m",node.ndx, self.vertices[node.vertex_ndx]);
         let node_p = self.vertices[node.vertex_ndx];
 
         // Looking for splitt candidates
@@ -340,12 +342,12 @@ impl SkeletonBuilder {
                 self.shrining_polygon.next(**e).vertex_ndx != node.vertex_ndx)
             {
                 let edge_end = self.shrining_polygon.next(*edge_start);
-                print!("  considering edge from node {}-{} ",edge_start.ndx,edge_end.ndx);
 
                 // coordinates (Points)
                 let edge_start_p = self.vertices[edge_start.vertex_ndx];
                 let edge_end_p = self.vertices[edge_end.vertex_ndx];
-                println!("  with cooridnates {} - {}",edge_start_p,edge_end_p);
+                trace!("considering edge from node {}-{}  with cooridnates {} - {}"
+                    ,edge_start.ndx, edge_end.ndx, edge_start_p,edge_end_p );
 
                 // vector pointing in the direction of the tested edge
                 let edge_vec = edge_start_p + edge_start.bisector() 
@@ -369,7 +371,7 @@ impl SkeletonBuilder {
                 let i = intersect( edge_start_p, edge_vec, node_p, self_edge );
 
                 if (i-node_p).magnitude() < 1e-5{
-                    println!("  skiping node: {}. value = {}", node.ndx,(i-node_p).magnitude());
+                    trace!("skiping node: {}. value = {}", node.ndx,(i-node_p).magnitude());
                     continue;
                 }
                 // Locate candidate b
@@ -394,10 +396,10 @@ impl SkeletonBuilder {
                     &(b-edge_start_p).normalize()) < EPSILON;
 
                 if !(x_start && x_end && x_edge) {
-                    println!("  - discarding candidate b: {b}");
+                    trace!("- discarding candidate b: {b}");
                     continue;
                 };
-                println!("\x1b[032m  - found candidate b: {b}\x1b[0m");
+                info!("\x1b[032m  - found candidate b: {b}\x1b[0m");
 
 
                 let time = (node_p - b).magnitude() / node.bisector().magnitude();
@@ -414,14 +416,14 @@ impl SkeletonBuilder {
 
 
     pub fn compute_skeleton(mut self) -> Result<StraightSkeleton, SkeletonError> {
-        println!("{self}");
+        debug!("{self}");
         while let Some((event, _)) = self.events.pop() {
             match event.event_type {
                 EventType::Edge => self.handle_edge_event(event)?,
                 EventType::Split(_) => self.handle_split_event(event)?,
                 EventType::Vertex => todo!(),//self.handle_vertex_event(event)?,
             }
-            println!("{self}");
+            debug!("\n{self}");
             if self.shrining_polygon.len() < 3 {
                 break;
             }
@@ -464,7 +466,7 @@ impl SkeletonBuilder {
         //find events for the new vertex
         self.find_events(new_node,event.time)?;
 
-        println!("\x1b[033mEdge Event for node:{} at t={:.3} p={}\x1b[0m",edge_start.ndx,event.time,new_vertex);
+        info!("\x1b[033mEdge Event for node:{} at t={:.3} p={}\x1b[0m",edge_start.ndx,event.time,new_vertex);
         Ok(())
     }
     fn handle_split_event(&mut self, event: Event) -> Result<(), SkeletonError> {
@@ -490,17 +492,15 @@ impl SkeletonBuilder {
                     edge = Some([edge_start,edge_end])
                     }
                 }
-        if edge.is_none() { println!("No split event found"); return Ok(()) }
+        if edge.is_none() { info!("No split event found for node: {}",node.ndx); return Ok(()) }
         let edge_start = edge.unwrap()[0];
         let edge_end = edge.unwrap()[1];
-        println!("edge start {}", edge_start.ndx);
-        println!("edge end {}", edge_end.ndx);
 
         self.vertices.push(b);
         self.edges.push(Edge{start:node.vertex_ndx,end:self.vertices.len()-1});
         //self.active_nodes.remove(&node.ndx);
 
-        println!("\x1b[033mSplit Event between node: {} and edge: ({}-{}) at: {}\x1b[0m",
+        info!("\x1b[033mSplit Event between node: {} and edge: ({}-{}) at: {}\x1b[0m",
             node.ndx,edge_start.ndx,edge_end.ndx,b);
 
         // ============= First edge loop ================
