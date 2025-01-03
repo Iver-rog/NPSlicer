@@ -203,10 +203,15 @@ enum EventType {
     Vertex,// A region disapears/colapses into a vertex
 }
 #[derive(Debug)]
+pub struct Vertex {
+    coords: Point2<f32>,
+    time: f32,
+}
+#[derive(Debug)]
 pub struct SkeletonBuilder {
     shrining_polygon: Nodes,
     original_polygon: Nodes,
-    vertices: Vec<Point2<f32>>,
+    vertices: Vec<Vertex>,
     edges: Vec<Edge>,
     events: PriorityQueue<Event, OrderedFloat<f32>>,
 }
@@ -255,7 +260,7 @@ impl SkeletonBuilder {
             shrining_polygon: Nodes::from_closed_curve(nodes.clone()),
             original_polygon: Nodes::from_closed_curve(nodes),
             edges,
-            vertices:points,
+            vertices:points.into_iter().map(|p| Vertex{coords:p,time:0.0}).collect(),
             events: PriorityQueue::new(),
         };
 
@@ -267,9 +272,9 @@ impl SkeletonBuilder {
             // Edge events
             let edge_event = compute_edge_event(
                 &node, 
-                builder.vertices[node.vertex_ndx],
+                builder.vertices[node.vertex_ndx].coords,
                 node.bisector(),
-                builder.vertices[builder.shrining_polygon.next(*node).vertex_ndx],
+                builder.vertices[builder.shrining_polygon.next(*node).vertex_ndx].coords,
                 builder.shrining_polygon.next(*node).bisector()
                 )?;
             if let Some(event) = edge_event {
@@ -290,9 +295,9 @@ impl SkeletonBuilder {
         // Edge events
         let edge_event = compute_edge_event(
             &vertex, 
-            self.vertices[vertex.vertex_ndx], 
+            self.vertices[vertex.vertex_ndx].coords, 
             vertex.bisector(),
-            self.vertices[self.shrining_polygon.next(vertex).vertex_ndx],
+            self.vertices[self.shrining_polygon.next(vertex).vertex_ndx].coords,
             self.shrining_polygon.next(vertex).bisector()
             )?;
         if let Some(event) = edge_event {
@@ -311,9 +316,9 @@ impl SkeletonBuilder {
         // Edge events
         let edge_event = compute_edge_event(
             &vertex, 
-            self.vertices[vertex.vertex_ndx], 
+            self.vertices[vertex.vertex_ndx].coords, 
             vertex.bisector(),
-            self.vertices[self.shrining_polygon.next(vertex).vertex_ndx],
+            self.vertices[self.shrining_polygon.next(vertex).vertex_ndx].coords,
             self.shrining_polygon.next(vertex).bisector()
             )?;
         if let Some(event) = edge_event {
@@ -327,14 +332,14 @@ impl SkeletonBuilder {
         let mut events = Vec::new();
         // Check if edge is a reflex angle
 
-        if !is_reflex(self.vertices[node.vertex_ndx],
-            self.vertices[self.shrining_polygon.next(*node).vertex_ndx],
-            self.vertices[self.shrining_polygon.prev(*node).vertex_ndx])
+        if !is_reflex(self.vertices[node.vertex_ndx].coords,
+            self.vertices[self.shrining_polygon.next(*node).vertex_ndx].coords,
+            self.vertices[self.shrining_polygon.prev(*node).vertex_ndx].coords)
         {
             return Ok(events)
         }
-        info!("\x1b[033mFinding split events for node: {} at {}\x1b[0m",node.ndx, self.vertices[node.vertex_ndx]);
-        let node_p = self.vertices[node.vertex_ndx];
+        info!("\x1b[033mFinding split events for node: {} at {}\x1b[0m",node.ndx, self.vertices[node.vertex_ndx].coords);
+        let node_p = self.vertices[node.vertex_ndx].coords;
 
         // Looking for splitt candidates
         for edge_start in self.original_polygon.nodes.iter()
@@ -344,8 +349,8 @@ impl SkeletonBuilder {
                 let edge_end = self.shrining_polygon.next(*edge_start);
 
                 // coordinates (Points)
-                let edge_start_p = self.vertices[edge_start.vertex_ndx];
-                let edge_end_p = self.vertices[edge_end.vertex_ndx];
+                let edge_start_p = self.vertices[edge_start.vertex_ndx].coords;
+                let edge_end_p = self.vertices[edge_end.vertex_ndx].coords;
                 trace!("considering edge from node {}-{}  with cooridnates {} - {}"
                     ,edge_start.ndx, edge_end.ndx, edge_start_p,edge_end_p );
 
@@ -355,10 +360,10 @@ impl SkeletonBuilder {
 
                 // vector pointing form the splitting vertex to its next vertex
                 let edge_left = node_p
-                    - self.vertices[self.shrining_polygon.next(*node).vertex_ndx];
+                    - self.vertices[self.shrining_polygon.next(*node).vertex_ndx].coords;
                 // vector pointing from the splitting vertex to its previous vertex
                 let edge_right = node_p 
-                    - self.vertices[self.shrining_polygon.prev(*node).vertex_ndx];
+                    - self.vertices[self.shrining_polygon.prev(*node).vertex_ndx].coords;
 
                 // a potential b is at the intersection of between our own bisector and the 
 		            // bisector of the angle between the tested edge and any one of our own edges.
@@ -428,7 +433,7 @@ impl SkeletonBuilder {
                 break;
             }
         }
-        let vertices = self.vertices;
+        let vertices = self.vertices.into_iter().map(|n| n.coords).collect();
         let edges = self.edges.into_iter()
             .map(|edge| [edge.start,edge.end] )
             .collect();
@@ -446,11 +451,11 @@ impl SkeletonBuilder {
         let edge_start = self.shrining_polygon.nodes[event.node.ndx];
         let edge_end = self.shrining_polygon.next(edge_start);
         // Calculate new vertex position
-        let edge_start_p = &self.vertices[edge_start.vertex_ndx];
+        let edge_start_p = &self.vertices[edge_start.vertex_ndx].coords;
         let new_vertex = edge_start_p + edge_start.bisector() * event.time.0;
         // Add new vertex to list
         let new_vertex_ndx = self.vertices.len();
-        self.vertices.push(new_vertex);
+        self.vertices.push(Vertex{coords:new_vertex,time:*event.time});
         // Add new skeleton vertex and edges
         self.edges.push(Edge{start:edge_start.vertex_ndx, end:new_vertex_ndx});
         self.edges.push(Edge{start:edge_end.vertex_ndx, end:new_vertex_ndx});
@@ -486,8 +491,8 @@ impl SkeletonBuilder {
             .filter(|n| self.shrining_polygon.contains(&n.ndx))
             .map(|n| [n, &self.shrining_polygon.nodes[n.next_ndx]] )
             .filter(|[_,edge_end]| edge_end.ndx != node.ndx ){
-                let start = self.vertices[edge_start.vertex_ndx] + edge_start.bisector()*time;
-                let end = self.vertices[edge_end.vertex_ndx] + edge_end.bisector()*time;
+                let start = self.vertices[edge_start.vertex_ndx].coords + edge_start.bisector()*time;
+                let end = self.vertices[edge_end.vertex_ndx].coords + edge_end.bisector()*time;
                 if is_point_on_edge(&b, &start, &end)? {
                     edge = Some([edge_start,edge_end])
                     }
@@ -496,7 +501,7 @@ impl SkeletonBuilder {
         let edge_start = edge.unwrap()[0];
         let edge_end = edge.unwrap()[1];
 
-        self.vertices.push(b);
+        self.vertices.push(Vertex{coords:b,time});
         self.edges.push(Edge{start:node.vertex_ndx,end:self.vertices.len()-1});
         //self.active_nodes.remove(&node.ndx);
 
@@ -504,12 +509,12 @@ impl SkeletonBuilder {
             node.ndx,edge_start.ndx,edge_end.ndx,b);
 
         // ============= First edge loop ================
-        let edge_start_p = &self.vertices[edge_start.vertex_ndx];
+        let edge_start_p = &self.vertices[edge_start.vertex_ndx].coords;
         let edge_start_possition = edge_start_p + edge_start.bisector() * time;
 
         // splitting vertex's neighbour forming a close loop with edge_start vertex:
         let s_vert_start = &self.shrining_polygon.nodes[node.next_ndx];
-        let s_vert_start_p = &self.vertices[node.vertex_ndx];
+        let s_vert_start_p = &self.vertices[node.vertex_ndx].coords;
         let s_vert_start_possition = s_vert_start_p + s_vert_start.bisector() * time;
 
         //assert!(edge_start != edge_end_neighbour); // make sure the remaining region is not a triangle (3 verts)
@@ -524,13 +529,13 @@ impl SkeletonBuilder {
             .bisector( bisect )
             .vertex_ndx( self.vertices.len()-1 );
 
-        let edge_end_p = &self.vertices[edge_end.vertex_ndx];
+        let edge_end_p = &self.vertices[edge_end.vertex_ndx].coords;
         let edge_end_possition = edge_end_p + edge_end.bisector() * time;
 
         // ============= Secound edge loop ================
         // splitting vertex's neighbour forming a close loop with edge_start vertex:
         let s_vert_end = &self.shrining_polygon.nodes[node.prev_ndx];
-        let s_vert_end_p = &self.vertices[s_vert_end.vertex_ndx];
+        let s_vert_end_p = &self.vertices[s_vert_end.vertex_ndx].coords;
         let s_vert_end_possition = s_vert_end_p + s_vert_end.bisector() * time;
 
         // add new vertex to vert_ref list
@@ -828,10 +833,10 @@ impl Display for SkeletonBuilder{
     fn fmt(&self, b: &mut Formatter)->Result<(),fmt::Error> {
         let nodes_display = format!("{}",self.shrining_polygon);
         let mut nodes_lines = nodes_display.split('\n');
-        writeln!(b,"{}  | Vertices  |",
+        writeln!(b,"{}  |     Vertices     |",
             nodes_lines.next()
             .unwrap_or("\x1b[1m|             Nodes            | Bisector  |"))?;
-        writeln!(b,"{}  \x1b[1;4m|  x  |  y  |\x1b[0m",
+        writeln!(b,"{}  \x1b[1;4m|  x  |  y  | time |\x1b[0m",
             nodes_lines.next()
             .unwrap_or("\x1b[1;4m| ndx | next | prev | vert_ndx |  x  |  y  |\x1b[0m"))?;
         for (i, node) in nodes_lines.enumerate() {
@@ -841,7 +846,7 @@ impl Display for SkeletonBuilder{
             // Vertices
             match self.vertices.get(i) {
                 None => write!(b,"     --")?,
-                Some(vert) => write!(b, "|{:+.2}|{:+.2}|",vert[0],vert[1])?,
+                Some(vert) => write!(b, "|{:+.2}|{:+.2}| {:.2} |",vert.coords[0],vert.coords[1],vert.time)?,
             };
             writeln!(b,"\x1b[0m  ")?;
         }
