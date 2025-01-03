@@ -439,12 +439,12 @@ impl SkeletonBuilder {
         Ok(result)
     }
     fn handle_edge_event(&mut self, event: Event) -> Result<(), SkeletonError> {
-        let edge_start = event.node;
-        let edge_end = self.shrining_polygon.next(edge_start);
-
-        if !self.shrining_polygon.contains(&edge_start.ndx) || !self.shrining_polygon.contains(&edge_end.ndx) {
+        if !self.shrining_polygon.contains(&event.node.ndx) || 
+           !self.shrining_polygon.contains(&event.node.next_ndx) {
             return Ok(());
         }
+        let edge_start = self.shrining_polygon.nodes[event.node.ndx];
+        let edge_end = self.shrining_polygon.next(edge_start);
         // Calculate new vertex position
         let edge_start_p = &self.vertices[edge_start.vertex_ndx];
         let new_vertex = edge_start_p + edge_start.bisector() * event.time.0;
@@ -470,10 +470,10 @@ impl SkeletonBuilder {
         Ok(())
     }
     fn handle_split_event(&mut self, event: Event) -> Result<(), SkeletonError> {
-        let node = event.node;
-        let time = event.time.0;
+        if !self.shrining_polygon.contains(&event.node.ndx) { return Ok(()) }
 
-        if !self.shrining_polygon.contains(&node.ndx) { return Ok(()) }
+        let node = self.shrining_polygon.nodes[event.node.ndx];
+        let time = event.time.0;
 
         let b = match event.event_type { 
             EventType::Split(split) => Point2::new(split[0].0,split[1].0),
