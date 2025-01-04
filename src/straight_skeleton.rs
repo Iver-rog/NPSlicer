@@ -2,6 +2,7 @@ use nalgebra::{Matrix2, Point2, Vector2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
+use std::collections::hash_set;
 use std::{collections::HashSet, f32::EPSILON, fmt::Formatter};
 use thiserror::Error;
 use std::hash::Hash;
@@ -216,15 +217,10 @@ pub struct SkeletonBuilder {
     events: PriorityQueue<Event, OrderedFloat<f32>>,
 }
 impl SkeletonBuilder {
-    pub fn new(points: Vec<Point2<f32>>, weights: &[f32]) -> Result<Self, SkeletonError> {
+    pub fn new(points: Vec<Point2<f32>>) -> Result<Self, SkeletonError> {
         if points.len() < 3 {
             return Err(SkeletonError::InvalidPolygon(
                 "Polygon must have at least 3 vertices".to_string(),
-            ));
-        }
-        if points.len() != weights.len() {
-            return Err(SkeletonError::InvalidPolygon(
-                "Number of weights must match number of vertices".to_string(),
             ));
         }
         let mut nodes = Vec::new();
@@ -263,7 +259,6 @@ impl SkeletonBuilder {
             vertices:points.into_iter().map(|p| Vertex{coords:p,time:0.0}).collect(),
             events: PriorityQueue::new(),
         };
-
 
         //initialize events 
         let mut event_que: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
@@ -418,17 +413,44 @@ impl SkeletonBuilder {
             }
         Ok(events)
     }
+    pub fn shrinking_polygon_at_time(&self, time:f32) -> StraightSkeleton {
+        let mut computed_vertecies:HashSet<usize> = HashSet::new();
+        let mut vertices = Vec::new();
+        let mut edges:Vec<[usize;2]> = Vec::new();
+        for node_ndx in self.shrining_polygon.active_nodes.iter()
+            .filter(|n|self.shrining_polygon.contains(n)) {
+                if computed_vertecies.contains(&node_ndx){continue};
+                let start_node = self.shrining_polygon.nodes[*node_ndx];
+                let first_index = edges.len();
+                for node in self.shrining_polygon.iter(&start_node){
+                    let vertex = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
+                    vertices.push(vertex);
+                    edges.push([vertices.len()-1,vertices.len()]);
+                    computed_vertecies.insert(node.ndx);
+                }
+                let last_index = edges.len()-1;
+                edges[last_index] = [last_index,first_index];
+            }
 
+        let contour = StraightSkeleton{
+            vertices,
+            edges,
+        };
+        return contour;
+    }
 
-    pub fn compute_skeleton(mut self) -> Result<StraightSkeleton, SkeletonError> {
+    pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
+        let mut debug_contours: Vec<StraightSkeleton> = Vec::new();
         debug!("{self}");
         while let Some((event, _)) = self.events.pop() {
+            let current_time = *event.time;
             match event.event_type {
                 EventType::Edge => self.handle_edge_event(event)?,
                 EventType::Split(_) => self.handle_split_event(event)?,
                 EventType::Vertex => todo!(),//self.handle_vertex_event(event)?,
             }
             debug!("\n{self}");
+            debug_contours.push(self.shrinking_polygon_at_time(current_time));
             if self.shrining_polygon.len() < 3 {
                 break;
             }
@@ -441,7 +463,7 @@ impl SkeletonBuilder {
             vertices,
             edges,
         };
-        Ok(result)
+        Ok((result,debug_contours))
     }
     fn handle_edge_event(&mut self, event: Event) -> Result<(), SkeletonError> {
         if !self.shrining_polygon.contains(&event.node.ndx) || 
@@ -811,10 +833,10 @@ pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32
 
 pub fn create_skeleton(
     points: Vec<Point2<f32>>,
-    weights: &[f32],
 ) -> Result<StraightSkeleton, SkeletonError> {
-    let builder = SkeletonBuilder::new(points, weights)?;
-    return builder.compute_skeleton();
+    let builder = SkeletonBuilder::new(points)?;
+    let (skeleton, debug_contours) = builder.compute_skeleton()?;
+    return Ok(skeleton);
 }
 
 

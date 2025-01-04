@@ -4,6 +4,7 @@ mod utils;
 use utils::Blender;
 mod straight_skeleton;
 use nalgebra::Point2;
+use log::{error};
 
 #[cfg(test)]
 mod test;
@@ -47,18 +48,17 @@ fn straight_skeleton(blender:&mut Blender) {
     let weights:Vec<f32> = vertices.iter().map(|_| 1.0 ).collect();
     let vertices_as_f32:Vec<[f32;3]> = vertices.clone().into_iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
-    match straight_skeleton::create_skeleton(vertices.clone(), &weights){
-        Ok(skeleton) =>{
-            let skel_points:Vec<[f32;2]> = skeleton.vertices.iter()
-                .map(|x| [x[0],x[1]])
-                .collect::<Vec<[f32;2]>>();
-
-            blender.line_body(
-                &skel_points,
-                skeleton.edges
-                );
+    match straight_skeleton::SkeletonBuilder::new(vertices.clone()){
+        Err(error) => error!("\x1b[031m{error}\x1b[0m"),
+        Ok(builder) => match builder.compute_skeleton() {
+            Err(error) => error!("{error}"),
+            Ok((skeleton,debug_contours)) => {
+                blender.line_body(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
+                for contour in debug_contours {
+                    blender.line_body(&contour.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), contour.edges);
+                }
+            } 
         }
-        Err(error) => println!("\x1b[031m{error}\x1b[0m")
     }
     blender.edge_loop_points(&vertices_as_f32);
 }
@@ -71,9 +71,7 @@ fn pipe_line(blender:&mut Blender){
             .map(|vec| Point2::new(vec[0],vec[1]))
             .collect();
 
-    let weights: Vec<f32> = contour.iter().map(|_| 1.0 ).collect();
-
-    let skeleton = straight_skeleton::create_skeleton(contour.clone(),&weights).unwrap();
+    let skeleton = straight_skeleton::create_skeleton(contour.clone()).unwrap();
 
     blender.line_body(
         &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
