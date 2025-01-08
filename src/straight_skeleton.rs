@@ -261,42 +261,19 @@ impl SkeletonBuilder {
         };
 
         //initialize events 
-        let mut event_que: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
-        for node in builder.shrining_polygon.nodes.iter() { 
-
-            // Edge events
-            let edge_event = compute_edge_event(
-                &node, 
-                builder.vertices[node.vertex_ndx].coords,
-                node.bisector(),
-                builder.vertices[builder.shrining_polygon.next(*node).vertex_ndx].coords,
-                builder.shrining_polygon.next(*node).bisector()
-                )?;
-            if let Some(event) = edge_event {
-                event_que.push(event.clone(), -event.time);
-            }
-            // Split events
-            let split_events = builder.compute_split_events(node)?;
-            for event in split_events {
-                event_que.push(event.clone(), -event.time);
-            }
+        for node in builder.shrining_polygon.nodes.clone().iter() {
+            builder.find_events(*node, OrderedFloat(0.0))?;
         }
-        builder.events = event_que;
-
         Ok(builder)
     }
 
     fn find_events(&mut self, vertex:Node, current_time: OrderedFloat<f32>) -> Result<(), SkeletonError> {
         // Edge events
-        let edge_event = compute_edge_event(
-            &vertex, 
-            self.vertices[vertex.vertex_ndx].coords, 
-            vertex.bisector(),
-            self.vertices[self.shrining_polygon.next(vertex).vertex_ndx].coords,
-            self.shrining_polygon.next(vertex).bisector()
+        let edge_event = self.compute_edge_event(
+            vertex.ndx, 
             )?;
         if let Some(event) = edge_event {
-            let time = current_time+event.time;
+            let time = event.time;
             self.events.push(event, -time);
         }
         // Split events
@@ -309,20 +286,37 @@ impl SkeletonBuilder {
     }
     fn find_edge_event(&mut self, vertex:Node, current_time: OrderedFloat<f32>) -> Result<(), SkeletonError> {
         // Edge events
-        let edge_event = compute_edge_event(
-            &vertex, 
-            self.vertices[vertex.vertex_ndx].coords, 
-            vertex.bisector(),
-            self.vertices[self.shrining_polygon.next(vertex).vertex_ndx].coords,
-            self.shrining_polygon.next(vertex).bisector()
+        let edge_event = self.compute_edge_event(
+            vertex.ndx
             )?;
         if let Some(event) = edge_event {
-            let time = current_time+event.time;
+            let time = event.time;
             self.events.push(event, -time);
         }
         Ok(())
     }
+    fn compute_edge_event(&self, vert_ndx:usize) -> Result<Option<Event>, SkeletonError> {
 
+        let v1 = self.shrining_polygon.nodes[vert_ndx];
+        let v1_vert = &self.vertices[v1.vertex_ndx];
+        let v2 = self.shrining_polygon.nodes[v1.next_ndx];
+        let v2_vert = &self.vertices[v2.vertex_ndx];
+
+        let v1_coord = v1_vert.coords + (-v1.bisector() * v1_vert.time);
+        let v2_coord = v2_vert.coords + (-v2.bisector() * v2_vert.time);
+        // Calculate intersection of bisectors
+        let t = compute_intersection_time(&v1_coord, &v1.bisector(), &v2_coord, &v2.bisector())?;
+
+        if t > 0.0 {
+            Ok(Some(Event {
+                time: OrderedFloat(t),
+                node: self.shrining_polygon.nodes[vert_ndx],
+                event_type: EventType::Edge,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
     fn compute_split_events<'a>(&'a self, node: &'a Node) -> Result<Vec<Event>, SkeletonError> {
         let mut events = Vec::new();
         // Check if edge is a reflex angle
@@ -745,26 +739,6 @@ impl SkeletonBuilder {
     //
     //    Ok(new_events)
     //}
-}
-fn compute_edge_event(vert:&Node, 
-    v1_coord:Point2<f32>, 
-    v1_bisect:Vector2<f32>, 
-    v2_coord:Point2<f32>, 
-    v2_bisect:Vector2<f32>
-    ) -> Result<Option<Event>, SkeletonError> {
-
-    // Calculate intersection of bisectors
-    let t = compute_intersection_time(&v1_coord, &v1_bisect, &v2_coord, &v2_bisect)?;
-
-    if t > 0.0 {
-        Ok(Some(Event {
-            time: OrderedFloat(t),
-            node: *vert,
-            event_type: EventType::Edge,
-        }))
-    } else {
-        Ok(None)
-    }
 }
 fn compute_intersection_time(
     p1: &Point2<f32>,
