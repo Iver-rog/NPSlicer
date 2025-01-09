@@ -71,6 +71,9 @@ impl Nodes {
         nodes,
         }
     }
+    pub fn deactivate(&mut self, node_ndx:&usize){
+        self.active_nodes.remove(node_ndx);
+    }
     pub fn merge(&mut self, mut node: NodeBuilder) -> Node {
         // Insert new node
         node.ndx(self.nodes.len());
@@ -475,6 +478,17 @@ impl SkeletonBuilder {
         // Add new skeleton vertex and edges
         self.edges.push(Edge{start:edge_start.vertex_ndx, end:new_vertex_ndx});
         self.edges.push(Edge{start:edge_end.vertex_ndx, end:new_vertex_ndx});
+
+        if edge_start.prev_ndx == edge_end.next_ndx {
+            // triangle detected vertex event
+            let remaining_vertex = self.shrining_polygon.nodes[edge_start.prev_ndx];
+            self.edges.push(Edge{start:remaining_vertex.vertex_ndx, end:new_vertex_ndx});
+            self.shrining_polygon.deactivate(&edge_start.ndx);
+            self.shrining_polygon.deactivate(&edge_end.ndx);
+            self.shrining_polygon.deactivate(&remaining_vertex.ndx);
+            return Ok(());
+        }
+
         // Calculate bisecotr for newly created vertex
         let bisector = 0.5*(edge_start.bisector() + edge_end.bisector());
         let new_node = Node::new()
