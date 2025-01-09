@@ -54,7 +54,7 @@ fn test_invalid_polygon() {
         Point2::new(1.0, 0.0),
     ];
     let weights = vec![1.0, 1.0];
-    let result = straight_skeleton::create_skeleton(points, &weights);
+    let result = straight_skeleton::create_skeleton(points);
     assert!(result.is_err());
 }
 #[test]

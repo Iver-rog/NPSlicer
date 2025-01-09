@@ -2,12 +2,11 @@ use nalgebra::{Matrix2, Point2, Vector2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
-use std::collections::hash_set;
 use std::{collections::HashSet, f32::EPSILON, fmt::Formatter};
 use thiserror::Error;
 use std::hash::Hash;
 use std::fmt::{self, Display};
-use log::{debug, error, info, log_enabled, trace, Level};
+use log::{debug, error, info, trace};
 
 
 #[derive(Debug, Error)]
@@ -284,10 +283,10 @@ impl SkeletonBuilder {
         }
         Ok(())
     }
-    fn find_edge_event(&mut self, vertex:Node, current_time: OrderedFloat<f32>) -> Result<(), SkeletonError> {
+    fn find_edge_event(&mut self, node_ndx:usize) -> Result<(), SkeletonError> {
         // Edge events
         let edge_event = self.compute_edge_event(
-            vertex.ndx
+            node_ndx
             )?;
         if let Some(event) = edge_event {
             let time = event.time;
@@ -466,6 +465,7 @@ impl SkeletonBuilder {
         }
         let edge_start = self.shrining_polygon.nodes[event.node.ndx];
         let edge_end = self.shrining_polygon.next(edge_start);
+
         // Calculate new vertex position
         let edge_start_p = &self.vertices[edge_start.vertex_ndx].coords;
         let new_vertex = edge_start_p + edge_start.bisector() * event.time.0;
@@ -569,12 +569,8 @@ impl SkeletonBuilder {
         self.find_events(left_node, event.time)?;
         self.find_events(right_node, event.time)?;
         // ToDo: it might also be nessesary to find events for the previous vertices
-        self.find_edge_event(
-            self.shrining_polygon.nodes[left_node.prev_ndx],
-            event.time)?;
-        self.find_edge_event(
-            self.shrining_polygon.nodes[right_node.prev_ndx],
-            event.time)?;
+        self.find_edge_event(left_node.prev_ndx)?;
+        self.find_edge_event(right_node.prev_ndx)?;
         Ok(())
     }
 
