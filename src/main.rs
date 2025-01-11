@@ -26,25 +26,26 @@ fn straight_skeleton(blender:&mut Blender) {
     //    Point2::new(2.0,1.0),
     //    Point2::new(0.0,1.0),
     //];
-    let vertices = vec![
-        Point2::new(0.0,0.0),
-        Point2::new(2.0,0.1),
-        Point2::new(2.1,1.0),
-        Point2::new(1.3,0.9),
-        Point2::new(1.1,0.5),
-        Point2::new(0.7,1.0),
-        Point2::new(0.0,1.1),
+    //let vertices = vec![
+    //    Point2::new(0.0,0.0),
+    //    Point2::new(2.0,0.1),
+    //    Point2::new(2.1,1.0),
+    //    Point2::new(1.3,0.9),
+    //    Point2::new(1.1,0.5),
+    //    Point2::new(0.7,1.0),
+    //    Point2::new(0.0,1.1),
+    //];
+    let vertices:Vec<Point2<f32>> = vec![
+        Point2::new(10.0,50.),
+        Point2::new(20.0,20.0),
+        Point2::new(25.0,40.),
+        Point2::new(63.5,10.),
+        Point2::new(63.5,25.0),
+        Point2::new(50.0,32.5),
+        Point2::new(62.5,42.5),
+        Point2::new(40., 52.0)
     ];
-    //let vertices:Vec<Point2<f32>> = vec![
-    //    Point2::new(40., 52.0),
-    //    Point2::new(62.5,42.5),
-    //    Point2::new(50.0,32.5),
-    //    Point2::new(63.5,25.0),
-    //    Point2::new(63.5,10.),
-    //    Point2::new(25.0,40.),
-    //    Point2::new(20.0,20.0),
-    //    Point2::new(10.0,50.)
-    //].into_iter().rev().collect();
+
     let weights:Vec<f32> = vertices.iter().map(|_| 1.0 ).collect();
     let vertices_as_f32:Vec<[f32;3]> = vertices.clone().into_iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
