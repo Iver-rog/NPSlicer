@@ -544,7 +544,7 @@ impl SkeletonBuilder {
 
         // splitting vertex's neighbour forming a close loop with edge_start vertex:
         let s_vert_start = &self.shrining_polygon.nodes[node.next_ndx];
-        let s_vert_start_p = &self.vertices[node.vertex_ndx].coords;
+        let s_vert_start_p = &self.vertices[s_vert_start.vertex_ndx].coords;
         let s_vert_start_possition = s_vert_start_p + s_vert_start.bisector() * time;
 
         //assert!(edge_start != edge_end_neighbour); // make sure the remaining region is not a triangle (3 verts)
