@@ -203,7 +203,6 @@ struct Event {
 enum EventType {
     Edge,  // A edge shrinks to zero lenght
     Split([OrderedFloat<f32>;2]), // A region is split into two parts
-    Vertex,// A region disapears/colapses into a vertex
 }
 #[derive(Debug)]
 pub struct Vertex {
@@ -443,7 +442,6 @@ impl SkeletonBuilder {
             match event.event_type {
                 EventType::Edge => self.handle_edge_event(event)?,
                 EventType::Split(_) => self.handle_split_event(event)?,
-                EventType::Vertex => todo!(),//self.handle_vertex_event(event)?,
             }
             debug!("\n{self}");
             debug_contours.push(self.shrinking_polygon_at_time(current_time));
@@ -587,168 +585,6 @@ impl SkeletonBuilder {
         self.find_edge_event(right_node.prev_ndx)?;
         Ok(())
     }
-
-    //
-    //fn handle_vertex_event(&mut self, event: Event) -> Result<(), SkeletonError> {
-    //    println!("vertex_event");
-    //    // Implementation of vertex event handling
-    //    // This would handle cases where multiple vertices collapse to a single point
-    //    let vertex_idx = event.vertex_idx;
-    //    let time = event.time.0;
-    //
-    //    // Check if the vertex is still active
-    //    if !self.active_vertices.contains(&vertex_idx) {
-    //        return Ok(());
-    //    }
-    //
-    //    // Find all vertices that collapse to this point
-    //    let vertex = &self.vertices[vertex_idx];
-    //    let collapse_position = vertex.position + vertex.bisector * time;
-    //
-    //    let mut collapsing_vertices = HashSet::new();
-    //    collapsing_vertices.insert(vertex_idx);
-    //
-    //    // Find other vertices that collapse to the same point
-    //    for (idx, other_vertex) in self.vertices.iter().enumerate() {
-    //        if idx != vertex_idx && self.active_vertices.contains(&idx) {
-    //            let other_position = other_vertex.position + other_vertex.bisector * time;
-    //            if (other_position - collapse_position).norm() < 1e-10 {
-    //                collapsing_vertices.insert(idx);
-    //            }
-    //        }
-    //    }
-    //
-    //    // Create new vertex at collapse point
-    //    let new_vertex_idx = self.result.vertices.len();
-    //    self.result.vertices.push(collapse_position);
-    //
-    //    // Add skeleton edges from all collapsing vertices
-    //    for &old_idx in &collapsing_vertices {
-    //        self.result.edges.push([old_idx, new_vertex_idx]);
-    //        self.active_vertices.remove(&old_idx);
-    //    }
-    //
-    //    // Update edge list
-    //    self.edges.retain(|edge| {
-    //        !collapsing_vertices.contains(&edge.start) && 
-    //        !collapsing_vertices.contains(&edge.end)
-    //    });
-    //
-    //    // Create new edges connecting to non-collapsing neighbors
-    //    let mut new_edges = Vec::new();
-    //    let mut processed_pairs = HashSet::new();
-    //
-    //    for &collapsing_idx in &collapsing_vertices {
-    //        for edge in &self.edges {
-    //            if edge.start == collapsing_idx || edge.end == collapsing_idx {
-    //                let other_idx = if edge.start == collapsing_idx {
-    //                    edge.end
-    //                } else {
-    //                    edge.start
-    //                };
-    //
-    //                if !collapsing_vertices.contains(&other_idx) {
-    //                    let pair = if other_idx < new_vertex_idx {
-    //                        (other_idx, new_vertex_idx)
-    //                    } else {
-    //                        (new_vertex_idx, other_idx)
-    //                    };
-    //
-    //                    if !processed_pairs.contains(&pair) {
-    //                        new_edges.push(Edge {
-    //                            start: pair.0,
-    //                            end: pair.1,
-    //                            weight: edge.weight,
-    //                        });
-    //                        processed_pairs.insert(pair);
-    //                    }
-    //                }
-    //            }
-    //        }
-    //    }
-    //
-    //    // Add the new edges
-    //    self.edges.extend(new_edges);
-    //
-    //    // Add new vertex to active set
-    //    self.active_vertices.insert(new_vertex_idx);
-    //
-    //    // Compute new events for the collapsed vertex
-    //    if let Ok(new_events) = self.compute_new_events_after_collapse(new_vertex_idx) {
-    //        for event in new_events {
-    //            self.events.push(event.clone(), -event.time);
-    //        }
-    //    }
-    //    Ok(())
-    //}
-    //   // Helper methods for the new implementations
-    //
-    //
-    //fn compute_new_events_after_split(
-    //    &self,
-    //    vertex_idx: usize,
-    //) -> Result<Vec<Event>, SkeletonError> {
-    //    let mut new_events = Vec::new();
-    //
-    //    // Compute new edge events
-    //    for edge in &self.edges {
-    //        if edge.start == vertex_idx || edge.end == vertex_idx {
-    //            if let Ok(Some(event)) = self.compute_edge_event(edge.start, edge.end) {
-    //                new_events.push(event);
-    //            }
-    //        }
-    //    }
-    //
-    //    // Compute new split events
-    //    if let Ok(mut split_events) = self.compute_split_events(vertex_idx) {
-    //        new_events.extend(split_events);
-    //    }
-    //
-    //    Ok(new_events)
-    //}
-    //
-    //fn compute_new_events_after_collapse(
-    //    &self,
-    //    vertex_idx: usize,
-    //) -> Result<Vec<Event>, SkeletonError> {
-    //    let mut new_events = Vec::new();
-    //
-    //    // Similar to compute_new_events_after_split, but also check for potential vertex events
-    //    // Compute edge events
-    //    for edge in &self.edges {
-    //        if edge.start == vertex_idx || edge.end == vertex_idx {
-    //            if let Ok(Some(event)) = self.compute_edge_event(edge.start, edge.end) {
-    //                new_events.push(event);
-    //            }
-    //        }
-    //    }
-    //
-    //    // Compute split events
-    //    if let Ok(mut split_events) = self.compute_split_events(vertex_idx) {
-    //        new_events.extend(split_events);
-    //    }
-    //
-    //    // Check for potential vertex events
-    //    let vertex_pos = &self.vertices[vertex_idx].position;
-    //    let vertex_bisector = &self.vertices[vertex_idx].bisector;
-    //
-    //    for (other_idx, other_vertex) in self.vertices.iter().enumerate() {
-    //        if other_idx != vertex_idx && self.active_vertices.contains(&other_idx) {
-    //            let time = self.compute_vertex_event_time(vertex_pos, vertex_bisector, 
-    //                &other_vertex.position, &other_vertex.bisector)?;
-    //
-    //            if let Some(t) = time {
-    //                new_events.push(Event {
-    //                    time: OrderedFloat(t),
-    //                    vertex_idx,
-    //                    event_type: EventType::Vertex,
-    //                });
-    //            }
-    //        }
-    //    }
-    //
-    //    Ok(new_events)
-    //}
 }
 fn compute_intersection_time(
     p1: &Point2<f32>,
@@ -829,7 +665,6 @@ impl Display for EventType{
         match self {
             EventType::Edge => write!(b,"Edge")?,
             EventType::Split(_) => write!(b,"Split")?,
-            EventType::Vertex => write!(b,"Vertex")?,
         }
         Ok(())
     }
