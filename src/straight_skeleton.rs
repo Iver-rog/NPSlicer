@@ -372,13 +372,14 @@ impl SkeletonBuilder {
                 let i = intersect( edge_start_p, edge_vec, node_p, self_edge );
 
                 if (i-node_p).magnitude() < 1e-5{
-                    trace!("skiping node: {}. value = {}", node.ndx,(i-node_p).magnitude());
+                    info!("skiping node: {}. value = {}", node.ndx,(i-node_p).magnitude());
                     continue;
                 }
                 // Locate candidate b
                 let line_vec = (node_p - i).normalize();
                 let mut ed_vec = (edge_vec).normalize();
-                if line_vec.dot(&ed_vec) < 0.0 {
+
+                if leftdot > rightdot {
                     ed_vec = - ed_vec
                 }
 
@@ -389,18 +390,18 @@ impl SkeletonBuilder {
 
                 // Check eligebility of b
                 // a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
-                let x_start = cross2d(&edge_end.bisector().normalize(),
-                    &(b-edge_end_p).normalize()) > -EPSILON;
-                let x_end = cross2d(&edge_start.bisector().normalize(),
+                let x_start = cross2d(&edge_start.bisector().normalize(),
                     &(b-edge_start_p).normalize()) < EPSILON;
+                let x_end = cross2d(&edge_end.bisector().normalize(),
+                    &(b-edge_end_p).normalize()) > -EPSILON;
                 let x_edge = cross2d(&edge_vec.normalize(),
                     &(b-edge_start_p).normalize()) < EPSILON;
 
                 if !(x_start && x_end && x_edge) {
-                    trace!("- discarding candidate b: {b}");
+                    debug!("- discarding candidate for edge:({}-{}) b: {b}",edge_start.ndx,edge_end.ndx);
                     continue;
                 };
-                info!("\x1b[032m  - found candidate b: {b}\x1b[0m");
+                info!("\x1b[032m  - found candidate for edge:({}-{}) b: {b}\x1b[0m",edge_start.ndx,edge_end.ndx);
 
 
                 let time = (node_p - b).magnitude() / node.bisector().magnitude();
@@ -474,8 +475,8 @@ impl SkeletonBuilder {
         let edge_end = self.shrining_polygon.next(edge_start);
 
         // Calculate new vertex position
-        let edge_start_p = &self.vertices[edge_start.vertex_ndx].coords;
-        let new_vertex = edge_start_p + edge_start.bisector() * event.time.0;
+        let edge_start_v = &self.vertices[edge_start.vertex_ndx];
+        let new_vertex = edge_start_v.coords + edge_start.bisector() * (event.time.0-edge_start_v.time);
         // Add new vertex to list
         let new_vertex_ndx = self.vertices.len();
         self.vertices.push(Vertex{coords:new_vertex,time:*event.time});
@@ -525,8 +526,10 @@ impl SkeletonBuilder {
             .filter(|n| self.shrining_polygon.contains(&n.ndx))
             .map(|n| [n, &self.shrining_polygon.nodes[n.next_ndx]] )
             .filter(|[_,edge_end]| edge_end.ndx != node.ndx ){
-                let start = self.vertices[edge_start.vertex_ndx].coords + edge_start.bisector()*time;
-                let end = self.vertices[edge_end.vertex_ndx].coords + edge_end.bisector()*time;
+                let start_v = &self.vertices[edge_start.vertex_ndx];
+                let end_v = &self.vertices[edge_end.vertex_ndx];
+                let start = start_v.coords + edge_start.bisector()*(time-start_v.time);
+                let end = end_v.coords + edge_end.bisector()*(time-end_v.time);
                 if is_point_on_edge(&b, &start, &end)? {
                     edge = Some([edge_start,edge_end])
                     }
@@ -749,6 +752,7 @@ pub fn is_point_on_edge(
     }
 
     let t = edge_vec.dot(&point_vec) / edge_length_sq;
+    let distance_from_edge = (point_vec - t*edge_vec).magnitude();
     let point_on_edge = edge_start + t*edge_vec;
-    Ok((point_on_edge - point).magnitude() < 1e-6 )
+    Ok(distance_from_edge < 1e-3 )
 }
