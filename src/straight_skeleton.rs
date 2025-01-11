@@ -322,9 +322,15 @@ impl SkeletonBuilder {
         let mut events = Vec::new();
         // Check if edge is a reflex angle
 
-        if !is_reflex(self.vertices[node.vertex_ndx].coords,
-            self.vertices[self.shrining_polygon.next(*node).vertex_ndx].coords,
-            self.vertices[self.shrining_polygon.prev(*node).vertex_ndx].coords)
+        let node_p = &self.vertices[node.vertex_ndx];
+        let next_node = self.shrining_polygon.next(*node);
+        let next_node_v = &self.vertices[next_node.vertex_ndx];
+        let prev_node = self.shrining_polygon.prev(*node);
+        let prev_node_v = &self.vertices[prev_node.vertex_ndx];
+
+        if !is_reflex(node_p.coords,
+            next_node_v.coords + (node_p.time - next_node_v.time)*next_node.bisector(),
+            prev_node_v.coords + (node_p.time - prev_node_v.time)*prev_node.bisector())
         {
             return Ok(events)
         }
