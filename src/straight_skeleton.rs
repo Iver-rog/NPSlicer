@@ -507,6 +507,13 @@ impl SkeletonBuilder {
 
         //find events for the new vertex
         self.find_events(new_node,event.time)?;
+        let prev_node = self.shrining_polygon.nodes[new_node.prev_ndx];
+        // find edge event for previous node
+        let edge_event = self.compute_edge_event( prev_node.ndx )?;
+        if let Some(event) = edge_event {
+            let time = event.time;
+            self.events.push(event, -time);
+        }
 
         info!("\x1b[033mEdge Event for node:{} at t={:.3} p={}\x1b[0m",edge_start.ndx,event.time,new_vertex);
         Ok(())
