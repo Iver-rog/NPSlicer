@@ -15,6 +15,8 @@ pub enum SkeletonError {
     InvalidPolygon(String),
     #[error("Computation error: {0}")]
     ComputationError(String),
+    #[error("Bisector Calculation Erorr: {0}")]
+    BisectorError(String),
     }
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Node {
@@ -237,7 +239,7 @@ impl SkeletonBuilder {
             let p_next = points[next_ndx];
             let p_prev = points[prev_ndx];
 
-            let bisector = bisector(p_current, p_next, p_prev).unwrap();
+            let bisector = bisector(p_current, p_next, p_prev)?;
 
             nodes.push(Node {
                 ndx: i,
@@ -626,7 +628,14 @@ pub fn bisector(
     let d = v1 + v2;
     let mut a = Matrix2::from_columns(&[d,-v1]);
     let t = Vector2::new(-v1[1], v1[0]);
-    assert!(a.try_inverse_mut());
+    match a.try_inverse_mut() {
+        true => (),
+        false => Err(SkeletonError::BisectorError( 
+            format!("invertable matrix {a}  current_point: {current_point}
+  next_point: {next_point}
+  prev_point: {prev_point}"
+                    ) ) )?
+    }
 
     let s = a * t;
 

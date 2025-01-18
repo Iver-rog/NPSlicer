@@ -72,7 +72,10 @@ fn pipe_line(blender:&mut Blender){
             .map(|vec| Point2::new(vec[0],vec[1]))
             .collect();
 
-    let skeleton = straight_skeleton::create_skeleton(contour.clone()).unwrap();
+    let skeleton = match straight_skeleton::create_skeleton(contour.clone()){
+        Ok(skeleton) => skeleton,
+        Err(err) =>{ println!("{err}"); panic!() }
+    };
 
     blender.line_body(
         &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
