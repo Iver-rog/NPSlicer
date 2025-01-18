@@ -28,7 +28,7 @@ pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
     blender.save_mesh(&overhangs, &stl_data.vertices,"overhangs".to_string());
 
     let overhang_regions = find_connected_components(&overhangs);
-    utils::print_component_info(&overhang_regions);
+    //utils::print_component_info(&overhang_regions);
     for (i,islands) in overhang_regions.iter().enumerate(){
         let filename = format!("overhang_island{i}");
         blender.save_mesh(&islands, &stl_data.vertices,filename);
