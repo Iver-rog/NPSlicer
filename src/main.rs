@@ -4,7 +4,7 @@ mod utils;
 use utils::Blender;
 mod straight_skeleton;
 use nalgebra::Point2;
-use log::{error};
+use log::error;
 
 #[cfg(test)]
 mod test;

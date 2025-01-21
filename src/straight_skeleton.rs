@@ -680,7 +680,7 @@ pub fn create_skeleton(
     points: Vec<Point2<f32>>,
 ) -> Result<StraightSkeleton, SkeletonError> {
     let builder = SkeletonBuilder::new(points)?;
-    let (skeleton, debug_contours) = builder.compute_skeleton()?;
+    let (skeleton, _debug_contours) = builder.compute_skeleton()?;
     return Ok(skeleton);
 }
 
@@ -769,6 +769,5 @@ pub fn is_point_on_edge(
 
     let t = edge_vec.dot(&point_vec) / edge_length_sq;
     let distance_from_edge = (point_vec - t*edge_vec).magnitude();
-    let point_on_edge = edge_start + t*edge_vec;
     Ok(distance_from_edge < 1e-3 )
 }
