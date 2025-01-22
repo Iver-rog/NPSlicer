@@ -274,7 +274,6 @@ impl SkeletonBuilder {
         // Edge events
         let edge_event = self.compute_edge_event(
             vertex.ndx, 
-            current_time.into()
             )?;
         if let Some(event) = edge_event {
             let time = event.time;
@@ -293,7 +292,6 @@ impl SkeletonBuilder {
         // Edge events
         let edge_event = self.compute_edge_event(
             node_ndx,
-            time
             )?;
         if let Some(event) = edge_event {
             let time = event.time;
@@ -301,22 +299,23 @@ impl SkeletonBuilder {
         }
         Ok(())
     }
-    fn compute_edge_event(&self, vert_ndx:usize, time:f32) -> Result<Option<Event>, SkeletonError> {
+    fn compute_edge_event(&self, vert_ndx:usize) -> Result<Option<Event>, SkeletonError> {
 
         let v1 = self.shrining_polygon.nodes[vert_ndx];
         let v1_vert = &self.vertices[v1.vertex_ndx];
         let v2 = self.shrining_polygon.nodes[v1.next_ndx];
         let v2_vert = &self.vertices[v2.vertex_ndx];
 
+        let max_time = v1_vert.time.max(v2_vert.time);
 
-        let v1_coord = v1_vert.coords + v1.bisector() * (time-v1_vert.time);
-        let v2_coord = v2_vert.coords + v2.bisector() * (time-v2_vert.time);
+        let v1_coord = v1_vert.coords + v1.bisector() * (max_time-v1_vert.time);
+        let v2_coord = v2_vert.coords + v2.bisector() * (max_time-v2_vert.time);
         // Calculate intersection of bisectors
         let t = compute_intersection_time(&v1_coord, &v1.bisector(), &v2_coord, &v2.bisector())?;
 
         if t > 0.0 {
             Ok(Some(Event {
-                time: OrderedFloat(t+time),
+                time: OrderedFloat(t+max_time),
                 node: self.shrining_polygon.nodes[vert_ndx],
                 event_type: EventType::Edge,
             }))
@@ -529,7 +528,7 @@ impl SkeletonBuilder {
         self.find_events(new_node,event.time)?;
         let prev_node = self.shrining_polygon.nodes[new_node.prev_ndx];
         // find edge event for previous node
-        let edge_event = self.compute_edge_event( prev_node.ndx, time)?;
+        let edge_event = self.compute_edge_event( prev_node.ndx)?;
         if let Some(event) = edge_event {
             dbg!(&event);
             let time = event.time;
