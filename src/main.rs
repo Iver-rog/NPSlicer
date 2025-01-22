@@ -22,12 +22,6 @@ fn main(){
 fn straight_skeleton(blender:&mut Blender) {
     //let vertices = vec![
     //    Point2::new(0.0,0.0),
-    //    Point2::new(2.0,0.0),
-    //    Point2::new(2.0,1.0),
-    //    Point2::new(0.0,1.0),
-    //];
-    //let vertices = vec![
-    //    Point2::new(0.0,0.0),
     //    Point2::new(2.0,0.1),
     //    Point2::new(2.1,1.0),
     //    Point2::new(1.3,0.9),
@@ -47,7 +41,6 @@ fn straight_skeleton(blender:&mut Blender) {
     //];
     let vertices = test_poly();
 
-    let weights:Vec<f32> = vertices.iter().map(|_| 1.0 ).collect();
     let vertices_as_f32:Vec<[f32;3]> = vertices.clone().into_iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
     match straight_skeleton::SkeletonBuilder::new(vertices.clone()){

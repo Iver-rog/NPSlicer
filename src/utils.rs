@@ -29,7 +29,6 @@ impl <'a> Blender<'a> {
         fs::create_dir(tmp).unwrap();
         let mesh = tmp.join("mesh");
         fs::create_dir(mesh.clone()).unwrap();
-        println!("{tmp:?}");
 
         return Blender{
             tmp_path:tmp.into(),

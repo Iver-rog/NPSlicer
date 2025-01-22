@@ -481,13 +481,14 @@ impl SkeletonBuilder {
         let edges = self.edges.into_iter()
             .map(|edge| [edge.start,edge.end] )
             .collect();
-        let result = StraightSkeleton {
+        let skeleton = StraightSkeleton {
             vertices,
             edges,
         };
-        Ok((result,debug_contours))
+        Ok((skeleton,debug_contours))
     }
-    fn handle_edge_event(&mut self, event: Event, time:f32) -> Result<bool, SkeletonError> {
+    fn handle_edge_event(&mut self, event:Event ) -> Result<bool, SkeletonError> {
+        let time = event.time;
         if !self.shrining_polygon.contains(&event.node.ndx) || 
            !self.shrining_polygon.contains(&event.node.next_ndx) {
             return Ok(false);
@@ -530,7 +531,6 @@ impl SkeletonBuilder {
         // find edge event for previous node
         let edge_event = self.compute_edge_event( prev_node.ndx)?;
         if let Some(event) = edge_event {
-            dbg!(&event);
             let time = event.time;
             self.events.push(event, -time);
         }
