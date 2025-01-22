@@ -2,10 +2,12 @@ use nalgebra::{Matrix2, Point2, Vector2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
-use std::{collections::HashSet, f32::EPSILON, fmt::Formatter};
+use std::{
+    collections::HashSet, 
+    f32::EPSILON, 
+    fmt::{self, Display, Formatter}
+};
 use thiserror::Error;
-use std::hash::Hash;
-use std::fmt::{self, Display};
 use log::{debug, error, info, trace};
 
 
@@ -226,6 +228,7 @@ impl SkeletonBuilder {
                 "Polygon must have at least 3 vertices".to_string(),
             ));
         }
+        info!("\x1b[034m========================== Initializing Polygon ==========================\x1b[0m");
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
         let mut active_nodes = HashSet::new();
@@ -270,19 +273,19 @@ impl SkeletonBuilder {
         Ok(builder)
     }
 
-    fn find_events(&mut self, vertex:Node, current_time: OrderedFloat<f32>) -> Result<(), SkeletonError> {
-        // Edge events
+    fn find_events(&mut self, node:Node, current_time: OrderedFloat<f32>) -> Result<(), SkeletonError> {
+        // Edge event between node and next_node
         let edge_event = self.compute_edge_event(
-            vertex.ndx, 
+            node.ndx, 
             )?;
         if let Some(event) = edge_event {
             let time = event.time;
             self.events.push(event, -time);
         }
         // Split events
-        let split_events = self.compute_split_events(&vertex)?;
+        let split_events = self.compute_split_events(&node)?;
         for mut event in split_events {
-            let time = event.time;//+current_time;
+            let time = event.time;
             event.time = time;
             self.events.push(event, -time);
         }
@@ -406,7 +409,7 @@ impl SkeletonBuilder {
                     //debug!("- discarding candidate for edge:({}-{}) b: {b}",edge_start.ndx,edge_end.ndx);
                     continue;
                 };
-                info!("\x1b[032m  - found candidate for edge:({}-{}) b: {b}\x1b[0m",edge_start.ndx,edge_end.ndx);
+                info!("  - found candidate for edge:({}-{}) b: {b}",edge_start.ndx,edge_end.ndx);
 
 
                 let t = (node_p - b).magnitude() / node.bisector().magnitude();
@@ -447,31 +450,22 @@ impl SkeletonBuilder {
     }
 
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
+        info!("\x1b[034m========================== Computing Skeleton ==========================\x1b[0m");
         let mut debug_contours: Vec<StraightSkeleton> = Vec::new();
-        debug!("\n{self}");
         while let Some((event, _)) = self.events.pop() {
             let current_time = *event.time;
-            match event.event_type {
-                EventType::Edge => match self.handle_edge_event(event,current_time){
-                    Ok(handled_event) => if handled_event {
+            let result = match event.event_type {
+                EventType::Edge => self.handle_edge_event(event),
+                EventType::Split(_) => self.handle_split_event(event),
+            };
+            match result {
+                Ok(print_debug) => {
+                    if print_debug {
                         debug!("\n{self}");
-                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
-                    },
-                    Err(error) => {
-                        println!("{error}");
-                        break
+                        debug_contours.push(self.shrinking_polygon_at_time(current_time))
                     }
                 },
-                EventType::Split(_) => match self.handle_split_event(event){
-                    Ok(handled_event) => if handled_event {
-                        debug!("\n{self}");
-                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
-                    },
-                    Err(error) => {
-                        println!("{error}");
-                        break
-                    }
-                },
+                Err(error) => println!("{error}")
             }
             if self.shrining_polygon.len() < 3 {
                 break;
@@ -488,9 +482,10 @@ impl SkeletonBuilder {
         Ok((skeleton,debug_contours))
     }
     fn handle_edge_event(&mut self, event:Event ) -> Result<bool, SkeletonError> {
-        let time = event.time;
         if !self.shrining_polygon.contains(&event.node.ndx) || 
            !self.shrining_polygon.contains(&event.node.next_ndx) {
+            info!("t:{:.3} skipping Edge Event node: {} \x1b[031minactive node in edge\x1b[0m",
+                event.time,event.node.ndx);
             return Ok(false);
         }
         let edge_start = self.shrining_polygon.nodes[event.node.ndx];
@@ -513,6 +508,8 @@ impl SkeletonBuilder {
             self.shrining_polygon.deactivate(&edge_start.ndx);
             self.shrining_polygon.deactivate(&edge_end.ndx);
             self.shrining_polygon.deactivate(&remaining_vertex.ndx);
+            info!("\x1b[032mt:{:.3} Vertex Event for node: {} & ({},{}) \x1b[0m",
+                event.time,edge_start.ndx,edge_end.ndx,remaining_vertex.ndx);
             return Ok(true);
         }
 
@@ -535,19 +532,24 @@ impl SkeletonBuilder {
             self.events.push(event, -time);
         }
 
-        info!("\x1b[033mt:{:.3} Edge Event for node:{} at p={}\x1b[0m",event.time,edge_start.ndx,new_vertex);
+        info!("\x1b[032mt:{:.3} Edge Event for node:{} at p={}\x1b[0m",event.time,edge_start.ndx,new_vertex);
         Ok(true)
     }
     fn handle_split_event(&mut self, event: Event) -> Result<bool, SkeletonError> {
-        if !self.shrining_polygon.contains(&event.node.ndx) { return Ok(false) }
-
-        let node = self.shrining_polygon.nodes[event.node.ndx];
-        let time = event.time.0;
-
         let b = match event.event_type { 
             EventType::Split(split) => Point2::new(split[0].0,split[1].0),
             _ => panic!("wrong event type sendt to handle split event funcion")
         };
+
+        let node = self.shrining_polygon.nodes[event.node.ndx];
+        let time = event.time.0;
+
+        if !self.shrining_polygon.contains(&event.node.ndx) { 
+            info!("t:{:.3} skipping Split Event node: {} split point: {} \x1b[031minactive node\x1b[0m",
+                event.time,node.ndx,b);
+            return Ok(false) 
+        }
+
         // find edge beeing split
         let mut edge = None;
         for [edge_start, edge_end] in self.shrining_polygon.nodes.iter()
@@ -563,14 +565,18 @@ impl SkeletonBuilder {
                     edge = Some([edge_start,edge_end])
                     }
                 }
-        if edge.is_none() { info!("No split event found for node: {}",node.ndx); return Ok(false) }
+        if edge.is_none() { 
+            info!("t:{:.3} skipping Split Event node: {} split point: {} \x1b[031mcould not find edge\x1b[0m",
+                event.time,node.ndx,b);
+            return Ok(false) 
+        }
         let edge_start = edge.unwrap()[0];
         let edge_end = edge.unwrap()[1];
 
         self.vertices.push(Vertex{coords:b,time});
         self.edges.push(Edge{start:node.vertex_ndx,end:self.vertices.len()-1});
 
-        info!("\x1b[033mt:{:.3} Split Event between node: {} and edge: ({}-{}) at point: {} \x1b[0m",
+        info!("\x1b[032mt:{:.3} Split Event between node: {} and edge: ({}-{}) at point: {} \x1b[0m",
             event.time,node.ndx,edge_start.ndx,edge_end.ndx,b);
 
         // ============= First edge loop ================
