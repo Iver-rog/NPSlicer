@@ -484,7 +484,7 @@ impl SkeletonBuilder {
     fn handle_edge_event(&mut self, event:Event ) -> Result<bool, SkeletonError> {
         if !self.shrining_polygon.contains(&event.node.ndx) || 
            !self.shrining_polygon.contains(&event.node.next_ndx) {
-            info!("t:{:.3} skipping Edge Event node: {} \x1b[031minactive node in edge\x1b[0m",
+            info!("t:{:.3} skipping Edge  Event node: {} \x1b[031minactive node in edge\x1b[0m",
                 event.time,event.node.ndx);
             return Ok(false);
         }
@@ -514,7 +514,16 @@ impl SkeletonBuilder {
         }
 
         // Calculate bisecotr for newly created vertex
-        let bisector = 0.5*(edge_start.bisector() + edge_end.bisector());
+        let edge_end_next = self.shrining_polygon.next(edge_end);
+        let edge_end_next_v = &self.vertices[edge_end_next.vertex_ndx];
+        let edge_end_next_p = edge_end_next_v.coords + (edge_end_next.bisector()*(event.time.0-edge_end_next_v.time)) ;
+
+        let edge_start_prev = self.shrining_polygon.prev(edge_start);
+        let edge_start_prev_v = &self.vertices[edge_start_prev.vertex_ndx];
+        let edge_start_prev_p = edge_start_prev_v.coords + (edge_start_prev.bisector()*(event.time.0-edge_start_prev_v.time)) ;
+
+        let bisector = bisector(new_vertex,edge_end_next_p,edge_start_prev_p)?;
+        //let bisector = 0.5*(edge_start.bisector() + edge_end.bisector());
         let new_node = Node::new()
             .next_ndx(edge_end.next_ndx)
             .prev_ndx(edge_start.prev_ndx) 
@@ -553,10 +562,9 @@ impl SkeletonBuilder {
         // find edge beeing split
         let mut edge = None;
         for [edge_start, edge_end] in self.shrining_polygon.nodes.iter()
-            .filter(|n| n.ndx != node.ndx)
             .filter(|n| self.shrining_polygon.contains(&n.ndx))
             .map(|n| [n, &self.shrining_polygon.nodes[n.next_ndx]] )
-            .filter(|[_,edge_end]| edge_end.ndx != node.ndx ){
+            .filter(|[edge_start,edge_end]| edge_start.ndx != node.ndx && edge_end.ndx != node.ndx ){
                 let start_v = &self.vertices[edge_start.vertex_ndx];
                 let end_v = &self.vertices[edge_end.vertex_ndx];
                 let start = start_v.coords + edge_start.bisector()*(time-start_v.time);
