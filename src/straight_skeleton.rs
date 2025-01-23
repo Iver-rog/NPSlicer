@@ -465,7 +465,10 @@ impl SkeletonBuilder {
                         debug_contours.push(self.shrinking_polygon_at_time(current_time))
                     }
                 },
-                Err(error) => println!("{error}")
+                Err(error) => {
+                    println!("{error}");
+                    println!("self");
+                }
             }
             if self.shrining_polygon.len() < 3 {
                 break;
@@ -567,6 +570,17 @@ impl SkeletonBuilder {
             .filter(|[edge_start,edge_end]| edge_start.ndx != node.ndx && edge_end.ndx != node.ndx ){
                 let start_v = &self.vertices[edge_start.vertex_ndx];
                 let end_v = &self.vertices[edge_end.vertex_ndx];
+
+                // the point b should lie inside the area bounded by the bisectors of the nodes of
+                // the edge beeing split:
+                let b_start = b - start_v.coords;
+                if cross2d(&edge_start.bisector(), &b_start) > EPSILON {continue}
+
+                let b_end = b - end_v.coords;
+                if cross2d(&edge_end.bisector(), &b_end) < EPSILON {continue}
+
+                // the point b should lie aproximatly on the edge at the time where the split event
+                // ocures
                 let start = start_v.coords + edge_start.bisector()*(time-start_v.time);
                 let end = end_v.coords + edge_end.bisector()*(time-end_v.time);
                 if is_point_on_edge(&b, &start, &end)? {
