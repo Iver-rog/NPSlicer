@@ -25,8 +25,8 @@ fn main(){
     .init();
 
     let mut blender = Blender::new();
-    //pipe_line(&mut blender);
-    straight_skeleton(&mut blender);
+    pipe_line(&mut blender);
+    //straight_skeleton(&mut blender);
 
     blender.show();
 }
@@ -72,21 +72,22 @@ fn straight_skeleton(blender:&mut Blender) {
 #[allow(unused)]
 fn pipe_line(blender:&mut Blender){
     let contours = stl_op::main(blender);
-    let first_contour = contours.iter().next().unwrap();
+    for (i,contour) in contours.into_iter().enumerate() {
+        println!("\x1b[032mcreating skeleton for contour {i}\x1b[0m");
+        let skeleton = match straight_skeleton::create_skeleton(
+            contour.into_iter()
+                .map(|vec| Point2::new(vec[0],vec[1]))
+                .collect()
+            ){
+            Ok(skeleton) => skeleton,
+            Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); panic!() }
+        };
 
-    let contour:Vec<Point2<f32>> = first_contour.to_owned().iter()
-            .map(|vec| Point2::new(vec[0],vec[1]))
-            .collect();
-
-    let skeleton = match straight_skeleton::create_skeleton(contour.clone()){
-        Ok(skeleton) => skeleton,
-        Err(err) =>{ println!("{err}"); panic!() }
-    };
-
-    blender.line_body(
-        &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
-        skeleton.edges.clone()
-        );
+        blender.line_body(
+            &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
+            skeleton.edges.clone()
+            );
+    }
 }
 fn test_poly() -> Vec<Point2<f32>>{
     vec![
