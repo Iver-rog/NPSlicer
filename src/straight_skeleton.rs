@@ -19,6 +19,12 @@ pub enum SkeletonError {
     ComputationError(String),
     #[error("Bisector Calculation Erorr: {0}")]
     BisectorError(String),
+    #[error("Initialization Error could not create SkeletonBuilder {0}")]
+    InitializationError(String),
+    #[error("Split event Error {0}")]
+    EdgeEventError(String),
+    #[error("Split event Error {0}")]
+    SplitEventError(String),
     }
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Node {
@@ -242,7 +248,10 @@ impl SkeletonBuilder {
             let p_next = points[next_ndx];
             let p_prev = points[prev_ndx];
 
-            let bisector = bisector(p_current, p_next, p_prev)?;
+            let bisector = match bisector(p_current, p_next, p_prev){
+                Ok(bisector) => bisector,
+                Err(error) => return Err(SkeletonError::InitializationError("Could not construct bisector for node {i}\n{error}".to_string()))
+            };
 
             nodes.push(Node {
                 ndx: i,
@@ -452,6 +461,7 @@ impl SkeletonBuilder {
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
         info!("\x1b[034m========================== Computing Skeleton ==========================\x1b[0m");
         let mut debug_contours: Vec<StraightSkeleton> = Vec::new();
+        let mut handled_events = 0;
         while let Some((event, _)) = self.events.pop() {
             let current_time = *event.time;
             let result = match event.event_type {
@@ -460,14 +470,15 @@ impl SkeletonBuilder {
             };
             match result {
                 Ok(print_debug) => {
+                    handled_events += 1;
                     if print_debug {
                         debug!("\n{self}");
                         debug_contours.push(self.shrinking_polygon_at_time(current_time))
                     }
                 },
                 Err(error) => {
-                    println!("{error}");
-                    println!("self");
+                    println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
+                    println!("{self}");
                 }
             }
             if self.shrining_polygon.len() < 3 {
@@ -525,7 +536,10 @@ impl SkeletonBuilder {
         let edge_start_prev_v = &self.vertices[edge_start_prev.vertex_ndx];
         let edge_start_prev_p = edge_start_prev_v.coords + (edge_start_prev.bisector()*(event.time.0-edge_start_prev_v.time)) ;
 
-        let bisector = bisector(new_vertex,edge_end_next_p,edge_start_prev_p)?;
+        let bisector = match bisector(new_vertex,edge_end_next_p,edge_start_prev_p){
+            Ok(bisector) => bisector,
+            Err(error)   => return Err(SkeletonError::EdgeEventError("could not calculate error for newly created vertex: {error}".to_string()))
+        };
         //let bisector = 0.5*(edge_start.bisector() + edge_end.bisector());
         let new_node = Node::new()
             .next_ndx(edge_end.next_ndx)
@@ -564,9 +578,12 @@ impl SkeletonBuilder {
 
         // find edge beeing split
         let mut edge = None;
+        // TODO: this loop redundantly checks each edge twise
         for [edge_start, edge_end] in self.shrining_polygon.nodes.iter()
             .filter(|n| self.shrining_polygon.contains(&n.ndx))
             .map(|n| [n, &self.shrining_polygon.nodes[n.next_ndx]] )
+            // split event has become a vertex event since split event calculation, a vertex event is expected to follow
+            .filter(|[edge_start,edge_end]| edge_start.ndx != node.next_ndx && edge_end.ndx != node.prev_ndx )
             .filter(|[edge_start,edge_end]| edge_start.ndx != node.ndx && edge_end.ndx != node.ndx ){
                 let start_v = &self.vertices[edge_start.vertex_ndx];
                 let end_v = &self.vertices[edge_end.vertex_ndx];
@@ -579,11 +596,11 @@ impl SkeletonBuilder {
                 let b_end = b - end_v.coords;
                 if cross2d(&edge_end.bisector(), &b_end) < EPSILON {continue}
 
-                // the point b should lie aproximatly on the edge at the time where the split event
-                // ocures
+                // the point b should lie aproximatly on the edge at the time where the split event ocures
                 let start = start_v.coords + edge_start.bisector()*(time-start_v.time);
                 let end = end_v.coords + edge_end.bisector()*(time-end_v.time);
                 if is_point_on_edge(&b, &start, &end)? {
+                    if edge.is_some() {println!("multiple edges found")};
                     edge = Some([edge_start,edge_end])
                     }
                 }
@@ -615,7 +632,10 @@ impl SkeletonBuilder {
         // add new vertex to vertex lisShort-circuiting logical ANDt
 
         // add new vertex to vert_ref list
-        let bisect = bisector(b, s_vert_start_possition, edge_start_possition)?;
+        let bisect = match bisector(b, s_vert_start_possition, edge_start_possition){
+            Ok(bisector) => bisector,
+            Err(error)   => return Err(SkeletonError::EdgeEventError(format!("s_vert_start:{} edge_start:{} {error}",s_vert_start.ndx,edge_start.ndx)))
+        };
         let left_node = Node::new()
             .next_ndx( node.next_ndx)
             .prev_ndx( edge_start.ndx)
@@ -632,7 +652,10 @@ impl SkeletonBuilder {
         let s_vert_end_possition = s_vert_end_p + s_vert_end.bisector() * time;
 
         // add new vertex to vert_ref list
-        let bisector = bisector(b, edge_end_possition, s_vert_end_possition )?;
+        let bisector = match bisector(b, edge_end_possition, s_vert_end_possition ){
+            Ok(bisector) => bisector,
+            Err(error)   => return Err(SkeletonError::EdgeEventError(format!("edge_end:{} s_vert_end:{} {error}",edge_end.ndx, s_vert_end.ndx)))
+        };
 
         let right_node = Node::new()
             .next_ndx( edge_end.ndx)
