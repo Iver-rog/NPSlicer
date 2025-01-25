@@ -469,12 +469,12 @@ impl SkeletonBuilder {
                 EventType::Split(_) => self.handle_split_event(event),
             };
             match result {
-                Ok(print_debug) => {
-                    handled_events += 1;
-                    if print_debug {
+                Ok(valid_event) => {
+                    if valid_event { 
                         debug!("\n{self}");
-                        debug_contours.push(self.shrinking_polygon_at_time(current_time))
-                    }
+                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
+                        handled_events += 1;
+                    };
                 },
                 Err(error) => {
                     println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
@@ -619,17 +619,13 @@ impl SkeletonBuilder {
             event.time,node.ndx,edge_start.ndx,edge_end.ndx,b);
 
         // ============= First edge loop ================
-        let edge_start_p = &self.vertices[edge_start.vertex_ndx].coords;
-        let edge_start_possition = edge_start_p + edge_start.bisector() * time;
+        let edge_start_v = &self.vertices[edge_start.vertex_ndx];
+        let edge_start_possition = edge_start_v.coords + edge_start.bisector() * (time-edge_start_v.time);
 
         // splitting vertex's neighbour forming a close loop with edge_start vertex:
         let s_vert_start = &self.shrining_polygon.nodes[node.next_ndx];
-        let s_vert_start_p = &self.vertices[s_vert_start.vertex_ndx].coords;
-        let s_vert_start_possition = s_vert_start_p + s_vert_start.bisector() * time;
-
-        //assert!(edge_start != edge_end_neighbour); // make sure the remaining region is not a triangle (3 verts)
-
-        // add new vertex to vertex lisShort-circuiting logical ANDt
+        let s_vert_start_v = &self.vertices[s_vert_start.vertex_ndx];
+        let s_vert_start_possition = s_vert_start_v.coords + s_vert_start.bisector() * (time-s_vert_start_v.time);
 
         // add new vertex to vert_ref list
         let bisect = match bisector(b, s_vert_start_possition, edge_start_possition){
@@ -642,14 +638,14 @@ impl SkeletonBuilder {
             .bisector( bisect )
             .vertex_ndx( self.vertices.len()-1 );
 
-        let edge_end_p = &self.vertices[edge_end.vertex_ndx].coords;
-        let edge_end_possition = edge_end_p + edge_end.bisector() * time;
+        let edge_end_v = &self.vertices[edge_end.vertex_ndx];
+        let edge_end_possition = edge_end_v.coords + edge_end.bisector() * (time-edge_end_v.time);
 
         // ============= Secound edge loop ================
         // splitting vertex's neighbour forming a close loop with edge_start vertex:
         let s_vert_end = &self.shrining_polygon.nodes[node.prev_ndx];
-        let s_vert_end_p = &self.vertices[s_vert_end.vertex_ndx].coords;
-        let s_vert_end_possition = s_vert_end_p + s_vert_end.bisector() * time;
+        let s_vert_end_v = &self.vertices[s_vert_end.vertex_ndx];
+        let s_vert_end_possition = s_vert_end_v.coords + s_vert_end.bisector() * (time-s_vert_end_v.time);
 
         // add new vertex to vert_ref list
         let bisector = match bisector(b, edge_end_possition, s_vert_end_possition ){
