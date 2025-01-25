@@ -11,22 +11,11 @@ use std::io::Write;
 mod test;
 
 fn main(){
-    env_logger::builder()
-        .format(|buf, record|{
-            match record.level() {
-                Level::Error => write!(buf,"\x1b[031mError\x1b[0m"),
-                Level::Warn  => write!(buf,"\x1b[033mWarn \x1b[0m"),
-                Level::Info  => write!(buf,"\x1b[032mInfo \x1b[0m"),
-                Level::Debug => write!(buf,"\x1b[034mDebug\x1b[0m"),
-                Level::Trace => write!(buf,"\x1b[035mTrace\x1b[0m"),
-            };
-            writeln!(buf,": {}",record.args())
-        })
-    .init();
+    init_logger();
 
     let mut blender = Blender::new();
-    //pipe_line(&mut blender);
-    straight_skeleton(&mut blender);
+    pipe_line(&mut blender);
+    //straight_skeleton(&mut blender);
 
     blender.show();
 }
@@ -92,6 +81,22 @@ fn pipe_line(blender:&mut Blender){
             );
     }
 }
+
+fn init_logger(){
+    env_logger::builder()
+        .format(|buf, record|{
+            match record.level() {
+                Level::Error => write!(buf,"\x1b[031mError\x1b[0m")?,
+                Level::Warn  => write!(buf,"\x1b[033mWarn \x1b[0m")?,
+                Level::Info  => write!(buf,"\x1b[032mInfo \x1b[0m")?,
+                Level::Debug => write!(buf,"\x1b[034mDebug\x1b[0m")?,
+                Level::Trace => write!(buf,"\x1b[035mTrace\x1b[0m")?,
+            };
+            writeln!(buf,": {}",record.args())
+        })
+    .init();
+}
+
 fn test_poly() -> Vec<Point2<f32>>{
     vec![
         Point2::new(-17.75, 14.74),

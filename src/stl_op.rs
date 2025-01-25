@@ -1,11 +1,10 @@
-#![allow(unused)]
 use crate::*;
 use utils::Blender;
 use std::fs::File;
 use std::io::BufReader;
 use std::f32::consts::PI;
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
-use stl_io::{self, Triangle, IndexedTriangle, Vector};
+use stl_io::{self, IndexedTriangle, Vector};
 
 pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
     let file_path = "../mesh/bunny2.stl";
@@ -47,7 +46,7 @@ pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
             edge_loop.reverse();
         }
     }
-    for edge_loop in large_edge_loops.clone() {
+    for edge_loop in large_edge_loops.iter() {
         blender.edge_loop(&edge_loop,&stl_data);
     }
 

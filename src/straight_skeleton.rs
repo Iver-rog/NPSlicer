@@ -250,7 +250,7 @@ impl SkeletonBuilder {
 
             let bisector = match bisector(p_current, p_next, p_prev){
                 Ok(bisector) => bisector,
-                Err(error) => return Err(SkeletonError::InitializationError("Could not construct bisector for node {i}\n{error}".to_string()))
+                Err(error) => return Err(SkeletonError::InitializationError(format!("Could not construct bisector for node {i}\n{error}")))
             };
 
             nodes.push(Node {
@@ -277,12 +277,12 @@ impl SkeletonBuilder {
 
         //initialize events 
         for node in builder.shrining_polygon.nodes.clone().iter() {
-            builder.find_events(*node, OrderedFloat(0.0))?;
+            builder.find_events(*node)?;
         }
         Ok(builder)
     }
 
-    fn find_events(&mut self, node:Node, current_time: OrderedFloat<f32>) -> Result<(), SkeletonError> {
+    fn find_events(&mut self, node:Node) -> Result<(), SkeletonError> {
         // Edge event between node and next_node
         let edge_event = self.compute_edge_event(
             node.ndx, 
@@ -300,7 +300,7 @@ impl SkeletonBuilder {
         }
         Ok(())
     }
-    fn find_edge_event(&mut self, node_ndx:usize,time:f32) -> Result<(), SkeletonError> {
+    fn find_edge_event(&mut self, node_ndx:usize) -> Result<(), SkeletonError> {
         // Edge events
         let edge_event = self.compute_edge_event(
             node_ndx,
@@ -538,7 +538,9 @@ impl SkeletonBuilder {
 
         let bisector = match bisector(new_vertex,edge_end_next_p,edge_start_prev_p){
             Ok(bisector) => bisector,
-            Err(error)   => return Err(SkeletonError::EdgeEventError("could not calculate error for newly created vertex: {error}".to_string()))
+            Err(error) => return Err(SkeletonError::EdgeEventError(
+                    format!("could not calculate bisector for newly created vertex: {error}")
+                    ))
         };
         //let bisector = 0.5*(edge_start.bisector() + edge_end.bisector());
         let new_node = Node::new()
@@ -549,7 +551,7 @@ impl SkeletonBuilder {
         let new_node = self.shrining_polygon.merge(new_node);
 
         //find events for the new vertex
-        self.find_events(new_node,event.time)?;
+        self.find_events(new_node)?;
         let prev_node = self.shrining_polygon.nodes[new_node.prev_ndx];
         // find edge event for previous node
         let edge_event = self.compute_edge_event( prev_node.ndx)?;
@@ -630,7 +632,7 @@ impl SkeletonBuilder {
         // add new vertex to vert_ref list
         let bisect = match bisector(b, s_vert_start_possition, edge_start_possition){
             Ok(bisector) => bisector,
-            Err(error)   => return Err(SkeletonError::EdgeEventError(format!("s_vert_start:{} edge_start:{} {error}",s_vert_start.ndx,edge_start.ndx)))
+            Err(error)   => return Err(SkeletonError::SplitEventError(format!("s_vert_start:{} edge_start:{} {error}",s_vert_start.ndx,edge_start.ndx)))
         };
         let left_node = Node::new()
             .next_ndx( node.next_ndx)
@@ -650,7 +652,7 @@ impl SkeletonBuilder {
         // add new vertex to vert_ref list
         let bisector = match bisector(b, edge_end_possition, s_vert_end_possition ){
             Ok(bisector) => bisector,
-            Err(error)   => return Err(SkeletonError::EdgeEventError(format!("edge_end:{} s_vert_end:{} {error}",edge_end.ndx, s_vert_end.ndx)))
+            Err(error)   => return Err(SkeletonError::SplitEventError(format!("edge_end:{} s_vert_end:{} {error}",edge_end.ndx, s_vert_end.ndx)))
         };
 
         let right_node = Node::new()
@@ -662,11 +664,11 @@ impl SkeletonBuilder {
         let [left_node,right_node] = self.shrining_polygon.split(left_node, right_node);
 
         // Find new events for the new verices
-        self.find_events(left_node, event.time)?;
-        self.find_events(right_node, event.time)?;
+        self.find_events(left_node)?;
+        self.find_events(right_node)?;
         // ToDo: it might also be nessesary to find events for the previous vertices
-        self.find_edge_event(left_node.prev_ndx,time)?;
-        self.find_edge_event(right_node.prev_ndx,time)?;
+        self.find_edge_event(left_node.prev_ndx)?;
+        self.find_edge_event(right_node.prev_ndx)?;
         Ok(true)
     }
 }
