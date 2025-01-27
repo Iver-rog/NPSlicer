@@ -1,4 +1,5 @@
 #![allow(unused)]
+use core::result;
 use std::{os::unix::process::CommandExt, process::Command};
 use std::fs::{self, File, OpenOptions};
 use std::path::Path;
@@ -124,6 +125,7 @@ impl <'a> Blender<'a> {
     }
 
     pub fn edge_loop_points(&mut self, edge_loop:&Vec<[f32;3]>){
+        if edge_loop.len() == 0 {println!("Blender Error: attempted to displey empty loop");return ()}
         let points: Vec<[f32;3]>= edge_loop.clone().into_iter()
             .map(|[x,y,z]| { [ x, y, z ] } )
             .collect();
