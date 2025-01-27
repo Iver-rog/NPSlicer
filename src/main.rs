@@ -5,7 +5,8 @@ use utils::Blender;
 mod straight_skeleton;
 use nalgebra::Point2;
 use log::{error, Level};
-use std::io::Write;
+use std::io::{Write, BufReader};
+use std::fs::File;
 
 #[cfg(test)]
 mod test;
@@ -14,32 +15,15 @@ fn main(){
     init_logger();
 
     let mut blender = Blender::new();
-    pipe_line(&mut blender);
+    //pipe_line(&mut blender);
     //straight_skeleton(&mut blender);
+    layers(&mut blender);
 
     blender.show();
 }
 #[allow(unused)]
 fn straight_skeleton(blender:&mut Blender) {
-    //let vertices = vec![
-    //    Point2::new(0.0,0.0),
-    //    Point2::new(2.0,0.1),
-    //    Point2::new(2.1,1.0),
-    //    Point2::new(1.3,0.9),
-    //    Point2::new(1.1,0.5),
-    //    Point2::new(0.7,1.0),
-    //    Point2::new(0.0,1.1),
-    //];
-    //let vertices:Vec<Point2<f32>> = vec![
-    //    Point2::new(10.0,50.),
-    //    Point2::new(20.0,20.0),
-    //    Point2::new(25.0,40.),
-    //    Point2::new(63.5,10.),
-    //    Point2::new(63.5,25.0),
-    //    Point2::new(50.0,32.5),
-    //    Point2::new(62.5,42.5),
-    //    Point2::new(40., 52.0)
-    //];
+    //let vertices = test_poly();
     let vertices = test_poly2();
 
     let vertices_as_f32:Vec<[f32;3]> = vertices.clone().into_iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
@@ -57,6 +41,15 @@ fn straight_skeleton(blender:&mut Blender) {
         }
     }
     blender.edge_loop_points(&vertices_as_f32);
+}
+fn layers(blender:&mut Blender){
+    let file_path = "../mesh/bunny2.stl";
+
+    let file = File::open(file_path).expect("Failed to open STL file");
+    let mut reader = BufReader::new(file);
+
+    let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
+    stl_op::extract_planar_layers(&mesh, 0.5,blender);
 }
 #[allow(unused)]
 fn pipe_line(blender:&mut Blender){

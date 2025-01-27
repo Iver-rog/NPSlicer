@@ -1,10 +1,211 @@
 use crate::*;
+use log::warn;
+use nalgebra_glm::floor;
 use utils::Blender;
+use core::iter::{IntoIterator, Iterator};
+use core::{assert, assert_eq, usize};
+use std::collections::hash_set::Intersection;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{stdout, BufReader};
 use std::f32::consts::PI;
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
-use stl_io::{self, IndexedTriangle, Vector};
+use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
+use nalgebra::Point3;
+
+pub struct Contour{
+    outer_loop: Vec<Point3<f32>>,
+    holes: Vec<Vec<Point3<f32>>>,
+}
+
+pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) {//-> Contour {
+    let z_max = mesh.vertices.iter().map(|vert| (vert[2]/layer_height).ceil() as usize).max().unwrap();
+    println!("{z_max}");;
+
+    let mut look_up_table:Vec<HashSet<usize>> = vec![HashSet::new();z_max+1];
+    for (face_ndx,min,max) in mesh.faces.iter().enumerate()
+        .map(|(i,tri)| {
+            let min = tri.vertices.iter()
+                .map(|vert| (mesh.vertices[*vert][2] / layer_height ).ceil() as usize)
+                .min().unwrap();
+            let max: usize = tri.vertices.iter()
+                .map(|vert| (mesh.vertices[*vert][2] / layer_height ).floor() as usize)
+                .max().unwrap();
+            (i,min,max)
+        }){
+            for layer_nr in min..=max {
+                look_up_table[layer_nr].insert(face_ndx);
+            }
+        }
+
+    // Debug: export faces to blender
+    for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
+    assert_eq!(look_up_table[layer_nr],face_ndxes.clone());
+        let owned_faces:Vec<IndexedTriangle> = face_ndxes.into_iter()
+            .map(|face_ndx| mesh.faces[*face_ndx].clone())
+            .collect();
+        blender.save_mesh(&owned_faces,&mesh.vertices,format!("layer {layer_nr}"));
+    }
+
+    let edges_to_tri_map = edges_to_triangles_map( mesh );
+    let mut contours:Vec<Vec<Point3<f32>>> = Vec::new();
+
+    for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
+        let z_plane = layer_height*(layer_nr as f32);
+        let contour = extract_layer(
+            z_plane,
+            face_ndxes,
+            mesh,
+            layer_nr,
+            &edges_to_tri_map,
+            blender);
+        blender.edge_loop_points(&contour.iter().map(|p|[p.x,p.y,p.z]).collect());
+        contours.push(contour);
+    }
+}
+#[allow(non_snake_case)]
+fn extract_layer(
+    z_plane:f32,
+    face_ndxes:&HashSet<usize>,
+    mesh:&IndexedMesh,
+    layer_nr:usize,
+    edges_to_tri_map:&HashMap<Edge,[usize;2]>,
+    blender:& mut Blender)
+    ->Vec<Point3<f32>>{
+
+    let mut handled_faces:HashSet<usize> = HashSet::new();
+    let mut handled_edges:HashSet<Edge> = HashSet::new();
+    let mut contour = Vec::new();
+    println!("layer number: {} z_plane: {}",&layer_nr,&z_plane);
+    while handled_faces.len() < face_ndxes.len() {
+
+        // Find a unprosessed face and edge to start the contour
+        for face_ndx in face_ndxes.iter(){
+            println!("========= outer loop =========");
+            if handled_faces.contains(face_ndx) {println!("Handled face allready {face_ndx}");continue}
+            let face = &mesh.faces[*face_ndx];
+            handled_faces.insert(*face_ndx);
+            let edges = get_edges(face);
+
+            let (intersection_p,first_edge) = match edges.iter()
+                .filter_map(|edge|{
+                    let p1 = mesh.vertices[edge.0];
+                    let edge_start = Point3::new(p1[0],p1[1],p1[2]);
+                    let p2 = mesh.vertices[edge.1];
+                    let edge_end = Point3::new(p2[0],p2[1],p2[2]);
+                    match edge_zplane_intersection(edge_start, edge_end, z_plane){
+                        Some(intersection_p) => {
+                            Some((intersection_p,edge))
+                        },
+                        None => {
+                            None
+                        },
+                    }
+                }).next() {
+                    Some(result)=>{println!("found intersection for face {face_ndx}");result},
+                    None => {
+                        println!("no intersection found for face {face_ndx}");
+                        continue
+                    }
+                };
+            handled_edges.insert(first_edge.clone());
+            contour.push(intersection_p);
+
+            // Inner loop
+            let mut prev_edge = first_edge.clone();
+            loop{
+                println!("========= inner loop for edge {}-{} =========",prev_edge.0,prev_edge.1);
+                //println!("prev_edge: ({},{})",prev_edge.0,prev_edge.1);
+                let [face1,face2] = edges_to_tri_map.get(&prev_edge).expect("prev edge exists in edges to tri map");
+
+                let next_tri = if handled_faces.contains(face1) 
+                        { println!("finding intersections for face {face2}"); face2 }
+                    else { 
+                        if handled_faces.contains(face1){ 
+                            println!("both faces handled f1:{face1} f2:{face2}");
+                            dbg!(&handled_faces);
+                            println!("Loop completed for layer {layer_nr}");
+                            break
+                        }
+                        else {println!("finding intersections for face {face1}"); face1}
+                    };
+                        //else {face1}
+
+                handled_faces.insert(*next_tri);
+                let face = &mesh.faces[*next_tri];
+                let edges = get_edges(face);
+
+                match edges.iter()
+                    .filter_map(|edge|{
+                        if handled_edges.contains(edge){return None;}
+                        let p1 = mesh.vertices[edge.0];
+                        let edge_start = Point3::new(p1[0],p1[1],p1[2]);
+                        let p2 = mesh.vertices[edge.1];
+                        let edge_end = Point3::new(p2[0],p2[1],p2[2]);
+                        match edge_zplane_intersection(edge_start, edge_end, z_plane){
+                            Some(intersection_p) => Some((intersection_p,edge)),
+                            None => None,
+                        }
+                    }).next() {
+                        Some((intersection_p,edge))=>{
+                            //println!("inner loop: found intersection for edge {next_tri}");
+                            println!("found intersection for edge {}-{}",edge.0,edge.1);
+                            contour.push(intersection_p);
+                            handled_edges.insert(edge.clone());
+                            prev_edge = edge.clone();
+                            continue;
+                        },
+                        None => {
+                            println!("No intersection found for face {next_tri} face is {}", if handled_faces.contains(next_tri){"handled"}else{"not handled"});
+                            for edge in edges {
+                                println!(" - edge: {}-{} {}",
+                                    edge.0,
+                                    edge.1,
+                                    if handled_edges.contains(&edge){"is handled"}else{"is not handled"}
+                                    )
+                            };
+                            //assert!(face_ndxes.contains(next_tri));
+                            blender.save_mesh(&vec![face.clone()], &mesh.vertices, format!("layer end point {layer_nr}"));
+                            break
+                        }
+                    };
+                }
+                //for (i,face) in handled_faces.iter().enumerate(){
+                //    blender.save_mesh(&vec![mesh.faces[*face].clone()], &mesh.vertices,format!("{face}"));
+                //}
+            }
+        println!("handled {} faces out of {}",handled_faces.len(), face_ndxes.len());
+        //break;
+        }
+    contour
+}
+fn get_edges(face:&IndexedTriangle)->[Edge;3]{
+    let [v1, v2, v3] = face.vertices;
+    [
+        Edge::new(v1,v2),
+        Edge::new(v2,v3),
+        Edge::new(v3,v1)
+    ]
+}
+#[test]
+fn edge_zplane_intersection_test(){
+    let edge_start = Point3::new(0.,0.,0.);
+    let edge_end = Point3::new(1.,1.,1.);
+    let result = edge_zplane_intersection(edge_start, edge_end, 0.5).expect("valid result");
+    assert_eq!(Point3::new(0.5,0.5,0.5),result);
+    let result = edge_zplane_intersection(edge_end, edge_start, 0.5).expect("valid result");
+    assert_eq!(Point3::new(0.5,0.5,0.5),result);
+    let result = edge_zplane_intersection(edge_start, edge_end, 1.5);
+    assert_eq!(None,result);
+    let result = edge_zplane_intersection(edge_end, edge_start, 1.5);
+    assert_eq!(None,result);
+}
+fn edge_zplane_intersection(edge_start:Point3<f32>,edge_end:Point3<f32>,z_plane:f32)-> Option<Point3<f32>>{
+    let edge_vec = edge_end - edge_start;
+    let scale = (z_plane - edge_start.z) / edge_vec.z;
+    if scale.is_sign_negative() {return None;}
+    if scale > 1.0 {return None;}
+    return Some(edge_start + edge_vec*scale)
+}
 
 pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
     let file_path = "../mesh/bunny2.stl";
@@ -61,11 +262,11 @@ pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
     return edge_loops_points
 }
 
-fn edges_to_triangles_map<'a>( stl_data:&'a stl_io::IndexedMesh ) -> HashMap<Edge,[&'a IndexedTriangle;2]>{
-    let mut edge_to_tri_ndx: HashMap<Edge,(&IndexedTriangle,Option<&IndexedTriangle>)>
+fn edges_to_triangles_map<'a>( stl_data:&'a stl_io::IndexedMesh ) -> HashMap<Edge,[usize;2]>{
+    let mut edge_to_tri_ndx: HashMap<Edge,(usize,Option<usize>)>
         = HashMap::with_capacity(stl_data.faces.len()*2);
 
-    for tri in stl_data.faces.iter() {
+    for (i,tri) in stl_data.faces.iter().enumerate() {
         let [v1, v2, v3] = tri.vertices;
         let edges = [
             Edge::new(v1,v2),
@@ -74,8 +275,8 @@ fn edges_to_triangles_map<'a>( stl_data:&'a stl_io::IndexedMesh ) -> HashMap<Edg
         ];
         for edge in edges { 
             let entry = edge_to_tri_ndx.entry(edge)
-                .or_insert((&tri,None));
-            entry.1 = Some(&tri);
+                .or_insert((i,None));
+            entry.1 = Some(i);
         }
     }
     let mut edge_to_tri = HashMap::with_capacity(stl_data.faces.len());
