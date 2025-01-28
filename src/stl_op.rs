@@ -4,7 +4,6 @@ use nalgebra_glm::floor;
 use utils::Blender;
 use core::iter::{IntoIterator, Iterator};
 use core::{assert, assert_eq, usize};
-use std::collections::hash_set::Intersection;
 use std::fs::File;
 use std::io::{stdout, BufReader};
 use std::f32::consts::PI;
@@ -12,16 +11,16 @@ use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
 use nalgebra::Point3;
 
-pub struct Contour{
+pub struct Polygon{
     outer_loop: Vec<Point3<f32>>,
     holes: Vec<Vec<Point3<f32>>>,
 }
 
-pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) {//-> Contour {
+pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Point3<f32>>> {
     let z_max = mesh.vertices.iter().map(|vert| (vert[2]/layer_height).ceil() as usize).max().unwrap();
-    println!("{z_max}");;
 
-    let mut look_up_table:Vec<HashSet<usize>> = vec![HashSet::new();z_max+1];
+    // Identify which faces intersect which z-planes and save result in look_up_table
+    let mut look_up_table:Vec<HashSet<usize>> = vec![HashSet::new();z_max];
     for (face_ndx,min,max) in mesh.faces.iter().enumerate()
         .map(|(i,tri)| {
             let min = tri.vertices.iter()
@@ -38,50 +37,49 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
         }
 
     // Debug: export faces to blender
-    for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
-    assert_eq!(look_up_table[layer_nr],face_ndxes.clone());
-        let owned_faces:Vec<IndexedTriangle> = face_ndxes.into_iter()
-            .map(|face_ndx| mesh.faces[*face_ndx].clone())
-            .collect();
-        blender.save_mesh(&owned_faces,&mesh.vertices,format!("layer {layer_nr}"));
-    }
+    //for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
+    //assert_eq!(look_up_table[layer_nr],face_ndxes.clone());
+    //    let owned_faces:Vec<IndexedTriangle> = face_ndxes.into_iter()
+    //        .map(|face_ndx| mesh.faces[*face_ndx].clone())
+    //        .collect();
+    //    blender.save_mesh(&owned_faces,&mesh.vertices,format!("layer {layer_nr}"));
+    //}
 
     let edges_to_tri_map = edges_to_triangles_map( mesh );
     let mut contours:Vec<Vec<Point3<f32>>> = Vec::new();
 
     for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
         let z_plane = layer_height*(layer_nr as f32);
+        //println!("layer number: {} z_plane: {}",&layer_nr,&z_plane);
         let contour = extract_layer(
             z_plane,
             face_ndxes,
             mesh,
-            layer_nr,
             &edges_to_tri_map,
-            blender);
-        blender.edge_loop_points(&contour.iter().map(|p|[p.x,p.y,p.z]).collect());
-        contours.push(contour);
+            );
+        for acontour in contour{
+            //blender.edge_loop_points(&acontour.iter().map(|p|[p.x,p.y,p.z]).collect());
+            contours.push(acontour);
+        }
     }
+    contours
 }
 #[allow(non_snake_case)]
 fn extract_layer(
     z_plane:f32,
     face_ndxes:&HashSet<usize>,
     mesh:&IndexedMesh,
-    layer_nr:usize,
-    edges_to_tri_map:&HashMap<Edge,[usize;2]>,
-    blender:& mut Blender)
-    ->Vec<Point3<f32>>{
+    edges_to_tri_map:&HashMap<Edge,[usize;2]>
+    ) ->Vec<Vec<Point3<f32>>> {
 
     let mut handled_faces:HashSet<usize> = HashSet::new();
     let mut handled_edges:HashSet<Edge> = HashSet::new();
-    let mut contour = Vec::new();
-    println!("layer number: {} z_plane: {}",&layer_nr,&z_plane);
+    let mut contours = Vec::new();
     while handled_faces.len() < face_ndxes.len() {
 
         // Find a unprosessed face and edge to start the contour
         for face_ndx in face_ndxes.iter(){
-            println!("========= outer loop =========");
-            if handled_faces.contains(face_ndx) {println!("Handled face allready {face_ndx}");continue}
+            if handled_faces.contains(face_ndx) {continue}
             let face = &mesh.faces[*face_ndx];
             handled_faces.insert(*face_ndx);
             let edges = get_edges(face);
@@ -101,34 +99,27 @@ fn extract_layer(
                         },
                     }
                 }).next() {
-                    Some(result)=>{println!("found intersection for face {face_ndx}");result},
+                    Some(result)=>{ result },
                     None => {
-                        println!("no intersection found for face {face_ndx}");
                         continue
                     }
                 };
             handled_edges.insert(first_edge.clone());
-            contour.push(intersection_p);
 
             // Inner loop
             let mut prev_edge = first_edge.clone();
+            let mut contour = vec![intersection_p];
             loop{
-                println!("========= inner loop for edge {}-{} =========",prev_edge.0,prev_edge.1);
-                //println!("prev_edge: ({},{})",prev_edge.0,prev_edge.1);
                 let [face1,face2] = edges_to_tri_map.get(&prev_edge).expect("prev edge exists in edges to tri map");
 
-                let next_tri = if handled_faces.contains(face1) 
-                        { println!("finding intersections for face {face2}"); face2 }
+                let next_tri = if handled_faces.contains(face1) { face2 }
                     else { 
                         if handled_faces.contains(face1){ 
-                            println!("both faces handled f1:{face1} f2:{face2}");
-                            dbg!(&handled_faces);
-                            println!("Loop completed for layer {layer_nr}");
+                            println!("Loop completed");
                             break
                         }
-                        else {println!("finding intersections for face {face1}"); face1}
+                        else { face1}
                     };
-                        //else {face1}
 
                 handled_faces.insert(*next_tri);
                 let face = &mesh.faces[*next_tri];
@@ -136,7 +127,7 @@ fn extract_layer(
 
                 match edges.iter()
                     .filter_map(|edge|{
-                        if handled_edges.contains(edge){return None;}
+                        if handled_edges.contains(edge){ return None;}
                         let p1 = mesh.vertices[edge.0];
                         let edge_start = Point3::new(p1[0],p1[1],p1[2]);
                         let p2 = mesh.vertices[edge.1];
@@ -147,36 +138,20 @@ fn extract_layer(
                         }
                     }).next() {
                         Some((intersection_p,edge))=>{
-                            //println!("inner loop: found intersection for edge {next_tri}");
-                            println!("found intersection for edge {}-{}",edge.0,edge.1);
                             contour.push(intersection_p);
                             handled_edges.insert(edge.clone());
                             prev_edge = edge.clone();
                             continue;
                         },
                         None => {
-                            println!("No intersection found for face {next_tri} face is {}", if handled_faces.contains(next_tri){"handled"}else{"not handled"});
-                            for edge in edges {
-                                println!(" - edge: {}-{} {}",
-                                    edge.0,
-                                    edge.1,
-                                    if handled_edges.contains(&edge){"is handled"}else{"is not handled"}
-                                    )
-                            };
-                            //assert!(face_ndxes.contains(next_tri));
-                            blender.save_mesh(&vec![face.clone()], &mesh.vertices, format!("layer end point {layer_nr}"));
+                            contours.push(contour);
                             break
                         }
                     };
                 }
-                //for (i,face) in handled_faces.iter().enumerate(){
-                //    blender.save_mesh(&vec![mesh.faces[*face].clone()], &mesh.vertices,format!("{face}"));
-                //}
             }
-        println!("handled {} faces out of {}",handled_faces.len(), face_ndxes.len());
-        //break;
         }
-    contour
+    contours
 }
 fn get_edges(face:&IndexedTriangle)->[Edge;3]{
     let [v1, v2, v3] = face.vertices;
@@ -240,10 +215,10 @@ pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
     }
 
     let mut large_edge_loops:Vec<Vec<usize>> = edge_perimeters.into_iter()
-        .filter(|edge_loop| area(edge_loop,&stl_data.vertices).abs() > 20.0 )
+        .filter(|edge_loop| area_indexed_contour(edge_loop,&stl_data.vertices).abs() > 20.0 )
         .collect();
     for edge_loop in &mut large_edge_loops{
-        if area(&edge_loop,&stl_data.vertices) < 0.0{
+        if area_indexed_contour(&edge_loop,&stl_data.vertices) < 0.0{
             edge_loop.reverse();
         }
     }
@@ -342,7 +317,24 @@ fn extract_perimeter(triangles: Vec<IndexedTriangle>) -> Vec<usize> {
     return edge_loop
 }
 
-fn area(point_index:&Vec<usize>, points: &Vec<Vector<f32>>) -> f32 {
+pub fn area_contour(point_index:&Vec<Point3<f32>>) -> f32 {
+    // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
+    let point_index_offset_by_one = point_index.iter()
+        .skip(1)
+        .chain( point_index.iter() );
+
+    return 0.5 * point_index.iter()
+        .zip(point_index_offset_by_one)
+        .map(|(p1,p2)|{
+            let x1 = p1[0];
+            let y1 = p1[1];
+            let x2 = p2[0];
+            let y2 = p2[1];
+            return x1*y2 - x2*y1
+        })
+        .sum::<f32>();
+}
+pub fn area_indexed_contour(point_index:&Vec<usize>, points: &Vec<Vector<f32>>) -> f32 {
     // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
     let point_index_offset_by_one = point_index.iter()
         .skip(1)
@@ -369,7 +361,7 @@ fn test_area_function(){
         Vector::new([-1.0, -1.0, 0.0]),
         Vector::new([ 1.0, -1.0, 0.0])
     ];
-    assert_eq!(area(&point_index, &points),4.0)
+    assert_eq!(area_indexed_contour(&point_index, &points),4.0)
 }
 fn find_connected_components(triangles: &[IndexedTriangle]) -> Vec<Vec<IndexedTriangle>> {
     let mut components: Vec<Vec<IndexedTriangle>> = Vec::new();
