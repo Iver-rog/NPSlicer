@@ -136,9 +136,12 @@ impl <'a> Blender<'a> {
 
         self.line_objects.push( (points, edges) );
     }
-    pub fn line_body(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
+    pub fn line_body2d(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
         let points3d = points.clone().into_iter().map(|[p1,p2]|[p1,p2,0.0]).collect();
         self.line_objects.push((points3d,edges.clone()));
+    }
+    pub fn line_body3d(&mut self,points:Vec<[f32;3]>,edges:Vec<[usize;2]>) {
+        self.line_objects.push((points,edges.clone()));
     }
     pub fn line_body_points(&mut self, edges:&Vec<[[f32;2];2]>) {
         let points3d: Vec<[f32;3]> = edges.iter().flatten()

@@ -3,8 +3,9 @@ mod stl_op;
 mod utils;
 use utils::Blender;
 mod straight_skeleton;
-use nalgebra::Point2;
+use nalgebra::{Point2,Point3};
 use log::{error, Level};
+use core::f32;
 use std::io::{Write, BufReader};
 use std::fs::File;
 
@@ -33,9 +34,9 @@ fn straight_skeleton(blender:&mut Blender) {
         Ok(builder) => match builder.compute_skeleton() {
             Err(error) => error!("{error}"),
             Ok((skeleton,debug_contours)) => {
-                blender.line_body(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
+                blender.line_body2d(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
                 for contour in debug_contours {
-                    blender.line_body(&contour.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), contour.edges);
+                    blender.line_body2d(&contour.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), contour.edges);
                 }
             } 
         }
@@ -43,13 +44,36 @@ fn straight_skeleton(blender:&mut Blender) {
     blender.edge_loop_points(&vertices_as_f32);
 }
 fn layers(blender:&mut Blender){
-    let file_path = "../mesh/bunny2.stl";
+    //let file_path = "../mesh/bunny2.stl";
+    let file_path = "../mesh/stanford-armadillo.stl";
 
     let file = File::open(file_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
 
     let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    stl_op::extract_planar_layers(&mesh, 0.5,blender);
+    let contours = stl_op::extract_planar_layers(&mesh, 1.0 ,blender);
+    for (i,contour) in contours.iter().enumerate() {
+        let layer_height = i as f32 * 1.0;
+        println!("contour {i} of {}",contours.len());
+        let mut contour = contour.clone();
+        if stl_op::area_contour(&contour) < 0.0 { 
+            contour = contour.into_iter().rev().collect::<Vec<Point3<f32>>>();
+        }
+
+        let skeleton = match straight_skeleton::create_skeleton(
+            contour.into_iter()
+                .map(|vec| Point2::new(vec[0],vec[1]))
+                .collect()
+            ){
+            Ok(skeleton) => skeleton,
+            Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); continue }
+        };
+
+        blender.line_body3d(
+            skeleton.vertices.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
+            skeleton.edges.clone()
+            );
+    }
 }
 #[allow(unused)]
 fn pipe_line(blender:&mut Blender){
@@ -68,7 +92,7 @@ fn pipe_line(blender:&mut Blender){
             Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); panic!() }
         };
 
-        blender.line_body(
+        blender.line_body2d(
             &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
             skeleton.edges.clone()
             );
