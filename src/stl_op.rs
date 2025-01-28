@@ -1,12 +1,7 @@
 use crate::*;
-use log::warn;
-use nalgebra_glm::floor;
 use utils::Blender;
 use core::iter::{IntoIterator, Iterator};
-use core::{assert, assert_eq, usize};
-use std::fs::File;
-use std::io::{stdout, BufReader};
-use std::f32::consts::PI;
+use core::{assert_eq, usize};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
 use nalgebra::Point3;
@@ -187,59 +182,41 @@ fn edge_zplane_intersection(edge_start:Point3<f32>,edge_end:Point3<f32>,z_plane:
     return Some(edge_start + edge_vec*scale)
 }
 
-pub fn main(blender:&mut Blender) -> Vec<Vec<Vector<f32>>>{
-    let file_path = "../mesh/bunny2.stl";
+pub fn extract_overhangs(mesh:&IndexedMesh,angle:f32) -> Vec<Vec<IndexedTriangle>>{
 
-    let file = File::open(file_path).expect("Failed to open STL file");
-    let mut reader = BufReader::new(file);
-
-    let stl_data = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    //let edge_to_tri = edges_to_triangles_map(&stl_data);
-
-    let overhangs: Vec<IndexedTriangle> = stl_data.faces.iter()
-        .filter(|tri| tri.normal[2] < -PI/6.0 )
+    let overhangs: Vec<&IndexedTriangle> = mesh.faces.iter()
+        .filter(|tri| tri.normal[2] < angle )
         .filter(|tri|{ !(
-            stl_data.vertices[tri.vertices[0]][2] < 0.0 &&
-            stl_data.vertices[tri.vertices[1]][2] < 0.0 &&
-            stl_data.vertices[tri.vertices[2]][2] < 0.0 
+            mesh.vertices[tri.vertices[0]][2] < 0.0 &&
+            mesh.vertices[tri.vertices[1]][2] < 0.0 &&
+            mesh.vertices[tri.vertices[2]][2] < 0.0 
             )})
-        .map(|tri| tri.clone() )
         .collect();
-    blender.save_mesh(&overhangs, &stl_data.vertices,"overhangs".to_string());
 
     let overhang_regions = find_connected_components(&overhangs);
-    //utils::print_component_info(&overhang_regions);
-    for (i,islands) in overhang_regions.iter().enumerate(){
-        let filename = format!("overhang_island{i}");
-        blender.save_mesh(&islands, &stl_data.vertices,filename);
-    }
+    return overhang_regions
+}
 
-    let mut edge_perimeters:Vec<Vec<usize>> = Vec::new();
-    for region in overhang_regions {
-        edge_perimeters.push( extract_perimeter(region) );
-    }
+pub fn extract_contours_larger_than(overhang_regions:Vec<Vec<IndexedTriangle>>,mesh:&IndexedMesh,min_area:f32)->Vec<Vec<usize>>{
 
-    let mut large_edge_loops:Vec<Vec<usize>> = edge_perimeters.into_iter()
-        .filter(|edge_loop| area_indexed_contour(edge_loop,&stl_data.vertices).abs() > 20.0 )
+    let mut overhang_contours:Vec<Vec<usize>> = overhang_regions.into_iter()
+        .map(|region| extract_perimeter(region))
+        .filter(|edge_loop| area_indexed_contour(edge_loop,&mesh.vertices).abs() > min_area )
         .collect();
-    for edge_loop in &mut large_edge_loops{
-        if area_indexed_contour(&edge_loop,&stl_data.vertices) < 0.0{
+
+    for edge_loop in &mut overhang_contours{
+        if area_indexed_contour(&edge_loop,&mesh.vertices) < 0.0{
             edge_loop.reverse();
         }
     }
-    for edge_loop in large_edge_loops.iter() {
-        blender.edge_loop(&edge_loop,&stl_data);
-    }
 
-    let mut edge_loops_points = Vec::new();
-    for edge_loop in large_edge_loops {
-        let edge_loop_points:Vec<Vector<f32>> = edge_loop.into_iter()
-            .map(|ndx| stl_data.vertices[ndx])
-            .collect();
-        edge_loops_points.push(edge_loop_points);
-    }
+    return overhang_contours
 
-    return edge_loops_points
+    //let mut edge_loops_points = overhang_contours.into_iter()
+    //    .map(|contour| contour.into_iter().map(|ndx| mesh.vertices[ndx]).collect() )
+    //    .collect();
+    //
+    //return edge_loops_points
 }
 
 fn edges_to_triangles_map<'a>( stl_data:&'a stl_io::IndexedMesh ) -> HashMap<Edge,[usize;2]>{
@@ -339,23 +316,6 @@ pub fn area_contour2d(point_index:&Vec<Point2<f32>>) -> f32 {
         })
         .sum::<f32>();
 }
-pub fn area_contour(point_index:&Vec<Point3<f32>>) -> f32 {
-    // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
-    let point_index_offset_by_one = point_index.iter()
-        .skip(1)
-        .chain( point_index.iter() );
-
-    return 0.5 * point_index.iter()
-        .zip(point_index_offset_by_one)
-        .map(|(p1,p2)|{
-            let x1 = p1[0];
-            let y1 = p1[1];
-            let x2 = p2[0];
-            let y2 = p2[1];
-            return x1*y2 - x2*y1
-        })
-        .sum::<f32>();
-}
 pub fn area_indexed_contour(point_index:&Vec<usize>, points: &Vec<Vector<f32>>) -> f32 {
     // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
     let point_index_offset_by_one = point_index.iter()
@@ -385,7 +345,7 @@ fn test_area_function(){
     ];
     assert_eq!(area_indexed_contour(&point_index, &points),4.0)
 }
-fn find_connected_components(triangles: &[IndexedTriangle]) -> Vec<Vec<IndexedTriangle>> {
+fn find_connected_components(triangles: &[&IndexedTriangle]) -> Vec<Vec<IndexedTriangle>> {
     let mut components: Vec<Vec<IndexedTriangle>> = Vec::new();
     let mut unvisited: HashSet<usize> = (0..triangles.len()).collect();
     

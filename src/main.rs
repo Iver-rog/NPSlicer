@@ -1,5 +1,6 @@
 #![allow(unused)]
 mod stl_op;
+use std::f32::consts::PI;
 mod utils;
 use utils::Blender;
 mod straight_skeleton;
@@ -43,6 +44,7 @@ fn straight_skeleton(blender:&mut Blender) {
     }
     blender.edge_loop_points(&vertices_as_f32);
 }
+#[allow(unused)]
 fn skeleton_layers(blender:&mut Blender){
     //let file_path = "../mesh/bunny2.stl";
     let file_path = "../mesh/stanford-armadillo.stl";
@@ -76,23 +78,39 @@ fn skeleton_layers(blender:&mut Blender){
 }
 #[allow(unused)]
 fn pipe_line(blender:&mut Blender){
-    let contours = stl_op::main(blender);
-    for (i,contour) in contours.into_iter().enumerate() {
+    let file_path = "../mesh/bunny2.stl";
+
+    let file = File::open(file_path).expect("Failed to open STL file");
+    let mut reader = BufReader::new(file);
+    let mesh = stl_io::read_stl(& mut reader).expect("Failed to parse STL file");
+    blender.save_mesh(&mesh.faces, &mesh.vertices, "input file".to_string());
+
+    let overhangs = stl_op::extract_overhangs(&mesh,-PI/6.0);
+    for (i,mesh_region) in overhangs.iter().enumerate() { blender.save_mesh(mesh_region, &mesh.vertices,format!("overhang {i}")) };
+
+    let contours = stl_op::extract_contours_larger_than(overhangs, &mesh, 20.0);
+    for contour in contours.iter() { blender.edge_loop(&contour,&mesh); }
+
+    let edge_loops_points:Vec<Vec<Point3<f32>>> = contours.into_iter()
+        .map(|contour| contour.into_iter()
+            .map(|index| mesh.vertices[index])
+            .map(|point| Point3::new(point[0],point[1],point[0]))
+            .collect() 
+            )
+        .collect();
+
+    for (i,contour) in edge_loops_points.into_iter().enumerate() {
         println!("\x1b[032mcreating skeleton for contour {i}\x1b[0m");
-        //for point in contour.iter() {
-        //    println!("Point2:new({},{}),",point[0],point[1]);
-        //}
+
         let skeleton = match straight_skeleton::create_skeleton(
-            contour.into_iter()
-                .map(|vec| Point2::new(vec[0],vec[1]))
-                .collect()
+            contour.into_iter().map(|point| point.xy() ).collect()
             ){
             Ok(skeleton) => skeleton,
-            Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); panic!() }
+            Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); continue }
         };
 
         blender.line_body2d(
-            &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
+            &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect(),
             skeleton.edges
             );
     }

@@ -131,8 +131,8 @@ def import_edge_loops():
 clear_scene()
 
 # Import your STL file
-input = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/mesh/bunny.stl"
-import_stl(input, (1,1,1,0.4))
+# input = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/mesh/bunny.stl"
+# import_stl(input, (1,1,1,0.4))
 
 # import_stls((1,1,1,0.4))
 
