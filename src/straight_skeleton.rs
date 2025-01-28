@@ -237,7 +237,6 @@ impl SkeletonBuilder {
         info!("\x1b[034m========================== Initializing Polygon ==========================\x1b[0m");
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
-        let mut active_nodes = HashSet::new();
 
         //builder.initialize_polygon(weights)?;
         for i in 0..points.len() {
@@ -264,7 +263,6 @@ impl SkeletonBuilder {
                 start: i,
                 end: next_ndx,
             });
-            active_nodes.insert(i);
         }
 
         let mut builder = SkeletonBuilder {
