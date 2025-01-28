@@ -478,7 +478,7 @@ impl SkeletonBuilder {
                 },
                 Err(error) => {
                     println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
-                    println!("{self}");
+                    //println!("{self}");
                 }
             }
             if self.shrining_polygon.len() < 3 {

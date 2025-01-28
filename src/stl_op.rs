@@ -15,8 +15,10 @@ pub struct Polygon{
     outer_loop: Vec<Point3<f32>>,
     holes: Vec<Vec<Point3<f32>>>,
 }
+pub fn polygons_from_contours(contours:Vec<Vec<Point2<f32>>>){
+}
 
-pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Point3<f32>>> {
+pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Vec<Point2<f32>>>> {
     let z_max = mesh.vertices.iter().map(|vert| (vert[2]/layer_height).ceil() as usize).max().unwrap();
 
     // Identify which faces intersect which z-planes and save result in look_up_table
@@ -46,7 +48,7 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
     //}
 
     let edges_to_tri_map = edges_to_triangles_map( mesh );
-    let mut contours:Vec<Vec<Point3<f32>>> = Vec::new();
+    let mut contours:Vec<Vec<Vec<Point2<f32>>>> = vec![Vec::new();z_max];
 
     for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
         let z_plane = layer_height*(layer_nr as f32);
@@ -57,11 +59,14 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
             mesh,
             &edges_to_tri_map,
             );
-        for acontour in contour{
-            //blender.edge_loop_points(&acontour.iter().map(|p|[p.x,p.y,p.z]).collect());
-            contours.push(acontour);
-        }
+        contours[layer_nr] = contour;
+        //for acontour in contour{
+        //contours[layer_nr].push(acontour);
+        //    //blender.edge_loop_points(&acontour.iter().map(|p|[p.x,p.y,p.z]).collect());
+        //    contours.push(acontour);
+        //}
     }
+    assert_eq!(contours.len(),z_max);
     contours
 }
 #[allow(non_snake_case)]
@@ -70,7 +75,7 @@ fn extract_layer(
     face_ndxes:&HashSet<usize>,
     mesh:&IndexedMesh,
     edges_to_tri_map:&HashMap<Edge,[usize;2]>
-    ) ->Vec<Vec<Point3<f32>>> {
+    ) ->Vec<Vec<Point2<f32>>> {
 
     let mut handled_faces:HashSet<usize> = HashSet::new();
     let mut handled_edges:HashSet<Edge> = HashSet::new();
@@ -92,7 +97,7 @@ fn extract_layer(
                     let edge_end = Point3::new(p2[0],p2[1],p2[2]);
                     match edge_zplane_intersection(edge_start, edge_end, z_plane){
                         Some(intersection_p) => {
-                            Some((intersection_p,edge))
+                            Some((intersection_p.xy(),edge))
                         },
                         None => {
                             None
@@ -138,7 +143,7 @@ fn extract_layer(
                         }
                     }).next() {
                         Some((intersection_p,edge))=>{
-                            contour.push(intersection_p);
+                            contour.push(intersection_p.xy());
                             handled_edges.insert(edge.clone());
                             prev_edge = edge.clone();
                             continue;
@@ -317,6 +322,23 @@ fn extract_perimeter(triangles: Vec<IndexedTriangle>) -> Vec<usize> {
     return edge_loop
 }
 
+pub fn area_contour2d(point_index:&Vec<Point2<f32>>) -> f32 {
+    // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
+    let point_index_offset_by_one = point_index.iter()
+        .skip(1)
+        .chain( point_index.iter() );
+
+    return 0.5 * point_index.iter()
+        .zip(point_index_offset_by_one)
+        .map(|(p1,p2)|{
+            let x1 = p1[0];
+            let y1 = p1[1];
+            let x2 = p2[0];
+            let y2 = p2[1];
+            return x1*y2 - x2*y1
+        })
+        .sum::<f32>();
+}
 pub fn area_contour(point_index:&Vec<Point3<f32>>) -> f32 {
     // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
     let point_index_offset_by_one = point_index.iter()

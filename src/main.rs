@@ -18,7 +18,7 @@ fn main(){
     let mut blender = Blender::new();
     //pipe_line(&mut blender);
     //straight_skeleton(&mut blender);
-    layers(&mut blender);
+    skeleton_layers(&mut blender);
 
     blender.show();
 }
@@ -27,9 +27,9 @@ fn straight_skeleton(blender:&mut Blender) {
     //let vertices = test_poly();
     let vertices = test_poly2();
 
-    let vertices_as_f32:Vec<[f32;3]> = vertices.clone().into_iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
+    let vertices_as_f32:Vec<[f32;3]> = vertices.iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
-    match straight_skeleton::SkeletonBuilder::new(vertices.clone()){
+    match straight_skeleton::SkeletonBuilder::new(vertices){
         Err(error) => error!("\x1b[031m{error}\x1b[0m"),
         Ok(builder) => match builder.compute_skeleton() {
             Err(error) => error!("{error}"),
@@ -43,7 +43,7 @@ fn straight_skeleton(blender:&mut Blender) {
     }
     blender.edge_loop_points(&vertices_as_f32);
 }
-fn layers(blender:&mut Blender){
+fn skeleton_layers(blender:&mut Blender){
     //let file_path = "../mesh/bunny2.stl";
     let file_path = "../mesh/stanford-armadillo.stl";
 
@@ -51,28 +51,27 @@ fn layers(blender:&mut Blender){
     let mut reader = BufReader::new(file);
 
     let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    let contours = stl_op::extract_planar_layers(&mesh, 1.0 ,blender);
-    for (i,contour) in contours.iter().enumerate() {
-        let layer_height = i as f32 * 1.0;
-        println!("contour {i} of {}",contours.len());
-        let mut contour = contour.clone();
-        if stl_op::area_contour(&contour) < 0.0 { 
-            contour = contour.into_iter().rev().collect::<Vec<Point3<f32>>>();
+    let contours = stl_op::extract_planar_layers(&mesh, 0.3 ,blender);
+    let nr_layers = contours.len();
+    for (i,mut layer) in contours.into_iter().enumerate() {
+        for mut contour in layer {
+        let layer_height = i as f32 * 0.3;
+        println!("contour {i} of {}",nr_layers);
+
+        if stl_op::area_contour2d(&contour) < 0.0 { 
+            contour = contour.into_iter().rev().collect::<Vec<Point2<f32>>>();
         }
 
-        let skeleton = match straight_skeleton::create_skeleton(
-            contour.into_iter()
-                .map(|vec| Point2::new(vec[0],vec[1]))
-                .collect()
-            ){
+        let skeleton = match straight_skeleton::create_skeleton(contour){
             Ok(skeleton) => skeleton,
             Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); continue }
         };
 
         blender.line_body3d(
             skeleton.vertices.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
-            skeleton.edges.clone()
+            skeleton.edges
             );
+        }
     }
 }
 #[allow(unused)]
@@ -94,7 +93,7 @@ fn pipe_line(blender:&mut Blender){
 
         blender.line_body2d(
             &skeleton.vertices.iter().map(|x| [x[0],x[1]]).collect::<Vec<[f32;2]>>(),
-            skeleton.edges.clone()
+            skeleton.edges
             );
     }
 }
