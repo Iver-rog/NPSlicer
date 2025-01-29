@@ -225,7 +225,6 @@ pub struct SkeletonBuilder {
     original_polygon: Nodes,
     vertices: Vec<Vertex>,
     edges: Vec<Edge>,
-    events: PriorityQueue<Event, OrderedFloat<f32>>,
 }
 impl SkeletonBuilder {
     pub fn new(points: Vec<Point2<f32>>) -> Result<Self, SkeletonError> {
@@ -265,47 +264,42 @@ impl SkeletonBuilder {
             });
         }
 
-        let mut builder = SkeletonBuilder {
+        let builder = SkeletonBuilder {
             shrining_polygon: Nodes::from_closed_curve(nodes.clone()),
             original_polygon: Nodes::from_closed_curve(nodes),
             edges,
             vertices:points.into_iter().map(|p| Vertex{coords:p,time:0.0}).collect(),
-            events: PriorityQueue::new(),
         };
 
-        //initialize events 
-        for node in builder.shrining_polygon.nodes.clone().iter() {
-            builder.find_events(*node)?;
-        }
         Ok(builder)
     }
 
-    fn find_events(&mut self, node:Node) -> Result<(), SkeletonError> {
+    fn find_events(& self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>, node:Node) -> Result<(), SkeletonError> {
         // Edge event between node and next_node
         let edge_event = self.compute_edge_event(
             node.ndx, 
             )?;
         if let Some(event) = edge_event {
             let time = event.time;
-            self.events.push(event, -time);
+            events.push(event, -time);
         }
         // Split events
         let split_events = self.compute_split_events(&node)?;
         for mut event in split_events {
             let time = event.time;
             event.time = time;
-            self.events.push(event, -time);
+            events.push(event, -time);
         }
         Ok(())
     }
-    fn find_edge_event(&mut self, node_ndx:usize) -> Result<(), SkeletonError> {
+    fn find_edge_event(&mut self, events:&mut PriorityQueue<Event, OrderedFloat<f32>> ,node_ndx:usize) -> Result<(), SkeletonError> {
         // Edge events
         let edge_event = self.compute_edge_event(
             node_ndx,
             )?;
         if let Some(event) = edge_event {
             let time = event.time;
-            self.events.push(event, -time);
+            events.push(event, -time);
         }
         Ok(())
     }
@@ -457,14 +451,20 @@ impl SkeletonBuilder {
     }
 
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
+
+        let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
+        //initialize events 
+        for node in self.shrining_polygon.nodes.iter() {
+            self.find_events(&mut events,*node)?;
+        }
         info!("\x1b[034m========================== Computing Skeleton ==========================\x1b[0m");
         let mut debug_contours: Vec<StraightSkeleton> = Vec::new();
         let mut handled_events = 0;
-        while let Some((event, _)) = self.events.pop() {
+        while let Some((event, _)) = events.pop() {
             let current_time = *event.time;
             let result = match event.event_type {
-                EventType::Edge => self.handle_edge_event(event),
-                EventType::Split(_) => self.handle_split_event(event),
+                EventType::Edge => self.handle_edge_event(&mut events,event),
+                EventType::Split(_) => self.handle_split_event(&mut events,event),
             };
             match result {
                 Ok(valid_event) => {
@@ -493,7 +493,7 @@ impl SkeletonBuilder {
         };
         Ok((skeleton,debug_contours))
     }
-    fn handle_edge_event(&mut self, event:Event ) -> Result<bool, SkeletonError> {
+    fn handle_edge_event(&mut self,events:&mut PriorityQueue<Event, OrderedFloat<f32>>, event:Event ) -> Result<bool, SkeletonError> {
         if !self.shrining_polygon.contains(&event.node.ndx) || 
            !self.shrining_polygon.contains(&event.node.next_ndx) {
             info!("t:{:.3} skipping Edge  Event node: {} \x1b[031minactive node in edge\x1b[0m",
@@ -549,19 +549,19 @@ impl SkeletonBuilder {
         let new_node = self.shrining_polygon.merge(new_node);
 
         //find events for the new vertex
-        self.find_events(new_node)?;
+        self.find_events(events,new_node)?;
         let prev_node = self.shrining_polygon.nodes[new_node.prev_ndx];
         // find edge event for previous node
         let edge_event = self.compute_edge_event( prev_node.ndx)?;
         if let Some(event) = edge_event {
             let time = event.time;
-            self.events.push(event, -time);
+            events.push(event, -time);
         }
 
         info!("\x1b[032mt:{:.3} Edge Event for node:{} at p={}\x1b[0m",event.time,edge_start.ndx,new_vertex);
         Ok(true)
     }
-    fn handle_split_event(&mut self, event: Event) -> Result<bool, SkeletonError> {
+    fn handle_split_event(&mut self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>,event: Event) -> Result<bool, SkeletonError> {
         let b = match event.event_type { 
             EventType::Split(split) => Point2::new(split[0].0,split[1].0),
             _ => panic!("wrong event type sendt to handle split event funcion")
@@ -662,11 +662,11 @@ impl SkeletonBuilder {
         let [left_node,right_node] = self.shrining_polygon.split(left_node, right_node);
 
         // Find new events for the new verices
-        self.find_events(left_node)?;
-        self.find_events(right_node)?;
+        self.find_events(events,left_node)?;
+        self.find_events(events,right_node)?;
         // ToDo: it might also be nessesary to find events for the previous vertices
-        self.find_edge_event(left_node.prev_ndx)?;
-        self.find_edge_event(right_node.prev_ndx)?;
+        self.find_edge_event(events,left_node.prev_ndx)?;
+        self.find_edge_event(events,right_node.prev_ndx)?;
         Ok(true)
     }
 }
@@ -783,14 +783,14 @@ impl Display for SkeletonBuilder{
             writeln!(b,"\x1b[0m  ")?;
         }
         // Events
-        match self.events.peek() {
-            None => (),
-            Some(event) => writeln!(b, "Next Event: {} event at {:.3} for node {}",
-                event.0.event_type,
-                event.0.time,
-                event.0.node.ndx
-                )?,
-        };
+        //match self.events.peek() {
+        //    None => (),
+        //    Some(event) => writeln!(b, "Next Event: {} event at {:.3} for node {}",
+        //        event.0.event_type,
+        //        event.0.time,
+        //        event.0.node.ndx
+        //        )?,
+        //};
         Ok(())
     }
 } 
