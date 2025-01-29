@@ -7,198 +7,24 @@ use std::{
     f32::EPSILON, 
     fmt::{self, Display, Formatter}
 };
-use thiserror::Error;
 use log::{debug, error, info, trace};
 
+#[cfg(test)]
+mod test;
 
-#[derive(Debug, Error)]
-pub enum SkeletonError {
-    #[error("Invalid polygon: {0}")]
-    InvalidPolygon(String),
-    #[error("Computation error: {0}")]
-    ComputationError(String),
-    #[error("Bisector Calculation Erorr: {0}")]
-    BisectorError(String),
-    #[error("Initialization Error could not create SkeletonBuilder {0}")]
-    InitializationError(String),
-    #[error("Split event Error {0}")]
-    EdgeEventError(String),
-    #[error("Split event Error {0}")]
-    SplitEventError(String),
-    }
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct Node {
-    pub ndx: usize,
-    pub next_ndx: usize,
-    pub prev_ndx: usize,
-    pub bisector: [OrderedFloat<f32>;2],
-    pub vertex_ndx: usize,
-}
-impl Node {
-    fn bisector(&self)-> Vector2<f32>{
-        Vector2::new(*self.bisector[0],*self.bisector[1])
-    }
-    pub fn new() -> NodeBuilder{
-        NodeBuilder::default()
-    }
-}
-#[derive(Default,Debug)]
-pub struct NodeBuilder {
-    pub ndx: Option<usize>,
-    pub next_ndx: Option<usize>,
-    pub prev_ndx: Option<usize>,
-    pub bisector: Option<Vector2<f32>>,
-    pub vertex_ndx: Option<usize>,
-}
-impl NodeBuilder {
-    fn ndx(&mut self,ndx:usize) { self.ndx = Some(ndx) }
-    fn next_ndx(mut self,ndx:usize) -> NodeBuilder { self.next_ndx = Some(ndx); return self }
-    fn prev_ndx(mut self,ndx:usize) -> NodeBuilder { self.prev_ndx = Some(ndx); return self }
-    fn bisector(mut self,bisector:Vector2<f32>) -> NodeBuilder { self.bisector = Some(bisector); return self }
-    fn vertex_ndx(mut self,vertex_ndx:usize) -> NodeBuilder { self.vertex_ndx = Some(vertex_ndx); return self }
-}
-impl From<NodeBuilder> for Node {
-    fn from(builder: NodeBuilder) -> Self {
-        let bisector = builder.bisector.unwrap();
-        Node{
-            ndx: builder.ndx.unwrap(),
-            next_ndx: builder.next_ndx.unwrap(),
-            prev_ndx: builder.prev_ndx.unwrap(),
-            bisector: [OrderedFloat::from(bisector[0]),OrderedFloat::from(bisector[1])],
-            vertex_ndx: builder.vertex_ndx.unwrap(),
-        }
-    }
-}
-#[derive(Debug,Default)]
-pub struct Nodes {
-    pub nodes: Vec<Node>,
-    active_nodes: HashSet<usize>,
-}
-impl Nodes {
-    pub fn from_closed_curve(nodes:Vec<Node>) -> Self {
-        Nodes {
-        active_nodes: HashSet::from_iter(0..nodes.len()),
-        nodes,
-        }
-    }
-    pub fn deactivate(&mut self, node_ndx:&usize){
-        self.active_nodes.remove(node_ndx);
-    }
-    pub fn merge(&mut self, mut node: NodeBuilder) -> Node {
-        // Insert new node
-        node.ndx(self.nodes.len());
-        let node = Node::from(node);
-        self.nodes.push(node);
-        self.active_nodes.insert(node.ndx);
-        // remove old vertices
-        let unused1 = self.nodes[node.prev_ndx].next_ndx;
-        let unused2 = self.nodes[node.next_ndx].prev_ndx;
-        self.active_nodes.remove(&unused1);
-        self.active_nodes.remove(&unused2);
-        // update node refrences to point to the new node
-        self.nodes[node.prev_ndx].next_ndx = node.ndx;
-        self.nodes[node.next_ndx].prev_ndx = node.ndx;
-        return node
-    }
-    pub fn split(&mut self, mut left_node:NodeBuilder, mut right_node:NodeBuilder)->[Node;2]{
-        left_node.ndx( self.nodes.len() );
-        let left_node = Node::from(left_node);
-        self.nodes.push(left_node);
-        let splitting_vert = self.nodes[left_node.next_ndx].prev_ndx;
-        self.nodes[left_node.next_ndx].prev_ndx = left_node.ndx;
-        self.nodes[left_node.prev_ndx].next_ndx = left_node.ndx;
+mod error;
+use error::SkeletonError;
 
-        right_node.ndx( self.nodes.len() );
-        let right_node = Node::from( right_node );
-        self.nodes.push(right_node);
-        self.nodes[right_node.next_ndx].prev_ndx = right_node.ndx;
-        self.nodes[right_node.prev_ndx].next_ndx = right_node.ndx;
+mod nodes;
+use nodes::{Nodes,Node};
 
-        self.active_nodes.insert(right_node.ndx);
-        self.active_nodes.insert(left_node.ndx);
-        self.active_nodes.remove(&splitting_vert);
-        return [left_node,right_node]
-    }
-
-    fn next(&self,strat_node:Node) -> Node{
-        self.nodes[strat_node.next_ndx]
-    }
-    fn prev(&self,strat_node:Node) -> Node{
-        self.nodes[strat_node.prev_ndx]
-    }
-    fn len(&self) -> usize {
-        self.active_nodes.len()
-    }
-    fn contains(&self, index:&usize) -> bool {
-        self.active_nodes.contains(index)
-    }
-}
-pub struct NodesIntoIterator<'a>{
-    starting:usize,
-    nodes:&'a Nodes,
-    next_node:usize,
-    stop: bool,
-}
-pub struct NodesIntoBackwardsIterator<'a>{
-    starting:usize,
-    nodes:&'a Nodes,
-    prev_node:usize,
-    stop: bool,
-}
-impl <'a> Iterator for NodesIntoIterator<'a>{
-    type Item = Node;
-    fn next(&mut self) -> Option<Self::Item> {
-        if !self.stop {
-            let node = self.nodes.nodes[self.next_node];
-            if node.ndx == self.starting{
-                self.stop = true
-            }
-            self.next_node = node.next_ndx;
-            return Some(node)
-        }
-        None
-    }
-}
-impl <'a> Iterator for NodesIntoBackwardsIterator<'a>{
-    type Item = Node;
-    fn next(&mut self) -> Option<Self::Item> {
-        if !self.stop {
-            let node = self.nodes.nodes[self.prev_node];
-            if node.ndx == self.starting{
-                self.stop = true
-            }
-            self.prev_node = node.prev_ndx;
-            return Some(node)
-        }
-        None
-    }
-}
-#[allow(unused)]
-impl Nodes {
-    pub fn iter(&self,starting_node:&Node) -> NodesIntoIterator {
-        NodesIntoIterator{
-            starting:starting_node.ndx,
-            nodes:&self,
-            next_node:starting_node.next_ndx,
-            stop: false,
-        }
-    }
-    pub fn back_iter(&self,starting_node:&Node) -> NodesIntoBackwardsIterator {
-        NodesIntoBackwardsIterator{
-            starting:starting_node.ndx,
-            nodes:&self,
-            prev_node:starting_node.prev_ndx,
-            stop: false,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Edge {
     pub start: usize,
     pub end: usize,
 }
-#[derive(Debug)]
+#[derive(Debug,Default)]
 pub struct StraightSkeleton {
     pub vertices: Vec<Point2<f32>>,
     pub edges: Vec<[usize;2]>,
@@ -272,6 +98,49 @@ impl SkeletonBuilder {
         };
 
         Ok(builder)
+    }
+    pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
+
+        let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
+        //initialize events 
+        for node in self.shrining_polygon.nodes.iter() {
+            self.find_events(&mut events,*node)?;
+        }
+        info!("\x1b[034m========================== Computing Skeleton ==========================\x1b[0m");
+        let mut debug_contours: Vec<StraightSkeleton> = Vec::new();
+        let mut handled_events = 0;
+        while let Some((event, _)) = events.pop() {
+            let current_time = *event.time;
+            let result = match event.event_type {
+                EventType::Edge => self.handle_edge_event(&mut events,event),
+                EventType::Split(_) => self.handle_split_event(&mut events,event),
+            };
+            match result {
+                Ok(valid_event) => {
+                    if valid_event { 
+                        debug!("\n{self}");
+                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
+                        handled_events += 1;
+                    };
+                },
+                Err(error) => {
+                    println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
+                    //println!("{self}");
+                }
+            }
+            if self.shrining_polygon.len() < 3 {
+                break;
+            }
+        }
+        let vertices = self.vertices.into_iter().map(|n| n.coords).collect();
+        let edges = self.edges.into_iter()
+            .map(|edge| [edge.start,edge.end] )
+            .collect();
+        let skeleton = StraightSkeleton {
+            vertices,
+            edges,
+        };
+        Ok((skeleton,debug_contours))
     }
 
     fn find_events(& self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>, node:Node) -> Result<(), SkeletonError> {
@@ -424,75 +293,7 @@ impl SkeletonBuilder {
             }
         Ok(events)
     }
-    pub fn shrinking_polygon_at_time(&self, time:f32) -> StraightSkeleton {
-        let mut computed_vertecies:HashSet<usize> = HashSet::new();
-        let mut vertices = Vec::new();
-        let mut edges:Vec<[usize;2]> = Vec::new();
-        for node_ndx in self.shrining_polygon.active_nodes.iter()
-            .filter(|n|self.shrining_polygon.contains(n)) {
-                if computed_vertecies.contains(&node_ndx){continue};
-                let start_node = self.shrining_polygon.nodes[*node_ndx];
-                let first_index = edges.len();
-                for node in self.shrining_polygon.iter(&start_node){
-                    let vertex = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
-                    vertices.push(vertex);
-                    edges.push([vertices.len()-1,vertices.len()]);
-                    computed_vertecies.insert(node.ndx);
-                }
-                let last_index = edges.len()-1;
-                edges[last_index] = [last_index,first_index];
-            }
 
-        let contour = StraightSkeleton{
-            vertices,
-            edges,
-        };
-        return contour;
-    }
-
-    pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
-
-        let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
-        //initialize events 
-        for node in self.shrining_polygon.nodes.iter() {
-            self.find_events(&mut events,*node)?;
-        }
-        info!("\x1b[034m========================== Computing Skeleton ==========================\x1b[0m");
-        let mut debug_contours: Vec<StraightSkeleton> = Vec::new();
-        let mut handled_events = 0;
-        while let Some((event, _)) = events.pop() {
-            let current_time = *event.time;
-            let result = match event.event_type {
-                EventType::Edge => self.handle_edge_event(&mut events,event),
-                EventType::Split(_) => self.handle_split_event(&mut events,event),
-            };
-            match result {
-                Ok(valid_event) => {
-                    if valid_event { 
-                        debug!("\n{self}");
-                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
-                        handled_events += 1;
-                    };
-                },
-                Err(error) => {
-                    println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
-                    //println!("{self}");
-                }
-            }
-            if self.shrining_polygon.len() < 3 {
-                break;
-            }
-        }
-        let vertices = self.vertices.into_iter().map(|n| n.coords).collect();
-        let edges = self.edges.into_iter()
-            .map(|edge| [edge.start,edge.end] )
-            .collect();
-        let skeleton = StraightSkeleton {
-            vertices,
-            edges,
-        };
-        Ok((skeleton,debug_contours))
-    }
     fn handle_edge_event(&mut self,events:&mut PriorityQueue<Event, OrderedFloat<f32>>, event:Event ) -> Result<bool, SkeletonError> {
         if !self.shrining_polygon.contains(&event.node.ndx) || 
            !self.shrining_polygon.contains(&event.node.next_ndx) {
@@ -669,6 +470,31 @@ impl SkeletonBuilder {
         self.find_edge_event(events,right_node.prev_ndx)?;
         Ok(true)
     }
+    pub fn shrinking_polygon_at_time(&self, time:f32) -> StraightSkeleton {
+        let mut computed_vertecies:HashSet<usize> = HashSet::new();
+        let mut vertices = Vec::new();
+        let mut edges:Vec<[usize;2]> = Vec::new();
+        for node_ndx in self.shrining_polygon.active_nodes_iter() {
+
+                if computed_vertecies.contains(&node_ndx){continue};
+                let start_node = self.shrining_polygon.nodes[*node_ndx];
+                let first_index = edges.len();
+                for node in self.shrining_polygon.iter(&start_node){
+                    let vertex = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
+                    vertices.push(vertex);
+                    edges.push([vertices.len()-1,vertices.len()]);
+                    computed_vertecies.insert(node.ndx);
+                }
+                let last_index = edges.len()-1;
+                edges[last_index] = [last_index,first_index];
+            }
+
+        let contour = StraightSkeleton{
+            vertices,
+            edges,
+        };
+        return contour;
+    }
 }
 fn compute_intersection_time(
     p1: &Point2<f32>,
@@ -750,7 +576,6 @@ pub fn create_skeleton(
     return Ok(skeleton);
 }
 
-
 impl Display for EventType{
     fn fmt(&self, b:&mut fmt::Formatter) -> Result<(),fmt::Error> {
         match self {
@@ -782,42 +607,10 @@ impl Display for SkeletonBuilder{
             };
             writeln!(b,"\x1b[0m  ")?;
         }
-        // Events
-        //match self.events.peek() {
-        //    None => (),
-        //    Some(event) => writeln!(b, "Next Event: {} event at {:.3} for node {}",
-        //        event.0.event_type,
-        //        event.0.time,
-        //        event.0.node.ndx
-        //        )?,
-        //};
         Ok(())
     }
 } 
 
-impl Display for Nodes{
-    fn fmt(&self, b: &mut Formatter)->Result<(),fmt::Error> {
-
-        writeln!(b,"\x1b[1m|             Nodes            | Bisector  |")?;
-        writeln!(b,"\x1b[1;4m| ndx | next | prev | vert_ndx |  x  |  y  |\x1b[0m")?;
-        for node in self.nodes.iter() {
-            // Nodes
-            if self.active_nodes.contains(&node.ndx){
-                write!(b,"\x1b[036m")?;
-            }
-            write!(b,"| {:<4}| {:<4} | {:<4} | {:<4}     |{:+.2}|{:+.2}|",
-                node.ndx,
-                node.next_ndx,
-                node.prev_ndx,
-                node.vertex_ndx,
-                node.bisector[0],
-                node.bisector[1],
-                )?;
-            writeln!(b,"\x1b[0m  ")?;
-        }
-        Ok(())
-    }
-} 
 pub fn is_point_on_edge(
     point: &Point2<f32>,
     edge_start: &Point2<f32>,

@@ -1,36 +1,34 @@
-#![allow(unused)]
+//#![allow(unused)]
 mod stl_op;
 use std::f32::consts::PI;
 mod utils;
 use utils::Blender;
-mod straight_skeleton;
+mod skeleton;
 use nalgebra::{Point2,Point3};
 use log::{error, Level};
 use core::f32;
 use std::io::{Write, BufReader};
 use std::fs::File;
 
-#[cfg(test)]
-mod test;
 
 fn main(){
     init_logger();
 
     let mut blender = Blender::new();
     //pipe_line(&mut blender);
-    //straight_skeleton(&mut blender);
-    skeleton_layers(&mut blender);
+    straight_skeleton(&mut blender);
+    //skeleton_layers(&mut blender);
 
     blender.show();
 }
-#[allow(unused)]
+//#[allow(unused)]
 fn straight_skeleton(blender:&mut Blender) {
     //let vertices = test_poly();
     let vertices = test_poly2();
 
     let vertices_as_f32:Vec<[f32;3]> = vertices.iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
-    match straight_skeleton::SkeletonBuilder::new(vertices){
+    match skeleton::SkeletonBuilder::new(vertices){
         Err(error) => error!("\x1b[031m{error}\x1b[0m"),
         Ok(builder) => match builder.compute_skeleton() {
             Err(error) => error!("{error}"),
@@ -64,7 +62,7 @@ fn skeleton_layers(blender:&mut Blender){
             contour = contour.into_iter().rev().collect::<Vec<Point2<f32>>>();
         }
 
-        let skeleton = match straight_skeleton::create_skeleton(contour){
+        let skeleton = match skeleton::create_skeleton(contour){
             Ok(skeleton) => skeleton,
             Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); continue }
         };
@@ -102,7 +100,7 @@ fn pipe_line(blender:&mut Blender){
     for (i,contour) in edge_loops_points.into_iter().enumerate() {
         println!("\x1b[032mcreating skeleton for contour {i}\x1b[0m");
 
-        let skeleton = match straight_skeleton::create_skeleton(
+        let skeleton = match skeleton::create_skeleton(
             contour.into_iter().map(|point| point.xy() ).collect()
             ){
             Ok(skeleton) => skeleton,
