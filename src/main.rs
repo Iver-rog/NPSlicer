@@ -1,9 +1,11 @@
 //#![allow(unused)]
+mod contours;
 mod stl_op;
-use std::f32::consts::PI;
+mod skeleton;
 mod utils;
 use utils::Blender;
-mod skeleton;
+
+use std::f32::consts::PI;
 use nalgebra::{Point2,Point3};
 use log::{error, Level};
 use core::f32;
