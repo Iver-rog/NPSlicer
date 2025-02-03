@@ -19,11 +19,11 @@ impl AABB {
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct Polygon{
-    outer_loop: Contour,
-    holes: Vec<Contour>,
+    pub outer_loop: Contour,
+    pub holes: Vec<Contour>,
 }
 impl Polygon {
-    fn new(mut outer_loop:Contour,mut holes:Vec<Contour>)->Self{
+    pub fn new(mut outer_loop:Contour,mut holes:Vec<Contour>)->Self{
         if outer_loop.area.is_sign_negative() {
             outer_loop.reverse_order();
         }
@@ -37,12 +37,17 @@ impl Polygon {
             holes,
         }
     }
+    pub fn area(&self) -> f32 {
+        let area = self.outer_loop.area;
+        let hole_area: f32 = self.holes.iter().map(|contour| contour.area ).sum();
+        return area - hole_area
+    }
 }
 #[derive(Debug,Clone,PartialEq)]
 pub struct Contour{
     area:f32,
     aabb:AABB,
-    points: Vec<Point2<f32>>
+    pub points: Vec<Point2<f32>>
 }
 impl Contour {
     pub fn reverse_order(&mut self) {
@@ -134,57 +139,49 @@ impl Contour {
     }
 }
 
-pub fn polygons_from_contours(contours:Vec<Contour>)->Vec<Polygon>{
-    let mut polygons = vec![Some(Vec::new());contours.len()];
+pub fn polygons_from_contours(mut contours:Vec<Contour>)->Vec<Polygon>{
+    let mut contour_inside_ref = vec![None;contours.len()];
     for (i,contour) in contours.iter().enumerate() {
         let test_point = contour.points[0];
 
         let mut contour_i_is_inside = None;
-        let mut contour_i_is_exterior = true;
-        for (n,intersection_contour) in contours.iter().enumerate(){
-            if i == n {continue}
+        for (n,intersection_contour) in contours.iter().enumerate().filter(|(n,_)|*n!=i){
+            //if i == n {continue}
             match intersection_contour.x_distance_to_contour(&test_point) {
+                None => (),
                 Some(new_distance) => {
                     match contour_i_is_inside {
+                        None => { contour_i_is_inside = Some((n,new_distance)) },
                         Some((_contour,old_distance)) => {
-                            if new_distance < old_distance { 
-                            contour_i_is_inside = Some((n,new_distance))
-                            }
+                            if new_distance < old_distance { contour_i_is_inside = Some((n,new_distance)) }
                         }
-                        None => {
-                            contour_i_is_inside = Some((n,new_distance));
-                            contour_i_is_exterior = false;
-                        },
                     }
                 }
-                None => (),
             }
-            println!("{contour_i_is_inside:?}");
         }
-        if !contour_i_is_exterior {
-            match contour_i_is_inside{
-                Some((n,_)) => { 
-                    match &mut polygons[n]{
-                        Some(vector) => {
-                            vector.push(i);
-                            polygons[i] = None;
-                        },
-                        none => panic!(),
-                    }
-                },
-                None => (),
-            }
+        match contour_i_is_inside{
+            Some((n,_)) => { 
+                assert!(contour_inside_ref[i]==None);
+                contour_inside_ref[i]=Some(n);
+            },
+            None => (),
         }
     }
-    polygons.iter()
-        .enumerate()
-        .filter_map(|(i,p)| match p {
-            Some(x)=> Some((i,x)),
+    let mut polygons = vec![(None,Vec::new());contours.len()];
+    for (i,is_inside) in contour_inside_ref.into_iter().enumerate().rev(){
+        match is_inside {
+            Some(i) => {
+                polygons[i].1.push( contours.pop().unwrap() );
+            },
+            None => polygons[i].0 = Some(contours.pop().unwrap()),
+        }
+    }
+
+    polygons.into_iter()
+        .filter_map(|(option_outer_loop,holes)| match option_outer_loop {
+            Some(outer_loop) => Some((outer_loop,holes)),
             None => None,
-        } )
-        .map(|(contour_ndx,holes_ndxes)|{
-            let contour = contours[contour_ndx].clone();
-            let holes = holes_ndxes.into_iter().map(|ndx|contours[*ndx].clone()).collect();
-            Polygon::new(contour,holes)
-        }).collect()
+        })
+        .map(|(outer_loop,holes)| Polygon::new(outer_loop,holes) )
+        .collect()
 }

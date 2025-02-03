@@ -1,4 +1,5 @@
 use crate::utils::Blender;
+use crate::contours::{Contour,Polygon,polygons_from_contours};
 
 use std::iter::{IntoIterator, Iterator};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
@@ -6,7 +7,7 @@ use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
 use nalgebra::{Point2, Point3};
 
 
-pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Vec<Point2<f32>>>> {
+pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Polygon>> {
     let z_max = mesh.vertices.iter().map(|vert| (vert[2]/layer_height).ceil() as usize).max().unwrap();
 
     // Identify which faces intersect which z-planes and save result in look_up_table
@@ -36,26 +37,26 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
     //}
 
     let edges_to_tri_map = edges_to_triangles_map( mesh );
-    let mut contours:Vec<Vec<Vec<Point2<f32>>>> = vec![Vec::new();z_max];
+    let mut polygons:Vec<Vec<Polygon>> = vec![Vec::new();z_max];
 
     for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
         let z_plane = layer_height*(layer_nr as f32);
         //println!("layer number: {} z_plane: {}",&layer_nr,&z_plane);
-        let contour = extract_layer(
+        let contours = extract_layer(
             z_plane,
             face_ndxes,
             mesh,
             &edges_to_tri_map,
             );
-        contours[layer_nr] = contour;
+        polygons[layer_nr] = polygons_from_contours(contours);
         //for acontour in contour{
         //contours[layer_nr].push(acontour);
         //    //blender.edge_loop_points(&acontour.iter().map(|p|[p.x,p.y,p.z]).collect());
         //    contours.push(acontour);
         //}
     }
-    assert_eq!(contours.len(),z_max);
-    contours
+    assert_eq!(polygons.len(),z_max);
+    polygons
 }
 #[allow(non_snake_case)]
 fn extract_layer(
@@ -63,7 +64,7 @@ fn extract_layer(
     face_ndxes:&HashSet<usize>,
     mesh:&IndexedMesh,
     edges_to_tri_map:&HashMap<Edge,[usize;2]>
-    ) ->Vec<Vec<Point2<f32>>> {
+    ) ->Vec<Contour> {
 
     let mut handled_faces:HashSet<usize> = HashSet::new();
     let mut handled_edges:HashSet<Edge> = HashSet::new();
@@ -137,7 +138,7 @@ fn extract_layer(
                             continue;
                         },
                         None => {
-                            contours.push(contour);
+                            contours.push(Contour::new(contour));
                             break
                         }
                     };

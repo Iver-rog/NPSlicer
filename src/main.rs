@@ -1,4 +1,4 @@
-//#![allow(unused)]
+#![allow(unused)]
 mod contours;
 mod stl_op;
 mod skeleton;
@@ -18,8 +18,8 @@ fn main(){
 
     let mut blender = Blender::new();
     //pipe_line(&mut blender);
-    straight_skeleton(&mut blender);
-    //skeleton_layers(&mut blender);
+    //straight_skeleton(&mut blender);
+    skeleton_layers(&mut blender);
 
     blender.show();
 }
@@ -53,26 +53,28 @@ fn skeleton_layers(blender:&mut Blender){
     let mut reader = BufReader::new(file);
 
     let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    let contours = stl_op::extract_planar_layers(&mesh, 0.3 ,blender);
-    let nr_layers = contours.len();
-    for (i,mut layer) in contours.into_iter().enumerate() {
-        for mut contour in layer {
+    blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
+
+    let layers = stl_op::extract_planar_layers(&mesh, 0.3 ,blender);
+    let nr_layers = layers.len();
+    for (i,mut layer) in layers.into_iter().enumerate() {
+        for mut polygon in layer {
         let layer_height = i as f32 * 0.3;
         println!("contour {i} of {}",nr_layers);
 
-        if stl_op::area_contour2d(&contour) < 0.0 { 
-            contour = contour.into_iter().rev().collect::<Vec<Point2<f32>>>();
-        }
-
-        let skeleton = match skeleton::create_skeleton(contour){
-            Ok(skeleton) => skeleton,
-            Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); continue }
-        };
-
-        blender.line_body3d(
-            skeleton.vertices.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
-            skeleton.edges
+        blender.edge_loop_points(
+            &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
             );
+
+        //let skeleton = match skeleton::create_skeleton(contour){
+        //    Ok(skeleton) => skeleton,
+        //    Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); continue }
+        //};
+        //
+        //blender.line_body3d(
+        //    skeleton.vertices.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
+        //    skeleton.edges
+        //    );
         }
     }
 }
