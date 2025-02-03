@@ -1,16 +1,275 @@
-use crate::*;
-use utils::Blender;
-use core::iter::{IntoIterator, Iterator};
-use core::{assert_eq, usize};
+use crate::utils::Blender;
+use core::{assert, f32};
+use std::iter::{IntoIterator, Iterator};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
-use nalgebra::Point3;
+use nalgebra::{min, point, wrap, Point2, Point3, Vector2};
 
+#[derive(Debug,Clone,PartialEq)]
 pub struct Polygon{
-    outer_loop: Vec<Point3<f32>>,
-    holes: Vec<Vec<Point3<f32>>>,
+    outer_loop: Contour,
+    holes: Vec<Contour>,
 }
-pub fn polygons_from_contours(contours:Vec<Vec<Point2<f32>>>){
+impl Polygon {
+    fn new(mut outer_loop:Contour,mut holes:Vec<Contour>)->Self{
+        if outer_loop.area.is_sign_negative() {
+            outer_loop.reverse_order();
+        }
+        for hole in holes.iter_mut() {
+            if hole.area.is_sign_positive(){
+                hole.reverse_order();
+            }
+        }
+        Self{
+            outer_loop,
+            holes,
+        }
+    }
+}
+#[derive(Debug,Clone,PartialEq)]
+pub struct Contour{
+    area:f32,
+    aabb:AABB,
+    points: Vec<Point2<f32>>
+}
+#[derive(Debug,Clone,PartialEq)]
+pub struct AABB{
+    x_max:f32,
+    x_min:f32,
+    y_max:f32,
+    y_min:f32,
+}
+impl AABB {
+    fn point_is_inside(&self,point:&Point2<f32>) -> bool {
+        self.x_min <= point.x && point.x <= self.x_max &&
+        self.y_min <= point.y && point.y <= self.y_max
+    }
+}
+#[test]
+fn equivalent_area_calculations_test(){
+    let points = vec![
+        Point2::new(0.0,0.0),
+        Point2::new(1.0,0.0),
+        Point2::new(0.0,1.0),
+    ];
+    let contour = Contour::new(points);
+    assert_eq!(area_contour2d(&contour.points),contour.area);
+}
+#[test]
+fn contour_reverse_order_test(){
+    let mut contour = Contour::new(vec![
+        Point2::new(0.0,0.0),
+        Point2::new(1.0,0.0),
+        Point2::new(0.0,1.0),
+    ]);
+    assert!(contour.area.is_sign_positive());
+    contour.reverse_order();
+    assert_eq!(contour.points,
+        vec![
+            Point2::new(0.0,1.0),
+            Point2::new(1.0,0.0),
+            Point2::new(0.0,0.0),
+        ] );
+    assert!(contour.area.is_sign_negative());
+}
+impl Contour {
+    pub fn reverse_order(&mut self) {
+        self.points.reverse();
+        self.area = self.area * -1.0;
+    }
+    pub fn new(points:Vec<Point2<f32>>) -> Self {
+        let first_point = points[0];
+
+        let mut aabb = AABB{
+            x_max: first_point.x,
+            x_min: first_point.x,
+            y_max: first_point.y,
+            y_min: first_point.y,
+        };
+        let mut area = 0.0;
+        let mut prev_point = first_point.clone();
+        for point in points.iter().skip(1) {
+            aabb.x_max = aabb.x_max.max(point.x);
+            aabb.x_min = aabb.x_min.min(point.x);
+            aabb.y_max = aabb.y_max.max(point.y);
+            aabb.y_min = aabb.y_min.min(point.y);
+            
+            area += prev_point.x*point.y-point.x*prev_point.y;
+            prev_point = *point;
+        }
+
+        return Contour{
+            area: area/2.0,
+            aabb,
+            points,
+        }
+    }
+    pub fn point_is_inside(&self,point:&Point2<f32>)->bool{
+        // returns true if a point is on or inside the contour
+        if !self.aabb.point_is_inside(&point) { return false }
+
+        let points_offset_by_one = self.points.iter()
+            .skip(1)
+            .chain( self.points.iter() );
+
+        let intersections: usize = self.points.iter()
+            .zip(points_offset_by_one)
+            // cast a ray from the test point towards the right direction allong 
+            // the x-axis and check if the ray intersects the edge
+            .map(|(p1,p2)|{
+                // check if the two points of the edge are on opposite sides of 
+                // the horizontal line at test point's x value
+                ((p1.y < point.y) != (p2.y <= point.y)) && 
+                // find where the edge intersects the horizontal line at test point's x value 
+                // and check if the crossing point lies on the right side of the test point
+                point.x <= ((point.y-p1.y)*(p2.x-p1.x)/(p2.y-p1.y) + p1.x)
+            })
+            .map(|bool| match bool { true => 1, false => 0, } )
+            .sum();
+        return intersections % 2 == 1
+    }
+    pub fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
+        // returns true if a point is on or inside the contour
+        if !self.aabb.point_is_inside(&point) { return None }
+
+        let points_offset_by_one = self.points.iter()
+            .skip(1)
+            .chain( self.points.iter() );
+
+        let intersections: Vec<f32> = self.points.iter()
+            .zip(points_offset_by_one)
+            // cast a ray from the test point towards the right direction allong 
+            // the x-axis and check if the ray intersects the edge
+            .filter_map(|(p1,p2)|{
+                // check if the two points of the edge are on opposite sides of 
+                // the horizontal line at test point's x value
+                if (p1.y < point.y) == (p2.y <= point.y) { return None }
+                // find where the edge intersects the horizontal line at test point's x value 
+                // and check if the crossing point lies on the right side of the test point
+                else {
+                    let d_x = (point.y-p1.y)*(p2.x-p1.x)/(p2.y-p1.y) + p1.x;
+                    if point.x <= d_x { return Some(d_x-point.x)}
+                    else {return None;}
+                }
+            })
+            .collect();
+        if intersections.len() % 2 == 1 { 
+            //let min = f32::INFINITY;
+            return Some(intersections.into_iter()
+                .fold(f32::INFINITY, |a, b| a.min(b))
+                )
+        }
+        else { return None }
+    }
+    pub fn is_positively_oriented(&self) -> bool { self.area.is_sign_positive() }
+}
+//pub fn ray_intersect(point:Point2<f32>,vector:Vector2<f32>,edge:[Point2<f32>;2])-> bool {
+//    let a = edge[0] - point;
+//    let b = edge[1] - point;
+//    vector.dot(a);
+//    true
+//}
+#[test]
+pub fn point_is_inside_contour_test(){
+    let contour = Contour::new( vec![
+        Point2::new(0.0,0.0),
+        Point2::new(1.0,0.0),
+        Point2::new(0.0,1.0),
+    ]);
+    assert!(   contour.point_is_inside(&Point2::new( 0.2,0.2 )),"test 1");
+    assert!(   contour.point_is_inside(&Point2::new( 0.5,0.5 )),"test 2");
+    assert!(   contour.point_is_inside(&Point2::new( 0.0,0.0 )),"test 3");
+    assert!( ! contour.point_is_inside(&Point2::new( 0.9,0.9 )),"test 4");
+    assert!( ! contour.point_is_inside(&Point2::new( 0.5,1.0 )),"test 5");
+    assert!( ! contour.point_is_inside(&Point2::new( 2.0,0.6 )),"test 6");
+    assert!( ! contour.point_is_inside(&Point2::new(-1.0,0.5 )),"test 7");
+    assert!( ! contour.point_is_inside(&Point2::new( 1.0,1.0 )),"test 8");
+}
+#[test]
+pub fn polygons_from_contours_test(){
+    let loop1 = vec![
+        Point2::new(0.0,0.0),
+        Point2::new(1.0,0.0),
+        Point2::new(0.0,1.0),
+    ];
+    let loop2 = vec![
+        Point2::new(-1.0,-1.0),
+        Point2::new( 3.0,-1.0),
+        Point2::new(-1.0, 3.0),
+    ];
+    let mut contour1 = Contour::new(loop1);
+    let contour2 = Contour::new(loop2);
+
+    let contours = vec![
+        contour1.clone(),
+        contour2.clone()
+    ];
+    contour1.reverse_order();
+    assert_eq!(
+    polygons_from_contours(contours)[0],
+    Polygon{
+        outer_loop:contour2,
+        holes:vec![contour1],
+        }
+    );
+}
+
+pub fn polygons_from_contours(contours:Vec<Contour>)->Vec<Polygon>{
+    let mut polygons = vec![Some(Vec::new());contours.len()];
+    for (i,contour) in contours.iter().enumerate() {
+        let test_point = contour.points[0];
+
+        let mut contour_i_is_inside = None;
+        let mut contour_i_is_exterior = true;
+        for (n,intersection_contour) in contours.iter().enumerate(){
+            if i == n {continue}
+            match intersection_contour.x_distance_to_contour(&test_point) {
+                Some(new_distance) => {
+                    match contour_i_is_inside {
+                        Some((_contour,old_distance)) => {
+                            if new_distance < old_distance { 
+                            contour_i_is_inside = Some((n,new_distance))
+                            }
+                        }
+                        None => {
+                            contour_i_is_inside = Some((n,new_distance));
+                            contour_i_is_exterior = false;
+                        },
+                    }
+                }
+                None => (),
+            }
+            println!("{contour_i_is_inside:?}");
+        }
+        //dbg!( &contour_i_is_inside );
+        //dbg!( &contour_i_is_exterior );
+        if !contour_i_is_exterior {
+            match contour_i_is_inside{
+                Some((n,d_x)) => { 
+                    match &mut polygons[n]{
+                        Some(vector) => {
+                            vector.push(i);
+                            polygons[i] = None;
+                        },
+                        none => panic!(),
+                    }
+                },
+                None => (),
+            }
+        }
+    }
+    //dbg!(&polygons);
+    polygons.iter()
+        .enumerate()
+        .filter_map(|(i,p)| match p {
+            Some(x)=> Some((i,x)),
+            None => None,
+        } )
+        .map(|(contour_ndx,holes_ndxes)|{
+            let contour = contours[contour_ndx].clone();
+            let holes = holes_ndxes.into_iter().map(|ndx|contours[*ndx].clone()).collect();
+            Polygon::new(contour,holes)
+        }).collect()
 }
 
 pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Vec<Point2<f32>>>> {
@@ -300,7 +559,7 @@ fn extract_perimeter(triangles: Vec<IndexedTriangle>) -> Vec<usize> {
 }
 
 pub fn area_contour2d(point_index:&Vec<Point2<f32>>) -> f32 {
-    // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
+    // computes the area of a edge perimeter using Green's theorem
     let point_index_offset_by_one = point_index.iter()
         .skip(1)
         .chain( point_index.iter() );
