@@ -18,6 +18,8 @@ use error::SkeletonError;
 mod nodes;
 use nodes::{Nodes,Node};
 
+use crate::contours::Polygon;
+
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Edge {
@@ -53,6 +55,58 @@ pub struct SkeletonBuilder {
     edges: Vec<Edge>,
 }
 impl SkeletonBuilder {
+    pub fn from_polygon(polygon:Polygon) -> Self {
+        let mut builder = SkeletonBuilder::new(polygon.outer_loop.points).unwrap();
+        for hole in polygon.holes.into_iter(){
+            builder.add_loop(hole.points);
+        }
+        return builder
+    }
+    pub fn add_loop(&mut self,mut points: Vec<Point2<f32>>) -> Result<(), SkeletonError> {
+        if points.len() < 3 {
+            return Err(SkeletonError::InvalidPolygon(
+                "Polygon must have at least 3 vertices".to_string(),
+            ));
+        }
+        info!("\x1b[034m========================== Initializing Polygon ==========================\x1b[0m");
+
+        let offset = self.shrining_polygon.len();
+        for i in 0..points.len() {
+            let next_ndx = (i + 1) % points.len();
+            let prev_ndx = if i == 0 {points.len()-1} else { i-1 };
+
+            let p_current = points[i];
+            let p_next = points[next_ndx];
+            let p_prev = points[prev_ndx];
+
+            let bisector = match bisector(p_current, p_next, p_prev){
+                Ok(bisector) => bisector,
+                Err(error) => return Err(SkeletonError::InitializationError(format!("Could not construct bisector for node {i}\n{error}")))
+            };
+
+            self.shrining_polygon.insert(Node {
+                ndx: i + offset,
+                next_ndx: next_ndx + offset,
+                prev_ndx: prev_ndx + offset,
+                bisector:[OrderedFloat(bisector[0]), OrderedFloat(bisector[1])],
+                vertex_ndx: i + offset
+            });
+            self.original_polygon.insert(Node {
+                ndx: i + offset,
+                next_ndx: next_ndx + offset,
+                prev_ndx: prev_ndx + offset,
+                bisector:[OrderedFloat(bisector[0]), OrderedFloat(bisector[1])],
+                vertex_ndx: i + offset
+            });
+            self.edges.push(Edge {
+                start: i + offset,
+                end: next_ndx + offset,
+            });
+        }
+        self.vertices.append(& mut points.into_iter().map(|p| Vertex{coords:p,time:0.0}).collect());
+
+        return Ok(())
+    }
     pub fn new(points: Vec<Point2<f32>>) -> Result<Self, SkeletonError> {
         if points.len() < 3 {
             return Err(SkeletonError::InvalidPolygon(
@@ -568,6 +622,11 @@ pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32
     return p1 + v1 * s[0];
 }
 
+pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton, SkeletonError> {
+    let builder = SkeletonBuilder::from_polygon(polygon);
+    let (skeleton, _debug_contours) = builder.compute_skeleton()?;
+    return Ok(skeleton);
+}
 pub fn create_skeleton(
     points: Vec<Point2<f32>>,
 ) -> Result<StraightSkeleton, SkeletonError> {
@@ -620,7 +679,7 @@ pub fn is_point_on_edge(
     let point_vec = point - edge_start;
 
     let edge_length_sq = edge_vec.norm_squared();
-    if edge_length_sq < 1e-5 {
+    if edge_length_sq < f32::EPSILON.powi(2){//1e-5 {
         return Err(SkeletonError::ComputationError(
             "Edge length too small".to_string(),
         ));

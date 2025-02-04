@@ -52,6 +52,10 @@ pub struct Nodes {
     active_nodes: HashSet<usize>,
 }
 impl Nodes {
+    pub fn insert(&mut self, node:Node) {
+        self.active_nodes.insert(self.nodes.len());
+        self.nodes.push(node);
+    }
     pub fn from_closed_curve(nodes:Vec<Node>) -> Self {
         Nodes {
         active_nodes: HashSet::from_iter(0..nodes.len()),
