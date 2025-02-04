@@ -1,5 +1,94 @@
 use crate::contours::*;
 use crate::stl_op::area_contour2d;
+#[test]
+fn reverse_order(){
+    let mut contour = Contour::new(vec![
+        Point2::new(0.0,0.0),
+        Point2::new(1.0,0.0),
+        Point2::new(1.0,1.0),
+        Point2::new(0.0,1.0),
+    ]);
+    assert!(contour.area > 0.0);
+    contour.reverse_order();
+    assert!(contour.area < 0.0);
+    assert_eq!(
+        contour,
+        Contour::new(vec![
+            Point2::new(0.0,1.0),
+            Point2::new(1.0,1.0),
+            Point2::new(1.0,0.0),
+            Point2::new(0.0,0.0),
+            ])
+        )
+}
+#[test]
+fn polygon_from_contours_2(){
+    let contours = vec![
+            Contour::new(vec![
+                Point2::new(0.0,0.0),
+                Point2::new(1.0,0.0),
+                Point2::new(1.0,1.0),
+                Point2::new(0.0,1.0),
+            ]),
+            Contour::new(vec![
+                Point2::new(0.1,0.1),
+                Point2::new(0.4,0.0),
+                Point2::new(0.4,0.9),
+                Point2::new(0.1,0.9),
+            ]),
+            Contour::new(vec![
+                Point2::new(0.5,0.1),
+                Point2::new(0.9,0.1),
+                Point2::new(0.9,0.9),
+                Point2::new(0.5,0.9),
+            ]),
+            Contour::new(vec![
+                Point2::new(2.0,0.0),
+                Point2::new(3.0,0.0),
+                Point2::new(3.0,1.9),
+                Point2::new(2.0,1.9),
+            ]),
+        ];
+    {
+        let mut polygons = polygons_from_contours(contours.clone());
+        assert_eq!(polygons.len(),2);
+
+        let polygon1 = polygons[0].clone();
+        assert_eq!(polygon1.holes.len(),2);
+
+        assert_eq!(polygon1.outer_loop,contours[0]);
+        assert!(polygon1.outer_loop.area > 0.0);
+        assert!(polygon1.holes[0].area < 0.0);
+        assert!(polygon1.holes[1].area < 0.0);
+
+        let polygon2 = polygons[1].clone();
+        assert_eq!(polygon2.outer_loop,contours[3]);
+        assert!(polygon2.outer_loop.area > 0.0);
+    }
+
+    let mut contours_random_orientation = contours.clone();
+    contours_random_orientation[0].reverse_order();
+    contours_random_orientation[2].reverse_order();
+
+    assert!(contours_random_orientation != contours);
+
+    {
+        let mut polygons = polygons_from_contours(contours_random_orientation.clone());
+        assert_eq!(polygons.len(),2);
+
+        let polygon1 = polygons[0].clone();
+        assert_eq!(polygon1.holes.len(),2);
+
+        assert_eq!(polygon1.outer_loop,contours[0]);
+        assert!(polygon1.outer_loop.area > 0.0);
+        assert!(polygon1.holes[0].area < 0.0);
+        assert!(polygon1.holes[1].area < 0.0);
+
+        let polygon2 = polygons[1].clone();
+        assert_eq!(polygon2.outer_loop,contours[3]);
+        assert!(polygon2.outer_loop.area > 0.0);
+    }
+}
 
 #[test]
 fn equivalent_area_calculations_test(){

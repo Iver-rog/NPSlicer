@@ -47,7 +47,7 @@ impl Polygon {
 }
 #[derive(Debug,Clone,PartialEq)]
 pub struct Contour{
-    area:f32,
+    pub area:f32,
     aabb:AABB,
     pub points: Vec<Point2<f32>>
 }
