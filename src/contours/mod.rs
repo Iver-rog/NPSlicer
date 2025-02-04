@@ -1,5 +1,3 @@
-use core::{cmp::Ordering, usize};
-
 use nalgebra::Point2;
 
 #[cfg(test)]
@@ -58,6 +56,7 @@ impl Contour {
     }
     pub fn new(points:Vec<Point2<f32>>) -> Self {
         let first_point = points[0];
+        let last_point = points[points.len()-1];
 
         let mut aabb = AABB{
             x_max: first_point.x,
@@ -65,7 +64,8 @@ impl Contour {
             y_max: first_point.y,
             y_min: first_point.y,
         };
-        let mut area = 0.0;
+        let mut area = last_point.x*first_point.y-first_point.x*last_point.y;
+
         let mut prev_point = first_point.clone();
         for point in points.iter().skip(1) {
             aabb.x_max = aabb.x_max.max(point.x);
