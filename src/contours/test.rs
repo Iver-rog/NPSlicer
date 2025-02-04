@@ -46,29 +46,40 @@ pub fn point_is_inside_contour_test(){
 }
 #[test]
 pub fn polygons_from_contours_test(){
-    let loop0 = vec![
+    let mut contour0 = Contour::new(vec![
         Point2::new(0.0,0.0),
         Point2::new(1.0,0.0),
         Point2::new(0.0,1.0),
-    ];
-    let loop1 = vec![
+    ]);
+    let contour1 = Contour::new(vec![
         Point2::new(-1.0,-1.0),
         Point2::new( 3.0,-1.0),
         Point2::new(-1.0, 3.0),
-    ];
-    let mut contour0 = Contour::new(loop0);
-    let contour1 = Contour::new(loop1);
+    ]);
+    let contour2 = Contour::new(vec![
+        Point2::new(0.1,0.1),
+        Point2::new(0.9,0.1),
+        Point2::new(0.1,0.9),
+    ]);
 
     let contours = vec![
         contour0.clone(),
-        contour1.clone()
+        contour1.clone(),
+        contour2.clone()
     ];
+    dbg!(polygons_from_contours(contours.clone()));
     contour0.reverse_order();
+    assert_eq!(polygons_from_contours(contours.clone()).len(),2);
     assert_eq!(
-    polygons_from_contours(contours)[0],
+    polygons_from_contours(contours),vec![
     Polygon{
         outer_loop:contour1,
         holes:vec![contour0],
-        }
+        },
+    Polygon{
+        outer_loop:contour2,
+        holes:vec![],
+        },
+    ]
     );
 }

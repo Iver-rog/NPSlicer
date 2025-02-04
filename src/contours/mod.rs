@@ -1,3 +1,5 @@
+use core::{cmp::Ordering, usize};
+
 use nalgebra::Point2;
 
 #[cfg(test)]
@@ -144,25 +146,26 @@ pub fn polygons_from_contours(mut contours:Vec<Contour>)->Vec<Polygon>{
     for (i,contour) in contours.iter().enumerate() {
         let test_point = contour.points[0];
 
-        let mut contour_i_is_inside = None;
-        for (n,intersection_contour) in contours.iter().enumerate().filter(|(n,_)|*n!=i){
-            //if i == n {continue}
-            match intersection_contour.x_distance_to_contour(&test_point) {
-                None => (),
-                Some(new_distance) => {
-                    match contour_i_is_inside {
-                        None => { contour_i_is_inside = Some((n,new_distance)) },
-                        Some((_contour,old_distance)) => {
-                            if new_distance < old_distance { contour_i_is_inside = Some((n,new_distance)) }
-                        }
-                    }
-                }
-            }
-        }
+        let contour_i_is_inside = contours.iter()
+            .enumerate()
+            .filter(|(n,_)|*n!=i)
+            .filter_map(|(n,intersection_contour)|
+                match intersection_contour.x_distance_to_contour(&test_point){
+                    Some(distance) => Some((n,distance)),
+                    None => None,
+            })
+            .enumerate() // count how many intersections occur
+            .reduce(|(_,(n_min,min_distance)),(n_intersect,(n_new,new_distance))| {
+                if new_distance < min_distance {(n_intersect,(n_new,new_distance))} else {(n_intersect,(n_min,min_distance))}
+            });
+
         match contour_i_is_inside{
-            Some((n,_)) => { 
-                assert!(contour_inside_ref[i]==None);
-                contour_inside_ref[i]=Some(n);
+            Some((n_intersect,(n,_))) => { 
+                // n_intersect is zero based eg n_intersect = 0 => 1 intersection
+                if n_intersect % 2 == 0 { 
+                    assert!(contour_inside_ref[i]==None);
+                    contour_inside_ref[i]=Some(n);
+                } 
             },
             None => (),
         }
@@ -170,9 +173,7 @@ pub fn polygons_from_contours(mut contours:Vec<Contour>)->Vec<Polygon>{
     let mut polygons = vec![(None,Vec::new());contours.len()];
     for (i,is_inside) in contour_inside_ref.into_iter().enumerate().rev(){
         match is_inside {
-            Some(i) => {
-                polygons[i].1.push( contours.pop().unwrap() );
-            },
+            Some(i) => { polygons[i].1.push( contours.pop().unwrap() ) },
             None => polygons[i].0 = Some(contours.pop().unwrap()),
         }
     }
