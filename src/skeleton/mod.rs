@@ -55,12 +55,12 @@ pub struct SkeletonBuilder {
     edges: Vec<Edge>,
 }
 impl SkeletonBuilder {
-    pub fn from_polygon(polygon:Polygon) -> Self {
-        let mut builder = SkeletonBuilder::new(polygon.outer_loop.points).unwrap();
+    pub fn from_polygon(polygon:Polygon) -> Result<Self,SkeletonError> {
+        let mut builder = SkeletonBuilder::new(polygon.outer_loop.points)?;
         for hole in polygon.holes.into_iter(){
-            builder.add_loop(hole.points);
+            builder.add_loop(hole.points)?;
         }
-        return builder
+        return Ok(builder)
     }
     pub fn add_loop(&mut self,mut points: Vec<Point2<f32>>) -> Result<(), SkeletonError> {
         if points.len() < 3 {
@@ -109,6 +109,7 @@ impl SkeletonBuilder {
     }
     pub fn new(points: Vec<Point2<f32>>) -> Result<Self, SkeletonError> {
         if points.len() < 3 {
+            error!("Polygon must have at least 3 vertices");
             return Err(SkeletonError::InvalidPolygon(
                 "Polygon must have at least 3 vertices".to_string(),
             ));
@@ -623,7 +624,7 @@ pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32
 }
 
 pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton, SkeletonError> {
-    let builder = SkeletonBuilder::from_polygon(polygon);
+    let builder = SkeletonBuilder::from_polygon(polygon)?;
     let (skeleton, _debug_contours) = builder.compute_skeleton()?;
     return Ok(skeleton);
 }
