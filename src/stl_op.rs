@@ -27,6 +27,7 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
             }
         }
 
+    //
     // Debug: export faces to blender
     //for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
     //assert_eq!(look_up_table[layer_nr],face_ndxes.clone());
@@ -85,22 +86,16 @@ fn extract_layer(
                     let p2 = mesh.vertices[edge.1];
                     let edge_end = Point3::new(p2[0],p2[1],p2[2]);
                     match edge_zplane_intersection(edge_start, edge_end, z_plane){
-                        Some(intersection_p) => {
-                            Some((intersection_p.xy(),edge))
-                        },
-                        None => {
-                            None
-                        },
+                        Some(intersection_p) => { Some((intersection_p.xy(),edge)) },
+                        None => { None },
                     }
                 }).next() {
                     Some(result)=>{ result },
-                    None => {
-                        continue
-                    }
+                    None => { continue }
                 };
             handled_edges.insert(first_edge.clone());
 
-            // Inner loop
+            // Inner loop: find the next face and edge untill the contour loops back onto itself
             let mut prev_edge = first_edge.clone();
             let mut contour = vec![intersection_p];
             loop{
@@ -119,7 +114,7 @@ fn extract_layer(
                 let face = &mesh.faces[*next_tri];
                 let edges = get_edges(face);
 
-                match edges.iter()
+                let mut intersection = edges.iter()
                     .filter_map(|edge|{
                         if handled_edges.contains(edge){ return None;}
                         let p1 = mesh.vertices[edge.0];
@@ -130,12 +125,32 @@ fn extract_layer(
                             Some(intersection_p) => Some((intersection_p,edge)),
                             None => None,
                         }
-                    }).next() {
-                        Some((intersection_p,edge))=>{
-                            contour.push(intersection_p.xy());
-                            handled_edges.insert(edge.clone());
-                            prev_edge = edge.clone();
-                            continue;
+                    });
+                let intersection1 = intersection.next();
+                let intersection2 = intersection.next();
+                match intersection1 {
+                        Some((intersection1_p,edge1))=>{
+                            match intersection2 {
+                                None => {
+                                    contour.push(intersection1_p.xy());
+                                    handled_edges.insert(edge1.clone());
+                                    prev_edge = edge1.clone();
+                                    continue;
+                                },
+                                Some((intersection2_p,edge2)) => {
+                                    let previous_p = contour.last()
+                                        .expect("contour was initialized with one point");
+                                    let (intersection_p,edge) = if 
+                                        (intersection1_p.xy() -previous_p).magnitude() < 
+                                        (intersection2_p.xy() -previous_p).magnitude() {
+                                        (intersection2_p.xy(),edge2)
+                                    } else { (intersection1_p.xy(),edge1) };
+                                    contour.push(intersection_p);
+                                    handled_edges.insert(edge.clone());
+                                    prev_edge = edge.clone();
+                                    continue;
+                                },
+                            }
                         },
                         None => {
                             contours.push(Contour::new(contour));
@@ -171,8 +186,7 @@ fn edge_zplane_intersection_test(){
 fn edge_zplane_intersection(edge_start:Point3<f32>,edge_end:Point3<f32>,z_plane:f32)-> Option<Point3<f32>>{
     let edge_vec = edge_end - edge_start;
     let scale = (z_plane - edge_start.z) / edge_vec.z;
-    if scale.is_sign_negative() {return None;}
-    if scale > 1.0 {return None;}
+    if scale + f32::EPSILON < 0.0 || scale - f32::EPSILON > 1.0 { return None }
     return Some(edge_start + edge_vec*scale)
 }
 
