@@ -21,7 +21,8 @@ fn main(){
     //pipe_line(&mut blender);
     //straight_skeleton(&mut blender);
     //skeleton_layers(&mut blender);
-    offset_polygon(&mut blender);
+    offset_layers(&mut blender);
+    //offset_polygon(&mut blender);
 
     blender.show();
 }
@@ -59,11 +60,11 @@ fn offset_polygon(blender:&mut Blender){
         Ok(skeleton_builder) => skeleton_builder,
         Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
             return }
-    };
+        };
     let offset_polygon = match skeleton.polygon_at_time(2.0){
         Ok(polygons) => polygons,
         Err(err) => {println!("{err}"); return;},
-    };
+        };
     for polygon in offset_polygon {
     blender.edge_loop_points(
         &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],0.0]).collect::<Vec<[f32;3]>>(),
@@ -72,7 +73,55 @@ fn offset_polygon(blender:&mut Blender){
         blender.edge_loop_points(
             &hole.points.iter().map(|x| [x[0],x[1],0.0]).collect::<Vec<[f32;3]>>()
             );
+        }
     }
+}
+fn offset_layers(blender:&mut Blender){
+    //let file_path = "../mesh/bunny2.stl";
+    let file_path = "../mesh/stanford-armadillo.stl";
+
+    let file = File::open(file_path).expect("Failed to open STL file");
+    let mut reader = BufReader::new(file);
+
+    let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
+    blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
+
+    let layers = stl_op::extract_planar_layers(&mesh, 0.2 ,blender);
+    let nr_layers = layers.len();
+    for (i,mut layer) in layers.into_iter().enumerate() {
+        for mut polygon in layer {
+            let layer_height = i as f32 * 0.2;
+            println!("contour {i} of {}",nr_layers);
+
+            //blender.edge_loop_points(
+            //    &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
+            //    );
+            //for hole in polygon.holes.iter(){
+            //    blender.edge_loop_points(
+            //        &hole.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>()
+            //        );
+            //    }
+
+            let skeleton = match skeleton::SkeletonBuilder::from_polygon(polygon.clone()){
+                Ok(skeleton_builder) => skeleton_builder,
+                Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
+                    return }
+                };
+            let offset_polygon = match skeleton.polygon_at_time(2.0){
+                Ok(polygons) => polygons,
+                Err(err) => {println!("{err}"); return;},
+                };
+            for polygon in offset_polygon {
+            blender.edge_loop_points(
+                &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
+                );
+            for hole in polygon.holes.iter(){
+                blender.edge_loop_points(
+                    &hole.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>()
+                    );
+                }
+            }
+        }
     }
 }
 #[allow(unused)]
