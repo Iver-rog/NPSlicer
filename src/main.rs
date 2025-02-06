@@ -3,6 +3,7 @@ mod contours;
 mod stl_op;
 mod skeleton;
 mod utils;
+use contours::{polygons_from_contours,Contour};
 use utils::Blender;
 
 use std::f32::consts::PI;
@@ -19,7 +20,8 @@ fn main(){
     let mut blender = Blender::new();
     //pipe_line(&mut blender);
     //straight_skeleton(&mut blender);
-    skeleton_layers(&mut blender);
+    //skeleton_layers(&mut blender);
+    offset_polygon(&mut blender);
 
     blender.show();
 }
@@ -43,6 +45,34 @@ fn straight_skeleton(blender:&mut Blender) {
         }
     }
     blender.edge_loop_points(&vertices_as_f32);
+}
+fn offset_polygon(blender:&mut Blender){
+    let contour = Contour::new(test_poly2());
+    let polygon = polygons_from_contours(vec![contour]).into_iter().next().unwrap();
+
+    blender.edge_loop_points(
+        &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],0.0]).collect::<Vec<[f32;3]>>(),
+        );
+
+    let skeleton = match skeleton::SkeletonBuilder::from_polygon(polygon.clone()){
+        Ok(skeleton_builder) => skeleton_builder,
+        Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
+            return }
+    };
+    let offset_polygon = match skeleton.polygon_at_time(2.0){
+        Ok(polygons) => polygons,
+        Err(err) => {println!("{err}"); return;},
+    };
+    for polygon in offset_polygon {
+    blender.edge_loop_points(
+        &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],0.0]).collect::<Vec<[f32;3]>>(),
+        );
+    for hole in polygon.holes.iter(){
+        blender.edge_loop_points(
+            &hole.points.iter().map(|x| [x[0],x[1],0.0]).collect::<Vec<[f32;3]>>()
+            );
+    }
+    }
 }
 #[allow(unused)]
 fn skeleton_layers(blender:&mut Blender){

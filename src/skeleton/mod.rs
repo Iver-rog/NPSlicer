@@ -18,7 +18,7 @@ use error::SkeletonError;
 mod nodes;
 use nodes::{Nodes,Node};
 
-use crate::contours::Polygon;
+use crate::contours::{self, polygons_from_contours, Polygon, Contour};
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -153,6 +153,34 @@ impl SkeletonBuilder {
         };
 
         Ok(builder)
+    }
+    pub fn polygon_at_time(mut self,stop_time:f32) -> Result<Vec<Polygon>, SkeletonError> {
+        let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
+        //initialize events 
+        for node in self.shrining_polygon.nodes.iter() {
+            self.find_events(&mut events,*node)?;
+        }
+        while let Some((event, _)) = events.pop() {
+            let current_time = *event.time;
+            if stop_time < *event.time { break }
+            let result = match event.event_type {
+                EventType::Edge => self.handle_edge_event(&mut events,event),
+                EventType::Split(_) => self.handle_split_event(&mut events,event),
+            };
+            match result {
+                Ok(valid_event) => {
+                    if valid_event { 
+                    };
+                },
+                Err(error) => {
+                    println!("\x1b[031m{error}\x1b[0m");
+                }
+            }
+            if self.shrining_polygon.len() < 3 {
+                break;
+            }
+        }
+        Ok (self.shrinking_polygon_at_time2(stop_time))
     }
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
 
@@ -525,12 +553,28 @@ impl SkeletonBuilder {
         self.find_edge_event(events,right_node.prev_ndx)?;
         Ok(true)
     }
+    pub fn shrinking_polygon_at_time2(&self, time:f32) -> Vec<Polygon> {
+        let mut computed_vertecies:HashSet<usize> = HashSet::new();
+        let mut edges:Vec<[usize;2]> = Vec::new();
+        let mut contours = Vec::new();
+        for node_ndx in self.shrining_polygon.active_nodes_iter() {
+                if computed_vertecies.contains(&node_ndx){continue};
+                let mut contour = Vec::new();
+                let start_node = self.shrining_polygon.nodes[*node_ndx];
+                for node in self.shrining_polygon.iter(&start_node){
+                    let vertex = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
+                    contour.push(vertex);
+                    computed_vertecies.insert(node.ndx);
+                }
+                contours.push(Contour::new(contour));
+            }
+        return polygons_from_contours(contours)
+    }
     pub fn shrinking_polygon_at_time(&self, time:f32) -> StraightSkeleton {
         let mut computed_vertecies:HashSet<usize> = HashSet::new();
         let mut vertices = Vec::new();
         let mut edges:Vec<[usize;2]> = Vec::new();
         for node_ndx in self.shrining_polygon.active_nodes_iter() {
-
                 if computed_vertecies.contains(&node_ndx){continue};
                 let start_node = self.shrining_polygon.nodes[*node_ndx];
                 let first_index = edges.len();
