@@ -27,7 +27,6 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
             }
         }
 
-    //
     // Debug: export faces to blender
     //for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
     //assert_eq!(look_up_table[layer_nr],face_ndxes.clone());
@@ -101,17 +100,10 @@ fn extract_layer(
             loop{
                 let [face1,face2] = edges_to_tri_map.get(&prev_edge).expect("prev edge exists in edges to tri map");
 
-                let next_tri = if handled_faces.contains(face1) { face2 }
-                    else { 
-                        if handled_faces.contains(face1){ 
-                            println!("Loop completed");
-                            break
-                        }
-                        else { face1}
-                    };
+                let next_face = if handled_faces.contains(face1) { face2 } else { face1 };
 
-                handled_faces.insert(*next_tri);
-                let face = &mesh.faces[*next_tri];
+                handled_faces.insert(*next_face);
+                let face = &mesh.faces[*next_face];
                 let edges = get_edges(face);
 
                 let mut intersection = edges.iter()
@@ -128,35 +120,24 @@ fn extract_layer(
                     });
                 let intersection1 = intersection.next();
                 let intersection2 = intersection.next();
-                match intersection1 {
-                        Some((intersection1_p,edge1))=>{
-                            match intersection2 {
-                                None => {
-                                    contour.push(intersection1_p.xy());
-                                    handled_edges.insert(edge1.clone());
-                                    prev_edge = edge1.clone();
-                                    continue;
-                                },
-                                Some((intersection2_p,edge2)) => {
-                                    let previous_p = contour.last()
-                                        .expect("contour was initialized with one point");
-                                    let (intersection_p,edge) = if 
-                                        (intersection1_p.xy() -previous_p).magnitude() < 
-                                        (intersection2_p.xy() -previous_p).magnitude() {
-                                        (intersection2_p.xy(),edge2)
-                                    } else { (intersection1_p.xy(),edge1) };
-                                    contour.push(intersection_p);
-                                    handled_edges.insert(edge.clone());
-                                    prev_edge = edge.clone();
-                                    continue;
-                                },
-                            }
+
+                let previous_p = contour.last()
+                    .expect("contour was initialized with one point");
+
+                let (new_point,edge) = match ( intersection1, intersection2 ) {
+                    ( None, None ) => { if contour.len() > 3 {contours.push(Contour::new(contour))}; break },
+                    ( Some((intersect1_p,edge1)), None ) => ( intersect1_p.xy(), edge1 ), 
+                    ( Some((intersect1_p,edge1)), Some((intersect2_p,edge2)) ) => {
+                        if (intersect1_p.xy() - previous_p).magnitude() < 
+                           (intersect2_p.xy() - previous_p).magnitude() 
+                        { (intersect2_p.xy(),edge2) } else { (intersect1_p.xy(),edge1) }
                         },
-                        None => {
-                            contours.push(Contour::new(contour));
-                            break
-                        }
+                    ( None, Some(_) ) => panic!("not possible"),
                     };
+
+                if (previous_p - new_point).magnitude() > 0.1 { contour.push(new_point) }
+                handled_edges.insert(edge.clone());
+                prev_edge = edge.clone();
                 }
             }
         }
