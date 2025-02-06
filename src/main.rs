@@ -28,7 +28,8 @@ fn main(){
 //#[allow(unused)]
 fn straight_skeleton(blender:&mut Blender) {
     //let vertices = test_poly();
-    let vertices = test_poly2();
+    //let vertices = test_poly2();
+    let vertices:Vec<Point2<f32>> = test_poly3().into_iter().rev().collect();
 
     let vertices_as_f32:Vec<[f32;3]> = vertices.iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
@@ -283,5 +284,29 @@ fn test_poly2()->Vec<Point2<f32>>{
         Point2::new(-19.1423,2.00642),
         Point2::new(-19.9244,1.60691),
         Point2::new(-20.5316,0.8208281)
+    ]
+}
+fn test_poly3() -> Vec<Point2<f32>>{
+    vec![
+        Point2::new(-3.9939733,-56.926804),
+        Point2::new(-4.23258,-56.471874),
+        Point2::new(-4.3377643,-56.002693),
+        Point2::new(-4.2944617,-55.611492),
+        Point2::new(-4.17033,-55.35061),
+        Point2::new(-3.7567666,-55.10629),
+        Point2::new(-3.0308802,-54.187786),
+        Point2::new(-1.5760118,-54.118313),
+        Point2::new(-1.3239056,-54.13446),
+        Point2::new(-1.1533076,-54.30105),
+        Point2::new(-0.29002458,-55.205486),
+        Point2::new(-0.2559766,-55.55263),
+        Point2::new(-0.31183338,-56.032677),
+        Point2::new(-0.43847734,-56.253956),
+        Point2::new(-1.0216255,-56.8932),
+        Point2::new(-1.5334679,-57.443157),
+        Point2::new(-2.095561,-57.562836),
+        Point2::new(-2.3588085,-57.64717),
+        Point2::new(-3.142513,-57.581615),
+        Point2::new(-3.2289486,-57.549732),
     ]
 }
