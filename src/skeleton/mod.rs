@@ -672,13 +672,6 @@ pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton, Skel
     let (skeleton, _debug_contours) = builder.compute_skeleton()?;
     return Ok(skeleton);
 }
-pub fn create_skeleton(
-    points: Vec<Point2<f32>>,
-) -> Result<StraightSkeleton, SkeletonError> {
-    let builder = SkeletonBuilder::new(points)?;
-    let (skeleton, _debug_contours) = builder.compute_skeleton()?;
-    return Ok(skeleton);
-}
 
 impl Display for EventType{
     fn fmt(&self, b:&mut fmt::Formatter) -> Result<(),fmt::Error> {

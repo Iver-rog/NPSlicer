@@ -3,7 +3,7 @@ mod contours;
 mod stl_op;
 mod skeleton;
 mod utils;
-use contours::{polygons_from_contours,Contour};
+use contours::{polygons_from_contours,Contour,Polygon};
 use utils::Blender;
 
 use std::f32::consts::PI;
@@ -138,12 +138,17 @@ fn pipe_line(blender:&mut Blender){
             )
         .collect();
 
-    for (i,contour) in edge_loops_points.into_iter().enumerate() {
+    for (i,contour) in edge_loops_points.into_iter()
+        .map(|loop_of_points| 
+            Polygon::new(
+                Contour::new( loop_of_points.into_iter().map(|p|p.xy()).collect() ),
+                    vec![]
+                    )
+            )
+            .enumerate() {
         println!("\x1b[032mcreating skeleton for contour {i}\x1b[0m");
 
-        let skeleton = match skeleton::create_skeleton(
-            contour.into_iter().map(|point| point.xy() ).collect()
-            ){
+        let skeleton = match skeleton::skeleton_from_polygon( contour ){
             Ok(skeleton) => skeleton,
             Err(err) =>{ println!("\x1b[032m{err}\x1b[0m"); continue }
         };
