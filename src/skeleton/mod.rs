@@ -2,6 +2,7 @@ use nalgebra::{Matrix2, Point2, Vector2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
+use core::{f32, fmt::write};
 use std::{
     collections::HashSet, 
     f32::EPSILON, 
@@ -41,6 +42,12 @@ struct Event {
 enum EventType {
     Edge,  // A edge shrinks to zero lenght
     Split([OrderedFloat<f32>;2]), // A region is split into two parts
+}
+impl Display for Event {
+    fn fmt(&self, b:&mut std::fmt::Formatter<'_>) -> Result<(),std::fmt::Error>{
+        write!(b, "t: {} {} Event:\n{} ",self.time,self.event_type,self.node)?;
+        Ok(())
+    }
 }
 #[derive(Debug)]
 pub struct Vertex {

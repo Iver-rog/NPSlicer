@@ -11,9 +11,9 @@ use stl_io::{IndexedTriangle, Triangle, Vector};
 pub struct Blender<'a> {
     tmp_path:Box<Path>,
     mesh_path:Box<Path>,
-    input_mesh:Option<&'a Path>,
-    output_meshes:Vec<&'a Path>,
-    line_objects:Vec<(Vec<[f32;3]>,Vec<[usize;2]>)>
+    pub input_mesh:Option<&'a Path>,
+    pub output_meshes:Vec<&'a Path>,
+    pub line_objects:Vec<(Vec<[f32;3]>,Vec<[usize;2]>)>
 }
 
 impl <'a> Blender<'a> {

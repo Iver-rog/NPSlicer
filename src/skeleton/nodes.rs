@@ -19,6 +19,19 @@ impl Node {
         NodeBuilder::default()
     }
 }
+impl Display for Node{
+    fn fmt(&self, b:&mut std::fmt::Formatter<'_>) -> Result<(),std::fmt::Error>{
+        write!(b, "ndx: {} next: {} prev: {} bisector: [{} {}] vert_ndx: {}",
+            self.ndx,
+            self.next_ndx,
+            self.prev_ndx,
+            self.bisector[0],
+            self.bisector[1],
+            self.vertex_ndx,
+            )?;
+        Ok(())
+    }
+}
 #[derive(Default,Debug)]
 pub struct NodeBuilder {
     pub ndx: Option<usize>,
