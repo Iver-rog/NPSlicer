@@ -19,18 +19,42 @@ fn main(){
 
     let mut blender = Blender::new();
     //pipe_line(&mut blender);
-    //straight_skeleton(&mut blender);
+    straight_skeleton(&mut blender);
+    straight_skeleton_copy(&mut blender);
     //skeleton_layers(&mut blender);
-    offset_layers(&mut blender);
+    //offset_layers(&mut blender);
     //offset_polygon(&mut blender);
 
     blender.show();
 }
 //#[allow(unused)]
+fn straight_skeleton_copy(blender:&mut Blender) {
+    //let vertices = test_poly();
+    //let vertices = test_poly2();
+    //let vertices:Vec<Point2<f32>> = test_poly3().into_iter().rev().collect();
+    let vertices = test_poly4();
+
+    let vertices_as_f32:Vec<[f32;3]> = vertices.iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
+
+    match skeleton::SkeletonBuilder::new(vertices){
+        Err(error) => error!("\x1b[031m{error}\x1b[0m"),
+        Ok(builder) => match builder.compute_skeleton() {
+            Err(error) => error!("{error}"),
+            Ok((skeleton,debug_contours)) => {
+                blender.line_body2d(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
+                for contour in debug_contours {
+                    blender.line_body2d(&contour.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), contour.edges);
+                }
+            } 
+        }
+    }
+    blender.edge_loop_points(&vertices_as_f32);
+}
 fn straight_skeleton(blender:&mut Blender) {
     //let vertices = test_poly();
     //let vertices = test_poly2();
-    let vertices:Vec<Point2<f32>> = test_poly3().into_iter().rev().collect();
+    //let vertices:Vec<Point2<f32>> = test_poly3().into_iter().rev().collect();
+    let vertices = test_poly5();
 
     let vertices_as_f32:Vec<[f32;3]> = vertices.iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
 
@@ -91,7 +115,8 @@ fn offset_layers(blender:&mut Blender){
     for (i,mut layer) in layers.into_iter().enumerate() {
         for mut polygon in layer {
             let layer_height = i as f32 * 0.2;
-            println!("contour {i} of {}",nr_layers);
+            print!("layer {i} of {} ",nr_layers);
+            println!("contour {}",blender.line_objects.len());
 
             //blender.edge_loop_points(
             //    &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
@@ -369,4 +394,26 @@ fn test_poly3() -> Vec<Point2<f32>>{
         Point2::new(-3.142513,-57.581615),
         Point2::new(-3.2289486,-57.549732),
     ]
+}
+fn test_poly4()-> Vec<Point2<f32>>{
+    vec![
+        Point2::new(2.745226, -1.7176516),
+        Point2::new(1.80445 , -0.8837962),
+        Point2::new(2.048872, -0.4495025),
+        Point2::new(1.585205, -0.5591917),
+        Point2::new(1.517513, -0.7409754),
+        Point2::new(0.537085, -1.42053),
+        Point2::new(2.6859, -1.8),
+        ]
+}
+fn test_poly5()-> Vec<Point2<f32>>{
+    vec![
+        Point2::new(27.45226, -17.176516),
+        Point2::new(18.0445 , -08.837962),
+        Point2::new(20.48872, -04.495025),
+        Point2::new(15.85205, -05.591917),
+        Point2::new(15.17513, -07.409754),
+        Point2::new(05.37085, -14.2053),
+        Point2::new(26.859, -18.),
+        ]
 }
