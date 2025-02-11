@@ -168,26 +168,21 @@ impl SkeletonBuilder {
             self.find_events(&mut events,*node)?;
         }
         while let Some((event, _)) = events.pop() {
-            let current_time = *event.time;
+            if self.shrining_polygon.len() == 0 { break }
             if stop_time < *event.time { break }
+
             let result = match event.event_type {
                 EventType::Edge => self.handle_edge_event(&mut events,event),
                 EventType::Split(_) => self.handle_split_event(&mut events,event),
             };
             match result {
-                Ok(valid_event) => {
-                    if valid_event { 
-                    };
-                },
-                Err(error) => {
-                    println!("\x1b[031m{error}\x1b[0m");
-                }
-            }
-            if self.shrining_polygon.len() < 3 {
-                break;
+                Ok(valid_event) => (),
+                Err(error) => { 
+                    println!("\x1b[031m{error}\x1b[0m"); 
+                    println!("{self}");}
             }
         }
-        Ok (self.shrinking_polygon_at_time2(stop_time))
+        return Ok(self.shrinking_polygon_at_time2(stop_time))
     }
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
 
@@ -200,6 +195,7 @@ impl SkeletonBuilder {
         let mut debug_contours: Vec<StraightSkeleton> = Vec::new();
         let mut handled_events = 0;
         while let Some((event, _)) = events.pop() {
+            if self.shrining_polygon.len() == 0 { break }
             let current_time = *event.time;
             let result = match event.event_type {
                 EventType::Edge => self.handle_edge_event(&mut events,event),
@@ -218,9 +214,6 @@ impl SkeletonBuilder {
                     //println!("{self}");
                 }
             }
-            if self.shrining_polygon.len() < 3 {
-                break;
-            }
         }
         let vertices = self.vertices.into_iter().map(|n| n.coords).collect();
         let edges = self.edges.into_iter()
@@ -230,7 +223,7 @@ impl SkeletonBuilder {
             vertices,
             edges,
         };
-        Ok((skeleton,debug_contours))
+        return Ok((skeleton,debug_contours))
     }
 
     fn find_events(& self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>, node:Node) -> Result<(), SkeletonError> {
