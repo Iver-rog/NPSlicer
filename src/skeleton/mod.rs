@@ -319,15 +319,16 @@ impl SkeletonBuilder {
                     ,edge_start.ndx, edge_end.ndx, edge_start_p,edge_end_p );
 
                 // vector pointing in the direction of the tested edge
-                let edge_vec = edge_start_p + edge_start.bisector() 
-                           - ( edge_end_p + edge_end.bisector() );
+                let edge_vec = if edge_start.vertex_ndx == edge_end.vertex_ndx {
+                edge_end_p + edge_end.bisector() - ( edge_start_p + edge_start.bisector() )
+                } else { edge_end_p - edge_start_p };
 
                 // vector pointing form the splitting vertex to its next vertex
-                let edge_left = node_p
-                    - self.vertices[self.shrining_polygon.next(*node).vertex_ndx].coords;
+                let edge_left = (node_p
+                    - self.vertices[self.shrining_polygon.next(*node).vertex_ndx].coords).normalize();
                 // vector pointing from the splitting vertex to its previous vertex
-                let edge_right = node_p 
-                    - self.vertices[self.shrining_polygon.prev(*node).vertex_ndx].coords;
+                let edge_right = (node_p 
+                    - self.vertices[self.shrining_polygon.prev(*node).vertex_ndx].coords).normalize();
 
                 // a potential b is at the intersection of between our own bisector and the 
 		            // bisector of the angle between the tested edge and any one of our own edges.
@@ -347,9 +348,7 @@ impl SkeletonBuilder {
                 let line_vec = (node_p - i).normalize();
                 let mut ed_vec = (edge_vec).normalize();
 
-                if leftdot > rightdot {
-                    ed_vec = - ed_vec
-                }
+                if leftdot < rightdot { ed_vec = - ed_vec }
 
                 let bisector = ed_vec + line_vec;
                 if bisector.magnitude() == 0.0 { continue; };
@@ -359,17 +358,25 @@ impl SkeletonBuilder {
                 // Check eligebility of b
                 // a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
                 let x_start = cross2d(&edge_start.bisector().normalize(),
-                    &(b-edge_start_p).normalize()) < EPSILON;
+                    &(b-edge_start_p).normalize()) < f32::EPSILON;
                 let x_end = cross2d(&edge_end.bisector().normalize(),
-                    &(b-edge_end_p).normalize()) > -EPSILON;
+                    &(b-edge_end_p).normalize()) > - f32::EPSILON;
                 let x_edge = cross2d(&edge_vec.normalize(),
-                    &(b-edge_start_p).normalize()) < EPSILON;
+                    &(b-edge_start_p).normalize()) > f32::EPSILON;
 
                 if !(x_start && x_end && x_edge) {
-                    //debug!("- discarding candidate for edge:({}-{}) b: {b}",edge_start.ndx,edge_end.ndx);
+                    debug!(" - discarding candidate for edge:({}-{}) b: ({:>7.4},{:>7.4}) [{} {} {}\x1b[0m]",
+                    edge_start.ndx,
+                    edge_end.ndx,
+                    b.x,
+                    b.y,
+                    if x_start {"\x1b[032mx_start"} else {"\x1b[031mx_start"},
+                    if x_edge {"\x1b[032mx_edge"} else {"\x1b[031mx_edge"},
+                    if x_end {"\x1b[032mx_end"} else {"\x1b[031mx_end"},
+                    );
                     continue;
                 };
-                info!("  - found candidate for edge:({}-{}) b: {b}",edge_start.ndx,edge_end.ndx);
+                info!("  - found candidate for edge:({}-{}) b: ({:>7.4},{:>7.4})",edge_start.ndx,edge_end.ndx,b.x,b.y);
 
 
                 let t = (node_p - b).magnitude() / node.bisector().magnitude();
@@ -684,7 +691,7 @@ impl Display for EventType{
     fn fmt(&self, b:&mut fmt::Formatter) -> Result<(),fmt::Error> {
         match self {
             EventType::Edge => write!(b,"Edge")?,
-            EventType::Split(_) => write!(b,"Split")?,
+            EventType::Split(split_p) => write!(b,"Split Event at {}{}",split_p[0],split_p[0])?,
         }
         Ok(())
     }
