@@ -267,7 +267,10 @@ impl SkeletonBuilder {
         let v1_coord = v1_vert.coords + v1.bisector() * (max_time-v1_vert.time);
         let v2_coord = v2_vert.coords + v2.bisector() * (max_time-v2_vert.time);
         // Calculate intersection of bisectors
-        let t = compute_intersection_time(&v1_coord, &v1.bisector(), &v2_coord, &v2.bisector())?;
+        let t = match compute_intersection_time(&v1_coord, &v1.bisector(), &v2_coord, &v2.bisector())?{
+            Some(t) => t,
+            None => return Ok(None),
+        };
 
         if t > 0.0 {
             Ok(Some(Event {
@@ -607,20 +610,25 @@ fn compute_intersection_time(
     v1: &Vector2<f32>,
     p2: &Point2<f32>,
     v2: &Vector2<f32>,
-) -> Result<f32, SkeletonError> {
+) -> Result<Option<f32>, SkeletonError> {
     // Solve the system of equations:
     // p1 + t*v1 = p2 + t*v2
     let dx = p2.x - p1.x;
     let dy = p2.y - p1.y;
     let det = v1.x * (-v2.y) - (-v2.x) * v1.y;
 
+    // check if the bisectors are parallel
     if det.abs() < 1e-5 {
+        // check if p2 lies on the line defined by p1 and v1
+        let s_x = ( p2.x - p1.x )/v1.x;
+        let s_y = ( p2.y - p1.y )/v1.y;
+        if (s_x - s_y).abs() > 1e-5 {return Ok(None)};
         return Err(SkeletonError::ComputationError(
-            "Parallel bisectors detected".to_string(),
+            format!("Parallel bisectors detected p1:{p1} v1:{v1} p2:{p2} v2:{v2}"),
         ));
     }
     let t = (dx * (-v2.y) - (-v2.x) * dy) / det;
-    Ok(t)
+    Ok(Some(t))
 }
 pub fn bisector(
     current_point: Point2<f32>,
