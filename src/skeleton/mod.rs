@@ -201,17 +201,17 @@ impl SkeletonBuilder {
                 EventType::Edge => self.handle_edge_event(&mut events,event),
                 EventType::Split(_) => self.handle_split_event(&mut events,event),
             };
+            debug_contours.push(self.shrinking_polygon_at_time(current_time));
             match result {
                 Ok(valid_event) => {
                     if valid_event { 
                         debug!("\n{self}");
-                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
                         handled_events += 1;
                     };
                 },
                 Err(error) => {
                     println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
-                    //println!("{self}");
+                    break 
                 }
             }
         }
