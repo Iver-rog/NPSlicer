@@ -6,6 +6,7 @@ use std::path::Path;
 use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
 use stl_io::{IndexedTriangle, Triangle, Vector};
+use crate::contours;
 
 #[derive(Debug)]
 pub struct Blender<'a> {
@@ -106,6 +107,18 @@ impl <'a> Blender<'a> {
         let mesh_path = self.mesh_path.to_str().unwrap();
         writeln!(f,"    return '{mesh_path}' ")?;
         return Ok(())
+    }
+    pub fn polygon(&mut self, polygon:&contours::Polygon,h:f32) {
+        let mut points:Vec<[f32;3]> = polygon.outer_loop.points.iter().map(|p|[p.x,p.y,h]).collect::<Vec<[f32;3]>>();
+        let mut edges:Vec<[usize;2]> = (0..(points.len()-1)).map(|i|[i,i+1]).collect();
+        edges.push([0,points.len()-1]);
+        for hole in polygon.holes.iter(){
+            let offset = points.len();
+            points.extend(hole.points.iter().map(|p|[p.x,p.y,h]));
+            edges.extend((offset..(points.len()-1)).map(|i|[i,i+1]));
+            edges.push([offset,points.len()-1]);
+        }
+        self.line_objects.push( (points, edges) );
     }
 
     pub fn edge_loop(&mut self, edge_loop:&Vec<usize>,stl:&stl_io::IndexedMesh){

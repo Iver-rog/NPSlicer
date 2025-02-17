@@ -58,7 +58,7 @@ fn straight_skeleton(blender:&mut Blender) {
     //let vertices = data::test_poly5();
     let vertices = data::test_poly7();
 
-    //let vertices_as_f32:Vec<[f32;3]> = vertices.iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
+    blender.polygon(&vertices, 0.0);
 
     //match skeleton::SkeletonBuilder::new(vertices){
     match skeleton::SkeletonBuilder::from_polygon(vertices){
@@ -80,9 +80,7 @@ fn offset_polygon(blender:&mut Blender){
     //let polygon = polygons_from_contours(vec![contour]).into_iter().next().unwrap();
     let polygon = data::test_poly6();
 
-    blender.edge_loop_points(
-        &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],0.0]).collect::<Vec<[f32;3]>>(),
-        );
+    blender.polygon(&polygon, 0.0);
 
     let skeleton = match skeleton::SkeletonBuilder::from_polygon(polygon.clone()){
         Ok(skeleton_builder) => skeleton_builder,
@@ -94,14 +92,7 @@ fn offset_polygon(blender:&mut Blender){
         Err(err) => {println!("{err}"); return;},
         };
     for polygon in offset_polygon {
-    blender.edge_loop_points(
-        &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],0.0]).collect::<Vec<[f32;3]>>(),
-        );
-    for hole in polygon.holes.iter(){
-        blender.edge_loop_points(
-            &hole.points.iter().map(|x| [x[0],x[1],0.0]).collect::<Vec<[f32;3]>>()
-            );
-        }
+        blender.polygon(&polygon, 0.0);
     }
 }
 fn offset_layers(blender:&mut Blender){
@@ -141,14 +132,7 @@ fn offset_layers(blender:&mut Blender){
                 Err(err) => {println!("{err}"); return;},
                 };
             for polygon in offset_polygon {
-            blender.edge_loop_points(
-                &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
-                );
-            for hole in polygon.holes.iter(){
-                blender.edge_loop_points(
-                    &hole.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>()
-                    );
-                }
+            blender.polygon(&polygon,layer_height);
             }
         }
     }
