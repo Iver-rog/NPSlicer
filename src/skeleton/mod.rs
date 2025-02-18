@@ -175,7 +175,7 @@ impl SkeletonBuilder {
                 EventType::Split(_) => self.handle_split_event(&mut events,event),
             };
             match result {
-                Ok(valid_event) => (),
+                Ok(_valid_event) => (),
                 Err(error) => { 
                     println!("\x1b[031m{error}\x1b[0m"); 
                     println!("{self}");}
@@ -334,7 +334,10 @@ impl SkeletonBuilder {
                 let rightdot = (edge_right.normalize().dot(&edge_vec.normalize())).abs();
                 let self_edge =  if leftdot < rightdot { edge_left }else{ edge_right };
 
-                let i = intersect( edge_start_p, edge_vec, node_p, self_edge );
+                let i = match intersect( edge_start_p, edge_vec, node_p, self_edge ){
+                    Some(i) => i,
+                    None => {error!("cant compute i: parallel bisectors"); continue }
+                };
 
                 if (i-node_p).magnitude() < 1e-5{
                     info!("skiping node: {}. value = {}", node.ndx,(i-node_p).magnitude());
@@ -347,10 +350,12 @@ impl SkeletonBuilder {
                 if leftdot < rightdot { ed_vec = - ed_vec }
 
                 let bisector = ed_vec + line_vec;
-                if bisector.magnitude() == 0.0 { continue; };
+                if bisector.magnitude() == 0.0 { continue };
 
-                let b = intersect(i, bisector, node_p, node.bisector() );
-
+                let b = match intersect(i, bisector, node_p, node.bisector() ){
+                    Some(b)=> b,
+                    None => { error!("cant compute b: parallel bisectors"); continue },
+                };
                 // Check eligebility of b
                 // a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
                 let x_start = cross2d(&edge_start.bisector().normalize(),
@@ -359,9 +364,11 @@ impl SkeletonBuilder {
                     &(b-edge_end_p).normalize()) > - f32::EPSILON;
                 let x_edge = cross2d(&edge_vec.normalize(),
                     &(b-edge_start_p).normalize()) > f32::EPSILON;
+                // check if b lies infront of the reflex vertex
+                let in_front = cross2d(&(b-node_p),&Vector2::new(node.bisector().y,-node.bisector().x)) < 0.0;
 
-                if !(x_start && x_end && x_edge) {
-                    debug!(" - discarding candidate for edge:({}-{}) b: ({:>7.4},{:>7.4}) [{} {} {}\x1b[0m]",
+                if !(x_start && x_end && x_edge && in_front) {
+                    debug!(" - discarding candidate for edge:({}-{}) b: ({:>7.4},{:>7.4}) [{} {} {} {}\x1b[0m]",
                     edge_start.ndx,
                     edge_end.ndx,
                     b.x,
@@ -369,6 +376,7 @@ impl SkeletonBuilder {
                     if x_start {"\x1b[032mx_start"} else {"\x1b[031mx_start"},
                     if x_edge {"\x1b[032mx_edge"} else {"\x1b[031mx_edge"},
                     if x_end {"\x1b[032mx_end"} else {"\x1b[031mx_end"},
+                    if in_front {"\x1b[032min_front"} else {"\x1b[031min_front"},
                     );
                     continue;
                 };
@@ -565,7 +573,6 @@ impl SkeletonBuilder {
     }
     pub fn shrinking_polygon_at_time2(&self, time:f32) -> Vec<Polygon> {
         let mut computed_vertecies:HashSet<usize> = HashSet::new();
-        let mut edges:Vec<[usize;2]> = Vec::new();
         let mut contours = Vec::new();
         for node_ndx in self.shrining_polygon.active_nodes_iter() {
                 if computed_vertecies.contains(&node_ndx){continue};
@@ -672,14 +679,24 @@ pub fn is_reflex(
 
     return (-v1).perp(&v2) < 0.0;
 }
-pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32>) -> Point2<f32> {
+pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32>) -> Option<Point2<f32>> {
     // calculate the intersection of two lines represented as a point(p) and a vector(v)
-    let u = p2 - p1;
-    let mut v = Matrix2::from_columns(&[v1,-v2]);
 
-    assert!(v.try_inverse_mut()); // panic if v is not invertable
-    let s = v*u;
-    return p1 + v1 * s[0];
+    let det = v1.x*v2.y - v1.y * v2.x; // determinant
+    if det.abs() < f32::EPSILON {
+        // vectors are parallel cant compute intersection
+        return None
+    }
+
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+
+    let t = (dx * v2.y - dy * v2.x) / det;
+
+    let xi = p1.x + t * v1.x;
+    let yi = p1.y + t * v1.y;
+
+    return Some(Point2::new(xi,yi))
 }
 
 pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton, SkeletonError> {
