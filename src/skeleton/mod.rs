@@ -2,7 +2,6 @@ use nalgebra::{Matrix2, Point2, Vector2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
-use core::{f32, fmt::write};
 use std::{
     collections::HashSet, 
     f32::EPSILON, 
@@ -19,7 +18,7 @@ use error::SkeletonError;
 mod nodes;
 use nodes::{Nodes,Node};
 
-use crate::contours::{self, polygons_from_contours, Polygon, Contour};
+use crate::contours::{ polygons_from_contours, Polygon, Contour};
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -69,7 +68,7 @@ impl SkeletonBuilder {
         }
         return Ok(builder)
     }
-    pub fn add_loop(&mut self,mut points: Vec<Point2<f32>>) -> Result<(), SkeletonError> {
+    pub fn add_loop(&mut self, points: Vec<Point2<f32>>) -> Result<(), SkeletonError> {
         if points.len() < 3 {
             return Err(SkeletonError::InvalidPolygon(
                 "Polygon must have at least 3 vertices".to_string(),
@@ -201,16 +200,17 @@ impl SkeletonBuilder {
                 EventType::Edge => self.handle_edge_event(&mut events,event),
                 EventType::Split(_) => self.handle_split_event(&mut events,event),
             };
-            debug_contours.push(self.shrinking_polygon_at_time(current_time));
             match result {
                 Ok(valid_event) => {
                     if valid_event { 
+                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
                         debug!("\n{self}");
                         handled_events += 1;
                     };
                 },
                 Err(error) => {
                     println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
+                    debug_contours.push(self.shrinking_polygon_at_time(current_time));
                     break 
                 }
             }

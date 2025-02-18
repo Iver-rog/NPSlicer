@@ -3,14 +3,13 @@ mod contours;
 mod stl_op;
 mod skeleton;
 mod utils;
-use contours::{polygons_from_contours,Contour,Polygon};
+use contours::{Contour,Polygon};
 use utils::Blender;
 mod data;
 
 use std::f32::consts::PI;
-use nalgebra::{Point2,Point3};
+use nalgebra::Point3;
 use log::{error, Level};
-use core::f32;
 use std::io::{Write, BufReader};
 use std::fs::File;
 
@@ -76,8 +75,6 @@ fn straight_skeleton(blender:&mut Blender) {
     //blender.edge_loop_points(&vertices_as_f32);
 }
 fn offset_polygon(blender:&mut Blender){
-    let contour = Contour::new(data::test_poly2());
-    //let polygon = polygons_from_contours(vec![contour]).into_iter().next().unwrap();
     let polygon = data::test_poly6();
 
     blender.polygon(&polygon, 0.0);
@@ -107,8 +104,8 @@ fn offset_layers(blender:&mut Blender){
 
     let layers = stl_op::extract_planar_layers(&mesh, 0.2 ,blender);
     let nr_layers = layers.len();
-    for (i,mut layer) in layers.into_iter().enumerate() {
-        for mut polygon in layer {
+    for (i, layer) in layers.into_iter().enumerate() {
+        for polygon in layer {
             let layer_height = i as f32 * 0.2;
             print!("layer {i} of {} ",nr_layers);
             println!("contour {}",blender.line_objects.len());
