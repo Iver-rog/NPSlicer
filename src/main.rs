@@ -4,6 +4,8 @@ mod stl_op;
 mod skeleton;
 mod utils;
 use contours::{Contour,Polygon};
+use contours::boolean::{boolean,filtered_boolean};
+use i_overlay::core::overlay_rule::OverlayRule;
 use utils::Blender;
 mod data;
 
@@ -19,16 +21,18 @@ fn main(){
 
     let mut blender = Blender::new();
     //pipe_line(&mut blender);
+
     //straight_skeleton(&mut blender);
-    //straight_skeleton_copy(&mut blender);
-    //skeleton_layers(&mut blender);
-    //offset_layers(&mut blender);
     //offset_polygon(&mut blender);
     //polygon_boolean(&mut blender);
+ 
+    //offset_layers(&mut blender);
+    //skeleton_layers(&mut blender);
+    boolean_layers(&mut blender);
 
     blender.show();
 }
-//#[allow(unused)]
+#[allow(dead_code)]
 fn polygon_boolean(blender:&mut Blender) {
     let poly = data::test_poly7();
     let clip = data::test_poly7_5();
@@ -38,12 +42,13 @@ fn polygon_boolean(blender:&mut Blender) {
     let boolean = poly.subtract(clip).into_iter().next().unwrap();
     blender.polygon(&boolean,0.0);
 }
+#[allow(dead_code)]
 fn straight_skeleton(blender:&mut Blender) {
     //let vertices = data::test_poly();
     //let vertices = data::test_poly2();
     //let vertices:Vec<Point2<f32>> = data::test_poly3().into_iter().rev().collect();
     //let vertices = data::test_poly5();
-    let vertices = data::test_poly7();
+    let vertices = data::test_poly8();
 
     blender.polygon(&vertices, 0.0);
 
@@ -62,6 +67,7 @@ fn straight_skeleton(blender:&mut Blender) {
     }
     //blender.edge_loop_points(&vertices_as_f32);
 }
+#[allow(dead_code)]
 fn offset_polygon(blender:&mut Blender){
     let polygon = data::test_poly6();
 
@@ -80,6 +86,62 @@ fn offset_polygon(blender:&mut Blender){
         blender.polygon(&polygon, 0.0);
     }
 }
+#[allow(dead_code)]
+fn boolean_layers(blender:&mut Blender){
+    //let file_path = "../mesh/bunny2.stl";
+    let file_path = "../mesh/stanford-armadillo.stl";
+
+    let file = File::open(file_path).expect("Failed to open STL file");
+    let mut reader = BufReader::new(file);
+
+    let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
+    blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
+
+    let layers = stl_op::extract_planar_layers(&mesh, 1.0 ,blender);
+    //layers.iter()
+    //    .enumerate()
+    //    .flat_map(|(i,layer)| 
+    //        layer.iter()
+    //        .map(move|l|(i,l) ) )
+    //    .for_each(|(i,l)|{ blender.polygon(&l,i as f32 * 1.0) });
+
+    let masks = layers.clone().into_iter();
+    let overhang_profiles = layers.clone().into_iter()
+        .skip(1)
+        .zip(masks)
+        //.map(|(n,n_minus_1)| filtered_boolean(n,n_minus_1,OverlayRule::Difference,0.1) );
+        .map(|(n,n_minus_1)| boolean(n,n_minus_1,OverlayRule::Difference) );
+
+    let l_n = 10; // how many layers down to merge overhangs
+    let overhang_profiles:Vec<Vec<Polygon>> = overhang_profiles.collect();
+    let merged_overhangs = (0..overhang_profiles.len())
+        .map(|i|( i, i.saturating_sub(l_n)..i ) )
+        .map(|(i, mask_ndxs)|{ 
+            let mut layer = layers[i].clone();
+            //let mut layer = overhang_profiles[i].clone();
+            let mut masks = mask_ndxs.map(|n|overhang_profiles[n].clone());
+            match masks.next(){
+                Some(mut mask) => {
+                    for next_mask in masks {
+                        //layer = filtered_boolean(layer,mask,OverlayRule::Union);
+                        mask = boolean(mask,next_mask,OverlayRule::Union);
+                        }
+                    layer = filtered_boolean(layer,mask,OverlayRule::Difference);
+                }
+                None => ()
+            }
+            (i,layer)
+        });
+
+
+    for (i,merged_overhang) in merged_overhangs {
+        let layer_height = 1.0*(i as f32);
+        for polygon in merged_overhang {
+            blender.polygon(&polygon, layer_height);
+        }
+    }
+}
+#[allow(dead_code)]
 fn offset_layers(blender:&mut Blender){
     //let file_path = "../mesh/bunny2.stl";
     let file_path = "../mesh/stanford-armadillo.stl";
@@ -123,7 +185,7 @@ fn offset_layers(blender:&mut Blender){
         }
     }
 }
-#[allow(unused)]
+#[allow(dead_code)]
 fn skeleton_layers(blender:&mut Blender){
     //let file_path = "../mesh/bunny2.stl";
     let file_path = "../mesh/stanford-armadillo.stl";
@@ -163,7 +225,7 @@ fn skeleton_layers(blender:&mut Blender){
         }
     }
 }
-#[allow(unused)]
+#[allow(dead_code)]
 fn pipe_line(blender:&mut Blender){
     let file_path = "../mesh/bunny2.stl";
 

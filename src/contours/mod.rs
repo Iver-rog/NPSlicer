@@ -5,7 +5,7 @@ use crate::{data, utils::Blender};
 
 #[cfg(test)]
 mod test;
-mod boolean;
+pub mod boolean;
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct AABB{
@@ -52,6 +52,11 @@ impl Polygon {
             hole.simplify(min_a);
         }
         self.holes = self.holes.clone().into_iter().filter(|c|c.area > min_a).collect();
+    }
+    pub fn flatten(self) -> Vec<Contour>{
+        let mut a = self.holes;
+        a.push(self.outer_loop);
+        a
     }
 }
 #[derive(Debug,Clone,PartialEq)]
