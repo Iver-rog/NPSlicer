@@ -27,6 +27,10 @@ pub struct Polygon{
     pub holes: Vec<Contour>,
 }
 impl Polygon {
+    pub fn invert(&mut self){
+        self.outer_loop.reverse_order();
+        self.holes.iter_mut().for_each(|c|c.reverse_order());
+    }
     pub fn new(mut outer_loop:Contour,mut holes:Vec<Contour>)->Self{
         if outer_loop.area.is_sign_negative() {
             outer_loop.reverse_order();
