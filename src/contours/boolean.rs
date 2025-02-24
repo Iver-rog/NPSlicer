@@ -1,16 +1,26 @@
 use crate::contours::{Polygon,Contour};
 use crate::contours::polygons_from_contours;
+use std::iter;
+use std::fmt::Display;
 use nalgebra::Point2;
-use i_overlay::core::fill_rule::FillRule;
-use i_overlay::core::overlay_rule::OverlayRule;
+use i_overlay::core::{fill_rule::FillRule,overlay_rule::OverlayRule};
 use i_overlay::float::single::SingleFloatOverlay;
 use i_overlay::i_float::float::compatible::FloatPointCompatible;
+use i_overlay::mesh::{
+    style::{LineJoin,OutlineStyle},
+    outline::offset::OutlineOffset
+};
 
 #[derive(Copy,Debug,Clone)]
 struct IOverlayCompatibleType(Point2<f32>);
 impl From<IOverlayCompatibleType> for nalgebra::Point2<f32> {
     fn from(t:IOverlayCompatibleType)-> Point2<f32>{
         t.0
+    }
+}
+impl Display for IOverlayCompatibleType{
+    fn fmt(&self,b:&mut std::fmt::Formatter<'_>)->Result<(),std::fmt::Error>{
+        write!(b,"({},{})",self.0.x,self.0.y)
     }
 }
 impl From<Point2<f32>> for IOverlayCompatibleType{
@@ -54,7 +64,27 @@ impl Polygon{
                 polygons_from_contours(contours).into_iter().next().unwrap()
             }).collect()
     }
+
+    pub fn offset(self,distance:f32)->Vec<Polygon>{
+        if self.outer_loop.points.len() == 0 {panic!("BBBBB Bad input shape no outerloop")}
+        let shape:Vec<Vec<IOverlayCompatibleType>>= iter::once(self.outer_loop)
+            .chain( self.holes.into_iter() )
+            .map(|c|c.points.into_iter().rev().map(|p|p.into()).collect() )
+            .collect();
+        //dbg!(&shape);
+        if shape.len() == 0 {panic!("BBBBB Bad input shape no polygons")}
+        dbg!(&shape);
+        let style = OutlineStyle::new(distance).line_join(LineJoin::Round(0.5));
+        let shapes = shape.outline(style);
+
+        let p:Vec<Contour> = shapes.into_iter()
+            .flatten()
+            .map(|c| Contour::new( c.into_iter().map(|p|p.into()).collect() ) )
+            .collect();
+        polygons_from_contours(p)
+    }
 }
+
 pub fn filtered_boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Polygon> {
     let subj:Vec<Vec<[f32;2]>> = poly.into_iter()
         .map(|p| p.flatten() )

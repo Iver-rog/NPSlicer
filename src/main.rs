@@ -73,19 +73,21 @@ fn offset_polygon(blender:&mut Blender){
     //polygon.invert();
 
     blender.polygon(&polygon, 0.0);
+    let i_overlay_poly = polygon.clone().offset(-2.0);
+
+    i_overlay_poly.iter().for_each(|p|blender.polygon(p, 1.0));
 
     let skeleton = match skeleton::SkeletonBuilder::from_polygon(polygon.clone()){
         Ok(skeleton_builder) => skeleton_builder,
         Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
             return }
         };
-    let offset_polygon = match skeleton.polygon_at_time(2.0){
+    let offset_poly = match skeleton.polygon_at_time(2.0){
         Ok(polygons) => polygons,
         Err(err) => {println!("{err}"); return;},
         };
-    for polygon in offset_polygon {
-        blender.polygon(&polygon, 0.0);
-    }
+
+    offset_poly.iter().for_each(|p|blender.polygon(p, 0.0));
 }
 #[allow(dead_code)]
 fn boolean_layers2(blender:&mut Blender){

@@ -16,6 +16,35 @@ fn simplify_contour(){
     //blender.show();
     assert!(c.points.len()<len);
 }
+pub fn i_offset_test(){
+    let contours = vec![
+        Contour::new(vec![
+            Point2::new(1.0, 2.0),
+            //Point2::new(1.0, 3.0),
+            Point2::new(1.0, 4.0),
+            Point2::new(2.0, 5.0),
+            Point2::new(4.0, 5.0),
+            Point2::new(5.0, 4.0),
+            Point2::new(5.0, 3.0),
+            Point2::new(8.0, 3.0),
+            Point2::new(8.0, 4.0),
+            Point2::new(9.0, 4.0),
+            Point2::new(10.0, 3.0),
+            Point2::new(11.0, 3.0),
+            Point2::new(11.0, 4.0),
+            Point2::new(12.0, 4.0),
+            Point2::new(12.0, 3.0),
+            Point2::new(13.0, 3.0),
+            Point2::new(13.0, 2.0),
+            Point2::new(5.0, 2.0),
+            Point2::new(4.0, 1.0),
+            Point2::new(2.0, 1.0),
+        ]),
+    ];
+    let shape = polygons_from_contours(contours).into_iter().next().unwrap();
+    let p = shape.offset(0.2);
+    assert!(p.len()!=0)
+}
 #[test]
 fn reverse_order(){
     let mut contour = Contour::new(vec![
