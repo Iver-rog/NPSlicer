@@ -4,26 +4,55 @@ use nalgebra::Point2;
 use i_overlay::core::fill_rule::FillRule;
 use i_overlay::core::overlay_rule::OverlayRule;
 use i_overlay::float::single::SingleFloatOverlay;
+use i_overlay::i_float::float::compatible::FloatPointCompatible;
 
+#[derive(Copy,Debug,Clone)]
+struct IOverlayCompatibleType(Point2<f32>);
+impl From<IOverlayCompatibleType> for nalgebra::Point2<f32> {
+    fn from(t:IOverlayCompatibleType)-> Point2<f32>{
+        t.0
+    }
+}
+impl From<Point2<f32>> for IOverlayCompatibleType{
+    fn from(p:Point2<f32>)->Self{
+        Self(p)
+    }
+}
+impl FloatPointCompatible<f32> for IOverlayCompatibleType {
+     fn from_xy(x: f32, y: f32) -> Self {
+         Self ( Point2::new(x,y) )
+     }
+
+     fn x(&self) -> f32 {
+         self.0.x
+     }
+
+     fn y(&self) -> f32 {
+         self.0.y
+     }
+ }
 impl Polygon{
     pub fn subtract(self, sub_shape:Self) -> Vec<Polygon>{
         // subtracts sub_shape from self
-        let subj:Vec<Vec<[f32;2]>> = self.flatten()
+        let subj:Vec<Vec<IOverlayCompatibleType>> = self.flatten()
             .into_iter()
-            .map(|contour| contour.points.into_iter().map(|p|[p.x,p.y]).collect() )
+            .map(|contour| contour.points.into_iter().map(|p|p.into()).collect() )
             .collect();
 
-        let clip:Vec<Vec<[f32;2]>> = sub_shape.flatten()
+        let clip:Vec<Vec<IOverlayCompatibleType>> = sub_shape.flatten()
             .into_iter()
-            .map(|contour| contour.points.into_iter().map(|p|[p.x,p.y]).collect() )
+            .map(|contour| contour.points.into_iter().map(|p|p.into()).collect() )
             .collect();
 
         let result = subj.overlay(&clip, OverlayRule::Difference, FillRule::EvenOdd);
 
-        return result.into_iter().map(|polygon|{
-            let contours = polygon.into_iter().map(|contour| Contour::new(contour.into_iter().map(|p|Point2::new(p[0],p[1])).collect())).collect();
-            polygons_from_contours(contours).into_iter().next().unwrap()
-        }).collect()
+        return result.into_iter()
+            .map(|polygon|{
+                let contours = polygon.into_iter()
+                    .map(|contour| Contour::new(contour.into_iter().map(|p|p.into()).collect()) )
+                    .collect();
+                polygons_from_contours(contours).into_iter().next().unwrap()
+            }).collect()
     }
 }
 pub fn filtered_boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Polygon> {
