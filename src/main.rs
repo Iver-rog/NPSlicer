@@ -28,7 +28,7 @@ fn main(){
  
     //offset_layers(&mut blender);
     //skeleton_layers(&mut blender);
-    boolean_layers(&mut blender);
+    boolean_layers2(&mut blender);
 
     blender.show();
 }
@@ -69,7 +69,8 @@ fn straight_skeleton(blender:&mut Blender) {
 }
 #[allow(dead_code)]
 fn offset_polygon(blender:&mut Blender){
-    let polygon = data::test_poly6();
+    let mut polygon = data::test_poly6();
+    //polygon.invert();
 
     blender.polygon(&polygon, 0.0);
 
@@ -85,6 +86,65 @@ fn offset_polygon(blender:&mut Blender){
     for polygon in offset_polygon {
         blender.polygon(&polygon, 0.0);
     }
+}
+#[allow(dead_code)]
+fn boolean_layers2(blender:&mut Blender){
+    //let file_path = "../mesh/bunny2.stl";
+    let file_path = "../mesh/stanford-armadillo.stl";
+
+    let file = File::open(file_path).expect("Failed to open STL file");
+    let mut reader = BufReader::new(file);
+
+    let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
+    blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
+
+    let layers = stl_op::extract_planar_layers(&mesh, 1.0 ,blender);
+    //layers.iter()
+    //    .enumerate()
+    //    .flat_map(|(i,layer)| 
+    //        layer.iter()
+    //        .map(move|l|(i,l) ) )
+    //    .for_each(|(i,l)|{ blender.polygon(&l,i as f32 * 1.0) });
+
+    let mut layers = layers.into_iter();
+    let mut prev_layer = layers.next().unwrap();
+    let mut new_overhangs = Vec::new();
+    for layer in layers{
+        let support = filtered_boolean(layer.clone(),prev_layer.clone(), OverlayRule::Difference );
+
+        support.iter().enumerate().for_each(|(i,p)|{blender.polygon(p,0.0)});
+
+        let offset_sup:Vec<Polygon> = support.into_iter()
+            .filter_map(|mut p|{
+                p.invert();
+            let skeleton = match skeleton::SkeletonBuilder::from_polygon(p){
+                Ok(skeleton_builder) => skeleton_builder,
+                Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
+                    return None }
+                };
+            match skeleton.polygon_at_time(2.0){
+                Ok(polygons) => Some(polygons),
+                Err(err) => {println!("{err}"); return None},
+                }
+            })
+            .flatten()
+            .collect();
+        subj.overlay(&clip, OverlayRule::Union, FillRule::EvenOdd);
+
+        offset_sup.iter().enumerate().for_each(|(i,p)|{println!("{i}");blender.polygon(p,1.0)});
+
+        let new_support = filtered_boolean(offset_sup.clone(), layer.clone(), OverlayRule::Intersect);
+        new_overhangs.push(new_support.clone());
+        prev_layer = new_support;
+        break
+    }
+
+    //for (i,merged_overhang) in new_overhangs.iter().enumerate() {
+    //    let layer_height = 1.0*(i as f32);
+    //    for polygon in merged_overhang {
+    //        blender.polygon(&polygon, layer_height);
+    //    }
+    //}
 }
 #[allow(dead_code)]
 fn boolean_layers(blender:&mut Blender){
@@ -132,7 +192,6 @@ fn boolean_layers(blender:&mut Blender){
             }
             (i,layer)
         });
-
 
     for (i,merged_overhang) in merged_overhangs {
         let layer_height = 1.0*(i as f32);
