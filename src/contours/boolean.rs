@@ -5,7 +5,9 @@ use std::fmt::Display;
 use nalgebra::Point2;
 use i_overlay::core::{fill_rule::FillRule,overlay_rule::OverlayRule};
 use i_overlay::float::single::SingleFloatOverlay;
+use i_overlay::float::clip::FloatClip;
 use i_overlay::i_float::float::compatible::FloatPointCompatible;
+use i_overlay::string::clip::ClipRule;
 use i_overlay::mesh::{
     style::{LineJoin,OutlineStyle},
     outline::offset::OutlineOffset
@@ -83,7 +85,29 @@ impl Polygon{
             .collect();
         polygons_from_contours(p)
     }
+    fn into_ioverlay_type(self)->Vec<Vec<IOverlayCompatibleType>>{
+        iter::once(self.outer_loop)
+            .chain( self.holes.into_iter() )
+            .map(|c|c.points.into_iter().rev().map(|p|p.into()).collect() )
+            .collect()
+    }
 }
+
+pub fn offset(polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
+    let shapes:Vec<Vec<Vec<IOverlayCompatibleType>>> = polygons.into_iter()
+        .map(|p|p.into_ioverlay_type())
+        .collect();
+
+    let style = OutlineStyle::new(distance).line_join(LineJoin::Round(0.5));
+    let shapes = shapes.outline(style);
+
+    let p:Vec<Contour> = shapes.into_iter()
+        .flatten()
+        .map(|c| Contour::new( c.into_iter().map(|p|p.into()).collect() ) )
+        .collect();
+    polygons_from_contours(p)
+}
+
 
 pub fn filtered_boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Polygon> {
     let subj:Vec<Vec<[f32;2]>> = poly.into_iter()
