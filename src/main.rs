@@ -4,7 +4,7 @@ mod stl_op;
 mod skeleton;
 mod utils;
 use contours::{Contour,Polygon};
-use contours::boolean::{boolean,filtered_boolean,offset};
+use contours::boolean::{boolean, clip_poly, filtered_boolean, offset};
 use i_overlay::core::overlay_rule::OverlayRule;
 use utils::Blender;
 mod data;
@@ -113,22 +113,29 @@ fn boolean_layers2(blender:&mut Blender){
 
     let mut layers = layers.into_iter();
     let mut prev_layer = layers.next().unwrap();
-    let mut new_overhangs = Vec::new();
-    for (i,layer) in layers.enumerate(){
+    //let mut new_overhangs = Vec::new();
+    for (i,layer) in layers.skip(5).enumerate(){
 
         let offset_sup = offset(prev_layer.clone(),d_x);
-        let new_support = boolean(offset_sup.clone(), layer.clone(), OverlayRule::Intersect);
+        let clip_poly = clip_poly(offset_sup.clone(), layer.clone());
+        println!("lines:{}",clip_poly.len());
 
-        new_overhangs.push(new_support.clone());
-        prev_layer = new_support;
+        layer.iter().for_each(|p|blender.polygon(p, 1.0));
+        offset_sup.iter().for_each(|p|blender.polygon(p, 2.0));
+        clip_poly.iter().for_each(|line|blender.line(line));
+        //let new_support = boolean(offset_sup.clone(), layer.clone(), OverlayRule::Intersect);
+
+        //new_overhangs.push(new_support.clone());
+        //prev_layer = new_support;
+        break
     }
 
-    for (i,merged_overhang) in new_overhangs.iter().enumerate() {
-        let layer_height = layer_h*((i+1) as f32);
-        for polygon in merged_overhang {
-            blender.polygon(&polygon, layer_height);
-        }
-    }
+    //for (i,merged_overhang) in new_overhangs.iter().enumerate() {
+    //    let layer_height = layer_h*((i+1) as f32);
+    //    for polygon in merged_overhang {
+    //        blender.polygon(&polygon, layer_height);
+    //    }
+    //}
 }
 #[allow(dead_code)]
 fn boolean_layers(blender:&mut Blender){

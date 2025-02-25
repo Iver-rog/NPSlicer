@@ -93,6 +93,20 @@ impl Polygon{
     }
 }
 
+pub fn clip_poly(obj:Vec<Polygon>,mask:Vec<Polygon>)-> Vec<Vec<Point2<f32>>>{
+    let clip_rule = ClipRule { invert: false, boundary_included: false };
+    let mask:Vec<Vec<Vec<IOverlayCompatibleType>>> = mask.into_iter()
+        .map(|p|p.into_ioverlay_type())
+        .collect();
+    obj.into_iter()
+        .map(|p|p.into_ioverlay_type())
+        .flatten()
+        .map(|p|p.clip_by(&mask, FillRule::NonZero, clip_rule)) // NOTE: wrong fillrule?
+        .flatten()
+        .map(|c|c.into_iter().map(|p|p.into()).collect())
+        .collect()
+}
+
 pub fn offset(polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
     let shapes:Vec<Vec<Vec<IOverlayCompatibleType>>> = polygons.into_iter()
         .map(|p|p.into_ioverlay_type())
