@@ -801,6 +801,18 @@ Polygon {
         )
     }
 }
+pub fn test_poly7_5()-> Polygon{
+    let outer_loop = vec![
+        Point2::new( 0.0, 0.0),
+        Point2::new( 3.0, 0.0),
+        Point2::new( 3.0, 3.0),
+        Point2::new( 0.0, 3.0),
+    ];
+    Polygon{
+        outer_loop: Contour::new( outer_loop ),
+        holes: Vec::new(),//vec![Contour::new(hole)],
+        }
+}
 pub fn test_poly7()-> Polygon{
     let outer_loop = vec![
         Point2::new(  0.0,  2.0),

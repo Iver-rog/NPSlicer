@@ -22,33 +22,21 @@ fn main(){
     //straight_skeleton(&mut blender);
     //straight_skeleton_copy(&mut blender);
     //skeleton_layers(&mut blender);
-    offset_layers(&mut blender);
+    //offset_layers(&mut blender);
     //offset_polygon(&mut blender);
+    //polygon_boolean(&mut blender);
 
     blender.show();
 }
 //#[allow(unused)]
-fn straight_skeleton_copy(blender:&mut Blender) {
-    //let vertices = test_poly();
-    //let vertices = test_poly2();
-    //let vertices:Vec<Point2<f32>> = test_poly3().into_iter().rev().collect();
-    let vertices = data::test_poly4();
+fn polygon_boolean(blender:&mut Blender) {
+    let poly = data::test_poly7();
+    let clip = data::test_poly7_5();
+    blender.polygon(&poly,0.0);
+    blender.polygon(&clip,0.0);
 
-    let vertices_as_f32:Vec<[f32;3]> = vertices.iter().map(|p|[ p[0],p[1], 0.0 ]).collect();
-
-    match skeleton::SkeletonBuilder::new(vertices){
-        Err(error) => error!("\x1b[031m{error}\x1b[0m"),
-        Ok(builder) => match builder.compute_skeleton() {
-            Err(error) => error!("{error}"),
-            Ok((skeleton,debug_contours)) => {
-                blender.line_body2d(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
-                for contour in debug_contours {
-                    blender.line_body2d(&contour.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), contour.edges);
-                }
-            } 
-        }
-    }
-    blender.edge_loop_points(&vertices_as_f32);
+    let boolean = poly.subtract(clip).into_iter().next().unwrap();
+    blender.polygon(&boolean,0.0);
 }
 fn straight_skeleton(blender:&mut Blender) {
     //let vertices = data::test_poly();

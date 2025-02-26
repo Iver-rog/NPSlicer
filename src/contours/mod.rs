@@ -5,6 +5,7 @@ use crate::{data, utils::Blender};
 
 #[cfg(test)]
 mod test;
+mod boolean;
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct AABB{
