@@ -19,10 +19,10 @@ fn main(){
 
     let mut blender = Blender::new();
     //pipe_line(&mut blender);
-    straight_skeleton(&mut blender);
+    //straight_skeleton(&mut blender);
     //straight_skeleton_copy(&mut blender);
     //skeleton_layers(&mut blender);
-    //offset_layers(&mut blender);
+    offset_layers(&mut blender);
     //offset_polygon(&mut blender);
 
     blender.show();
@@ -105,32 +105,33 @@ fn offset_layers(blender:&mut Blender){
     let layers = stl_op::extract_planar_layers(&mesh, 0.2 ,blender);
     let nr_layers = layers.len();
     for (i, layer) in layers.into_iter().enumerate() {
-        for polygon in layer {
+        for mut polygon in layer {
+            polygon.simplify(0.08);
             let layer_height = i as f32 * 0.2;
             print!("layer {i} of {} ",nr_layers);
             println!("contour {}",blender.line_objects.len());
 
-            //blender.edge_loop_points(
-            //    &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
-            //    );
-            //for hole in polygon.holes.iter(){
-            //    blender.edge_loop_points(
-            //        &hole.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>()
-            //        );
-            //    }
+            blender.edge_loop_points(
+                &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
+                );
+            for hole in polygon.holes.iter(){
+                blender.edge_loop_points(
+                    &hole.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>()
+                    );
+                }
 
-            let skeleton = match skeleton::SkeletonBuilder::from_polygon(polygon.clone()){
-                Ok(skeleton_builder) => skeleton_builder,
-                Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
-                    return }
-                };
-            let offset_polygon = match skeleton.polygon_at_time(2.0){
-                Ok(polygons) => polygons,
-                Err(err) => {println!("{err}"); return;},
-                };
-            for polygon in offset_polygon {
-            blender.polygon(&polygon,layer_height);
-            }
+            //let skeleton = match skeleton::SkeletonBuilder::from_polygon(polygon.clone()){
+            //    Ok(skeleton_builder) => skeleton_builder,
+            //    Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
+            //        return }
+            //    };
+            //let offset_polygon = match skeleton.polygon_at_time(2.0){
+            //    Ok(polygons) => polygons,
+            //    Err(err) => {println!("{err}"); return;},
+            //    };
+            //for polygon in offset_polygon {
+            //blender.polygon(&polygon,layer_height);
+            //}
         }
     }
 }

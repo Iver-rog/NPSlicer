@@ -1,6 +1,22 @@
 use crate::contours::*;
 use crate::stl_op::area_contour2d;
 #[test]
+fn simplify_contour(){
+    //let mut blender = Blender::new();
+
+    let mut c = Contour::new(data::test_poly());
+    //blender.polygon(&Polygon::new(c.clone(),vec![]), 0.0);
+
+    let len = c.points.len();
+    println!("original len {len}");
+    c.simplify(0.05);
+    println!("len after simplify {}",c.points.len());
+
+    //blender.polygon(&Polygon::new(c.clone(),vec![]), 0.0);
+    //blender.show();
+    assert!(c.points.len()<len);
+}
+#[test]
 fn reverse_order(){
     let mut contour = Contour::new(vec![
         Point2::new(0.0,0.0),

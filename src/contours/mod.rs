@@ -1,4 +1,7 @@
 use nalgebra::Point2;
+use nalgebra_glm::cross2d;
+
+use crate::{data, utils::Blender};
 
 #[cfg(test)]
 mod test;
@@ -42,6 +45,13 @@ impl Polygon {
         let hole_area: f32 = self.holes.iter().map(|contour| contour.area ).sum();
         return area - hole_area
     }
+    pub fn simplify(&mut self, min_a:f32){
+        self.outer_loop.simplify(min_a);
+        for hole in &mut self.holes{
+            hole.simplify(min_a);
+        }
+        self.holes = self.holes.clone().into_iter().filter(|c|c.area > min_a).collect();
+    }
 }
 #[derive(Debug,Clone,PartialEq)]
 pub struct Contour{
@@ -50,6 +60,25 @@ pub struct Contour{
     pub points: Vec<Point2<f32>>
 }
 impl Contour {
+    pub fn simplify(&mut self, min_a:f32){
+        let len = self.points.len();
+        for i in (0..len).rev(){
+            let i_pluss = (i+1)%self.points.len();
+            let i_minus = if i == 0 {self.points.len().saturating_sub(1)}else{i.saturating_sub(1)};
+
+            let p = self.points[i];
+            let p_p = self.points[i_pluss];
+            let p_m = self.points[i_minus];
+
+            let v1 = p_p - p;
+            let v2 = p_m - p;
+
+            let area_x2 = cross2d(&v1, &v2);
+            println!("area_x2 {area_x2}");
+            if area_x2.abs() < min_a*2. {self.points.remove(i);}
+        }
+        if self.points.len() < 3 {self.points.clear(); self.area = 0.0;}
+    }
     pub fn reverse_order(&mut self) {
         self.points.reverse();
         self.area = self.area * -1.0;

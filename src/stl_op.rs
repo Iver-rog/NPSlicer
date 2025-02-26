@@ -135,6 +135,7 @@ fn extract_layer(
                     ( None, Some(_) ) => panic!("not possible"),
                     };
 
+                // avoid adding points that are in close proximity to simplify the contour
                 if (previous_p - new_point).magnitude() > 0.1 { contour.push(new_point) }
                 handled_edges.insert(edge.clone());
                 prev_edge = edge.clone();
