@@ -98,6 +98,41 @@ impl Polygon{
             .collect()
     }
 }
+pub fn i_simplify(polygons: Vec<Polygon>,min_a:f32)->Vec<Polygon>{
+    let p: Vec<Vec<Vec<IOverlayCompatibleType>>>= polygons.into_iter().map(|p|p.into_ioverlay_type()).collect();
+    let p_simple = p.simplify_shape(FillRule::EvenOdd,min_a);
+    p.into_iter().map(|p|p.into()).collect()
+}
+
+impl From<Vec<Vec<IOverlayCompatibleType>>> for Polygon{
+    fn from(c:Vec<Vec<IOverlayCompatibleType>>)-> Self{
+        let mut contours = c.into_iter();
+        let outer_loop = match contours.next() {
+            Some(contour) => Contour::new(contour.into_iter().rev().map(|p|p.into()).collect()),
+            None => return Polygon::new(Contour::new(vec![]),vec![]),
+        };
+        let holes:Vec<Contour> = contours.map(|c| Contour::new(
+                    c.into_iter().map(|p|p.into()).collect()
+                    )
+                ).collect();
+
+        return Polygon::new( outer_loop, holes )
+    }
+}
+
+pub fn offset_line(line:Vec<Point2<f32>>,d_x:f32)->Vec<Polygon>{
+    let style = StrokeStyle::new(d_x)
+        .line_join(LineJoin::Miter(1.0))
+        .start_cap(LineCap::Butt)
+        .end_cap(LineCap::Butt);
+    let line:Vec<IOverlayCompatibleType> = line.into_iter().map(|p|p.into()).collect();
+    let polygons = line.stroke(style, false);
+    let p:Vec<Contour> = polygons.into_iter()
+        .flatten()
+        .map(|c| Contour::new( c.into_iter().map(|p|p.into()).collect() ) )
+        .collect();
+    polygons_from_contours(p)
+}
 
 pub fn clip_poly(obj:Vec<Polygon>,mask:Vec<Polygon>)-> Vec<Vec<Point2<f32>>>{
     let clip_rule = ClipRule { invert: false, boundary_included: false };
