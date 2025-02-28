@@ -142,8 +142,10 @@ pub fn clip_poly(obj:Vec<Polygon>,mask:Vec<Polygon>)-> Vec<Vec<Point2<f32>>>{
     obj.into_iter()
         .map(|p|p.into_ioverlay_type())
         .flatten()
+        .map(|mut p|{p.push(p[0]);p})
         .map(|p|p.clip_by(&mask, FillRule::NonZero, clip_rule)) // NOTE: wrong fillrule?
         .flatten()
+        .filter(|c|c.len()>5)
         .map(|c|c.into_iter().map(|p|p.into()).collect())
         .collect()
 }
@@ -170,6 +172,7 @@ pub fn filtered_boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -
         .flatten()
         .map(|c| 
             c.points.into_iter()
+            .rev()
             .map(|p|[p.x,p.y])
             .collect()
             )
@@ -180,12 +183,13 @@ pub fn filtered_boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -
         .flatten()
         .map(|c| 
             c.points.into_iter()
+            .rev()
             .map(|p|[p.x,p.y])
             .collect()
             )
         .collect();
 
-    let result = subj.overlay(&clip, mode, FillRule::EvenOdd);
+    let result = subj.overlay(&clip, mode, FillRule::NonZero);
 
     return result.into_iter()
         .map(|contours|{
@@ -216,6 +220,7 @@ pub fn boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Pol
         .flatten()
         .map(|c|
             c.points.into_iter()
+            .rev()
             .map(|p|[p.x,p.y])
             .collect()
             )
@@ -226,12 +231,13 @@ pub fn boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Pol
         .flatten()
         .map(|c|
             c.points.into_iter()
+            .rev()
             .map(|p|[p.x,p.y])
             .collect()
             )
         .collect();
 
-    let result = subj.overlay(&clip, mode, FillRule::EvenOdd);
+    let result = subj.overlay(&clip, mode, FillRule::NonZero);
 
     return result.into_iter()
         .map(|p_loop|{
