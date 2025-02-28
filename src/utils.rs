@@ -1,10 +1,12 @@
 #![allow(unused)]
+use core::iter::IntoIterator;
 use core::result;
 use std::{os::unix::process::CommandExt, process::Command};
 use std::fs::{self, File, OpenOptions};
 use std::path::Path;
 use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
+use nalgebra::Point2;
 use stl_io::{IndexedTriangle, Triangle, Vector};
 use crate::contours;
 
@@ -148,6 +150,11 @@ impl <'a> Blender<'a> {
         edges.push([edges.len(),0]);
 
         self.line_objects.push( (points, edges) );
+    }
+    pub fn line(&mut self, points:&Vec<Point2<f32>>,z_height:f32){
+        let edges = (0..(points.len()-1)).map(|i|[i,i+1]).collect();
+        let points = points.into_iter().map(|p|[p.x,p.y,z_height]).collect();
+        self.line_objects.push((points,edges));
     }
     pub fn line_body2d(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
         let points3d = points.clone().into_iter().map(|[p1,p2]|[p1,p2,0.0]).collect();

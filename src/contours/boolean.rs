@@ -1,16 +1,22 @@
-use crate::contours::{Polygon,Contour};
-use crate::contours::polygons_from_contours;
+use crate::contours::{Polygon,Contour,polygons_from_contours};
 use std::iter;
 use std::fmt::Display;
 use nalgebra::Point2;
-use i_overlay::core::{fill_rule::FillRule,overlay_rule::OverlayRule};
-use i_overlay::float::single::SingleFloatOverlay;
-use i_overlay::float::clip::FloatClip;
 use i_overlay::i_float::float::compatible::FloatPointCompatible;
 use i_overlay::string::clip::ClipRule;
+use i_overlay::core::{
+    fill_rule::FillRule,
+    overlay_rule::OverlayRule
+};
+use i_overlay::float::{
+    single::SingleFloatOverlay,
+    clip::FloatClip,
+    simplify::SimplifyShape,
+};
 use i_overlay::mesh::{
-    style::{LineJoin,OutlineStyle},
-    outline::offset::OutlineOffset
+    style::{LineJoin,OutlineStyle,LineCap,StrokeStyle},
+    outline::offset::OutlineOffset,
+    stroke::offset::StrokeOffset,
 };
 
 #[derive(Copy,Debug,Clone)]
