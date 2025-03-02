@@ -52,10 +52,13 @@ impl Polygon {
     }
     pub fn simplify(&mut self, min_a:f32){
         self.outer_loop.simplify(min_a);
-        for hole in &mut self.holes{
-            hole.simplify(min_a);
-        }
-        self.holes = self.holes.clone().into_iter().filter(|c|c.area > min_a).collect();
+        if (self.outer_loop.area < min_a) | (self.outer_loop.points.len() < 3){
+            self.outer_loop.points.clear();
+            self.outer_loop.area = 0.0;
+            self.holes.clear();
+        };
+        self.holes.iter_mut().for_each(|hole|hole.simplify(min_a));
+        self.holes.retain(|c|c.area.abs() > min_a);
     }
     pub fn flatten(self) -> Vec<Contour>{
         let mut a = self.holes;
