@@ -11,7 +11,7 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
     let z_max = mesh.vertices.iter().map(|vert| (vert[2]/layer_height).ceil() as usize).max().unwrap();
 
     // Identify which faces intersect which z-planes and save result in look_up_table
-    let mut look_up_table:Vec<HashSet<usize>> = vec![HashSet::new();z_max];
+    let mut look_up_table:Vec<HashSet<usize>> = vec![HashSet::new();z_max+1];
     for (face_ndx,min,max) in mesh.faces.iter().enumerate()
         .map(|(i,tri)| {
             let min = tri.vertices.iter()
@@ -37,7 +37,7 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
     //}
 
     let edges_to_tri_map = edges_to_triangles_map( mesh );
-    let mut polygons:Vec<Vec<Polygon>> = vec![Vec::new();z_max];
+    let mut polygons:Vec<Vec<Polygon>> = vec![Vec::new();z_max+1];
 
     for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
         let z_plane = layer_height*(layer_nr as f32);
@@ -55,7 +55,7 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
         //    contours.push(acontour);
         //}
     }
-    assert_eq!(polygons.len(),z_max);
+    assert_eq!(polygons.len(),z_max+1);
     polygons
 }
 #[allow(non_snake_case)]
