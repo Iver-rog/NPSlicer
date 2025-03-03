@@ -4,13 +4,13 @@ mod stl_op;
 mod skeleton;
 mod utils;
 use contours::{Contour,Polygon};
-use contours::boolean::{boolean, clip_poly, filtered_boolean, offset};
+use contours::boolean::{boolean, clip_poly, filtered_boolean, i_simplify, offset, offset_line};
 use i_overlay::core::overlay_rule::OverlayRule;
 use utils::Blender;
 mod data;
 
 use std::f32::consts::PI;
-use nalgebra::Point3;
+use nalgebra::{Point2, Point3};
 use log::{error, Level};
 use std::io::{Write, BufReader};
 use std::fs::File;
@@ -92,50 +92,69 @@ fn offset_polygon(blender:&mut Blender){
 #[allow(dead_code)]
 fn boolean_layers2(blender:&mut Blender){
     //let file_path = "../mesh/bunny2.stl";
-    let file_path = "../mesh/stanford-armadillo.stl";
+    //let file_path = "../mesh/stanford-armadillo.stl";
+    let file_path = "../mesh/curved overhang.stl";
 
     let file = File::open(file_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
 
     //let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
     let mut mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    mesh.vertices.iter_mut().for_each(|v|*v=stl_io::Vector::new([v[0],v[1],v[2]-20.]));
+    //mesh.vertices.iter_mut().for_each(|v|*v=stl_io::Vector::new([v[0],v[1],v[2]-20.]));
     blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
 
     let layer_h = 1.0; // layer height
     let theta = PI/6.; // overhang angle
     let d_x = layer_h/theta.tan();
 
-    let layers = stl_op::extract_planar_layers(&mesh, layer_h ,blender);
+    let mut layers = stl_op::extract_planar_layers(&mesh, layer_h ,blender);
+    layers.iter_mut().for_each(|layer| layer.iter_mut().for_each(|polygon|polygon.simplify(0.3)));
     //layers.iter().enumerate()
     //    .flat_map(|(i,layer)| layer.iter().map(move|l|(i,l) ) )
     //    .for_each(|(i,l)|{ blender.polygon(&l,i as f32 * 1.0) });
 
     let mut layers = layers.into_iter();
     let mut prev_layer = layers.next().unwrap();
-    //let mut new_overhangs = Vec::new();
-    for (i,layer) in layers.skip(5).enumerate(){
+    let mut new_overhangs = Vec::new();
+    for (i, layer) in layers.enumerate(){//.skip(5){
+        println!("layer {i}");
 
         let offset_sup = offset(prev_layer.clone(),d_x);
-        let clip_poly = clip_poly(offset_sup.clone(), layer.clone());
-        println!("lines:{}",clip_poly.len());
+        let clip_lines = clip_poly(offset_sup.clone(), layer.clone());
+        let additional_sup:Vec<Polygon> = clip_lines.clone()
+            .into_iter()
+            .map(|line| offset_line(line,d_x*3.))
+            .flatten()
+            .collect();
+        //let additional_sup = additional_sup.map(|i|i.into)
 
-        layer.iter().for_each(|p|blender.polygon(p, 1.0));
-        offset_sup.iter().for_each(|p|blender.polygon(p, 2.0));
-        clip_poly.iter().for_each(|line|blender.line(line));
-        //let new_support = boolean(offset_sup.clone(), layer.clone(), OverlayRule::Intersect);
+        let new_support1 = boolean(additional_sup.clone(), prev_layer.clone(), OverlayRule::Union);
+        let new_support2 = boolean(new_support1.clone(), offset_sup.clone(), OverlayRule::Intersect);
+        let mut new_support3 = boolean(new_support2.clone(), layer.clone(), OverlayRule::Intersect);
+        new_support3.iter_mut().for_each(|p|p.simplify(0.3));
+        let new_support4:Vec<Polygon> = new_support3.into_iter().filter(|p|p.area().abs() > 0.3).collect();
+        //let new_support = new_support.into_iter().filter(|p|p.area()>0.0).collect();
+        let new_support5 = i_simplify(new_support4, 0.3);
 
-        //new_overhangs.push(new_support.clone());
-        //prev_layer = new_support;
-        break
+        //prev_layer.iter().for_each(|p|blender.polygon(p, 0.0));
+        //offset_sup.iter().for_each(|p|blender.polygon(p, 0.0));
+        //layer.iter().for_each(|p|blender.polygon(p, 1.0));
+        //clip_lines.iter().for_each(|line|blender.line(line,2.0));
+        //additional_sup.iter().for_each(|p|blender.polygon(p, 3.0));
+        //new_support.iter().for_each(|p|blender.polygon(p, 4.0));
+
+        new_overhangs.push(new_support5.clone());
+        prev_layer = new_support5;
+        //break
     }
+    println!("created {} layers",new_overhangs.len());
 
-    //for (i,merged_overhang) in new_overhangs.iter().enumerate() {
-    //    let layer_height = layer_h*((i+1) as f32);
-    //    for polygon in merged_overhang {
-    //        blender.polygon(&polygon, layer_height);
-    //    }
-    //}
+    for (i,merged_overhang) in new_overhangs.iter().enumerate() {
+        let layer_height = layer_h*((i+1) as f32);
+        for polygon in merged_overhang {
+            blender.polygon(&polygon, layer_height);
+        }
+    }
 }
 #[allow(dead_code)]
 fn boolean_layers(blender:&mut Blender){
@@ -248,8 +267,8 @@ fn skeleton_layers(blender:&mut Blender){
 
     let layers = stl_op::extract_planar_layers(&mesh, 0.2 ,blender);
     let nr_layers = layers.len();
-    for (i,mut layer) in layers.into_iter().enumerate() {
-        for mut polygon in layer {
+    for (i, layer) in layers.into_iter().enumerate() {
+        for polygon in layer {
             let layer_height = i as f32 * 0.2;
             println!("contour {i} of {}",nr_layers);
 
