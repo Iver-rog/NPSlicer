@@ -4,7 +4,8 @@ use crate::contours::{Contour,Polygon,polygons_from_contours};
 use std::iter::{IntoIterator, Iterator};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
-use nalgebra::{Point2, Point3};
+use nalgebra::{Point2, Point3, Vector2};
+use nalgebra_glm::cross2d;
 
 
 pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Polygon>> {
@@ -13,14 +14,14 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
     // Identify which faces intersect which z-planes and save result in look_up_table
     let mut look_up_table:Vec<HashSet<usize>> = vec![HashSet::new();z_max+1];
     for (face_ndx,min,max) in mesh.faces.iter().enumerate()
-        .map(|(i,tri)| {
+        .map(|(face_ndx,tri)| {
             let min = tri.vertices.iter()
                 .map(|vert| (mesh.vertices[*vert][2] / layer_height ).ceil() as usize)
                 .min().unwrap();
             let max: usize = tri.vertices.iter()
                 .map(|vert| (mesh.vertices[*vert][2] / layer_height ).floor() as usize)
                 .max().unwrap();
-            (i,min,max)
+            (face_ndx,min,max)
         }){
             for layer_nr in min..=max {
                 look_up_table[layer_nr].insert(face_ndx);
@@ -29,7 +30,6 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
 
     // Debug: export faces to blender
     //for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
-    //assert_eq!(look_up_table[layer_nr],face_ndxes.clone());
     //    let owned_faces:Vec<IndexedTriangle> = face_ndxes.into_iter()
     //        .map(|face_ndx| mesh.faces[*face_ndx].clone())
     //        .collect();
@@ -37,26 +37,21 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
     //}
 
     let edges_to_tri_map = edges_to_triangles_map( mesh );
-    let mut polygons:Vec<Vec<Polygon>> = vec![Vec::new();z_max+1];
 
-    for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
-        let z_plane = layer_height*(layer_nr as f32);
-        //println!("layer number: {} z_plane: {}",&layer_nr,&z_plane);
-        let contours = extract_layer(
-            z_plane,
-            face_ndxes,
-            mesh,
-            &edges_to_tri_map,
-            );
-        polygons[layer_nr] = polygons_from_contours(contours);
-        //for acontour in contour{
-        //contours[layer_nr].push(acontour);
-        //    //blender.edge_loop_points(&acontour.iter().map(|p|[p.x,p.y,p.z]).collect());
-        //    contours.push(acontour);
-        //}
-    }
-    assert_eq!(polygons.len(),z_max+1);
-    polygons
+    return look_up_table.iter()
+        .enumerate() 
+        .skip(1) // skip since we dont want to create a layer at the same level as the build plate
+        .map(|(layer_nr,face_ndxes)|{
+            let z_plane = layer_height*(layer_nr as f32);
+            let contours = extract_layer(
+                z_plane,
+                face_ndxes,
+                mesh,
+                &edges_to_tri_map,
+                );
+            polygons_from_contours(contours)
+        })
+        .collect();
 }
 #[allow(non_snake_case)]
 fn extract_layer(
@@ -136,7 +131,19 @@ fn extract_layer(
                     };
 
                 // avoid adding points that are in close proximity to simplify the contour
-                if (previous_p - new_point).magnitude() > 0.1 { contour.push(new_point) }
+                {
+                    let mut points = contour.iter().rev();
+                    match (points.next(),points.next()) {
+                        (Some(p1),Some(p2))=> {
+                            let p3 = new_point;
+                            let v1 = p1-p2;
+                            let v2 = p3-p2;
+                            if cross2d(&v1, &v2).abs() < 0.1{contour.pop();}
+                        },
+                        _=>(),
+                    }
+                }
+                contour.push(new_point);
                 handled_edges.insert(edge.clone());
                 prev_edge = edge.clone();
                 }
@@ -166,10 +173,13 @@ fn edge_zplane_intersection_test(){
     assert_eq!(None,result);
 }
 fn edge_zplane_intersection(edge_start:Point3<f32>,edge_end:Point3<f32>,z_plane:f32)-> Option<Point3<f32>>{
-    let edge_vec = edge_end - edge_start;
-    let scale = (z_plane - edge_start.z) / edge_vec.z;
-    if scale + f32::EPSILON < 0.0 || scale - f32::EPSILON > 1.0 { return None }
-    return Some(edge_start + edge_vec*scale)
+    let (p1,p2) = if edge_start.z < edge_end.z {(edge_start, edge_end)} else {(edge_end, edge_start)};
+    let edge_vec = p2 - p1;
+    if edge_vec.z == 0.0 {return None} // edge is parrallel to the z plane inf intersections
+    let scale = (z_plane - p1.z) / edge_vec.z;
+    if !( (0.0 < scale) && (scale <= 1.0) ) {return None}
+    let result = p1 + edge_vec*scale;
+    return Some(p1 + edge_vec*scale);
 }
 
 pub fn extract_overhangs(mesh:&IndexedMesh,angle:f32) -> Vec<Vec<IndexedTriangle>>{
