@@ -59,8 +59,8 @@ fn straight_skeleton(blender:&mut Blender) {
             Err(error) => error!("{error}"),
             Ok((skeleton,debug_contours)) => {
                 blender.line_body2d(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
-                for contour in debug_contours {
-                    blender.line_body2d(&contour.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), contour.edges);
+                for polygon in debug_contours.iter().flatten() {
+                    blender.polygon(polygon,0.0);
                 }
             } 
         }

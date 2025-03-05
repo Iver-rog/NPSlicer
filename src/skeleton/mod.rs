@@ -1,4 +1,4 @@
-use nalgebra::{Matrix2, Point2, Vector2};
+use nalgebra::{Matrix2, Point2, Point3, Vector2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
@@ -27,9 +27,22 @@ pub struct Edge {
     pub end: usize,
 }
 #[derive(Debug,Default)]
+pub struct StraightSkeleton3d {
+    pub vertices: Vec<Point3<f32>>,
+    pub edges: Vec<[usize;2]>,
+}
+#[derive(Debug,Default)]
 pub struct StraightSkeleton {
     pub vertices: Vec<Point2<f32>>,
     pub edges: Vec<[usize;2]>,
+}
+impl From<StraightSkeleton3d> for StraightSkeleton{
+    fn from(sk:StraightSkeleton3d)->Self{
+        StraightSkeleton{
+            vertices: sk.vertices.into_iter().map(|p|p.xy()).collect(),
+            edges: sk.edges,
+        }
+    }
 }
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct Event {
@@ -183,7 +196,11 @@ impl SkeletonBuilder {
         }
         return Ok(self.shrinking_polygon_at_time2(stop_time))
     }
-    pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<StraightSkeleton>), SkeletonError> {
+    pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<Vec<Polygon>>), SkeletonError> {
+        let (skel3d,dbg_poly) = self.compute_skeleton3d()?;
+        return Ok((skel3d.into(),dbg_poly))
+    }
+    pub fn compute_skeleton3d(mut self) -> Result<(StraightSkeleton3d,Vec<Vec<Polygon>>), SkeletonError> {
 
         let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
         //initialize events 
@@ -191,7 +208,7 @@ impl SkeletonBuilder {
             self.find_events(&mut events,*node)?;
         }
         info!("\x1b[034m========================== Computing Skeleton ==========================\x1b[0m");
-        let mut debug_contours: Vec<StraightSkeleton> = Vec::new();
+        let mut debug_contours: Vec<Vec<Polygon>> = Vec::new();
         let mut handled_events = 0;
         while let Some((event, _)) = events.pop() {
             if self.shrining_polygon.len() == 0 { break }
@@ -203,23 +220,25 @@ impl SkeletonBuilder {
             match result {
                 Ok(valid_event) => {
                     if valid_event { 
-                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
+                        debug_contours.push(self.shrinking_polygon_at_time2(current_time));
                         debug!("\n{self}");
                         handled_events += 1;
                     };
                 },
                 Err(error) => {
                     println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
-                    debug_contours.push(self.shrinking_polygon_at_time(current_time));
+                    debug_contours.push(self.shrinking_polygon_at_time2(current_time));
                     break 
                 }
             }
         }
-        let vertices = self.vertices.into_iter().map(|n| n.coords).collect();
+        let vertices = self.vertices.into_iter()
+            .map(|n| Point3::new(n.coords.x,n.coords.y,n.time))
+            .collect();
         let edges = self.edges.into_iter()
             .map(|edge| [edge.start,edge.end] )
             .collect();
-        let skeleton = StraightSkeleton {
+        let skeleton = StraightSkeleton3d {
             vertices,
             edges,
         };
@@ -699,9 +718,9 @@ pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32
     return Some(Point2::new(xi,yi))
 }
 
-pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton, SkeletonError> {
+pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton3d, SkeletonError> {
     let builder = SkeletonBuilder::from_polygon(polygon)?;
-    let (skeleton, _debug_contours) = builder.compute_skeleton()?;
+    let (skeleton, _debug_contours) = builder.compute_skeleton3d()?;
     return Ok(skeleton);
 }
 
