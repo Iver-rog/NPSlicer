@@ -4,7 +4,7 @@ use crate::contours::{Contour,Polygon,polygons_from_contours};
 use std::iter::{IntoIterator, Iterator};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
-use nalgebra::{Point2, Point3, Vector2};
+use nalgebra::{Point2, Point3};
 use nalgebra_glm::cross2d;
 
 

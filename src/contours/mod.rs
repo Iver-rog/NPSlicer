@@ -1,14 +1,12 @@
 use nalgebra::Point2;
 use nalgebra_glm::cross2d;
 
-use crate::{data, utils::Blender};
-
 #[cfg(test)]
 mod test;
 pub mod boolean;
 
 #[derive(Debug,Clone,PartialEq)]
-pub struct AABB{
+struct AABB{
     x_max:f32,
     x_min:f32,
     y_max:f32,
@@ -87,7 +85,6 @@ impl Contour {
             let v2 = p_m - p;
 
             let area_x2 = cross2d(&v1, &v2);
-            println!("area_x2 {area_x2}");
             if area_x2.abs() < min_a*2. {self.points.remove(i);}
         }
         if self.points.len() < 3 {self.points.clear(); self.area = 0.0;}

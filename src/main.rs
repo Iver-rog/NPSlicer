@@ -4,7 +4,7 @@ mod stl_op;
 mod skeleton;
 mod utils;
 use contours::{Contour,Polygon};
-use contours::boolean::{boolean, clip_poly, filtered_boolean, i_simplify, offset, offset_line};
+use contours::boolean::{boolean, clip_poly, i_simplify, offset, offset_line};
 use i_overlay::core::overlay_rule::OverlayRule;
 use utils::Blender;
 mod data;
@@ -196,7 +196,7 @@ fn boolean_layers(blender:&mut Blender){
                         //layer = filtered_boolean(layer,mask,OverlayRule::Union);
                         mask = boolean(mask,next_mask,OverlayRule::Union);
                         }
-                    layer = filtered_boolean(layer,mask,OverlayRule::Difference);
+                    layer = boolean(layer,mask,OverlayRule::Difference);
                 }
                 None => ()
             }
