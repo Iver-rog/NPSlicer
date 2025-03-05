@@ -27,22 +27,9 @@ pub struct Edge {
     pub end: usize,
 }
 #[derive(Debug,Default)]
-pub struct StraightSkeleton3d {
+pub struct StraightSkeleton {
     pub vertices: Vec<Point3<f32>>,
     pub edges: Vec<[usize;2]>,
-}
-#[derive(Debug,Default)]
-pub struct StraightSkeleton {
-    pub vertices: Vec<Point2<f32>>,
-    pub edges: Vec<[usize;2]>,
-}
-impl From<StraightSkeleton3d> for StraightSkeleton{
-    fn from(sk:StraightSkeleton3d)->Self{
-        StraightSkeleton{
-            vertices: sk.vertices.into_iter().map(|p|p.xy()).collect(),
-            edges: sk.edges,
-        }
-    }
 }
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct Event {
@@ -194,13 +181,9 @@ impl SkeletonBuilder {
                     println!("{self}");}
             }
         }
-        return Ok(self.shrinking_polygon_at_time2(stop_time))
+        return Ok(self.shrinking_polygon_at_time(stop_time))
     }
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<Vec<Polygon>>), SkeletonError> {
-        let (skel3d,dbg_poly) = self.compute_skeleton3d()?;
-        return Ok((skel3d.into(),dbg_poly))
-    }
-    pub fn compute_skeleton3d(mut self) -> Result<(StraightSkeleton3d,Vec<Vec<Polygon>>), SkeletonError> {
 
         let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
         //initialize events 
@@ -220,14 +203,14 @@ impl SkeletonBuilder {
             match result {
                 Ok(valid_event) => {
                     if valid_event { 
-                        debug_contours.push(self.shrinking_polygon_at_time2(current_time));
+                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
                         debug!("\n{self}");
                         handled_events += 1;
                     };
                 },
                 Err(error) => {
                     println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
-                    debug_contours.push(self.shrinking_polygon_at_time2(current_time));
+                    debug_contours.push(self.shrinking_polygon_at_time(current_time));
                     break 
                 }
             }
@@ -238,7 +221,7 @@ impl SkeletonBuilder {
         let edges = self.edges.into_iter()
             .map(|edge| [edge.start,edge.end] )
             .collect();
-        let skeleton = StraightSkeleton3d {
+        let skeleton = StraightSkeleton {
             vertices,
             edges,
         };
@@ -590,7 +573,7 @@ impl SkeletonBuilder {
         self.find_edge_event(events,right_node.prev_ndx)?;
         Ok(true)
     }
-    pub fn shrinking_polygon_at_time2(&self, time:f32) -> Vec<Polygon> {
+    pub fn shrinking_polygon_at_time(&self, time:f32) -> Vec<Polygon> {
         let mut computed_vertecies:HashSet<usize> = HashSet::new();
         let mut contours = Vec::new();
         for node_ndx in self.shrining_polygon.active_nodes_iter() {
@@ -605,30 +588,6 @@ impl SkeletonBuilder {
                 contours.push(Contour::new(contour));
             }
         return polygons_from_contours(contours)
-    }
-    pub fn shrinking_polygon_at_time(&self, time:f32) -> StraightSkeleton {
-        let mut computed_vertecies:HashSet<usize> = HashSet::new();
-        let mut vertices = Vec::new();
-        let mut edges:Vec<[usize;2]> = Vec::new();
-        for node_ndx in self.shrining_polygon.active_nodes_iter() {
-                if computed_vertecies.contains(&node_ndx){continue};
-                let start_node = self.shrining_polygon.nodes[*node_ndx];
-                let first_index = edges.len();
-                for node in self.shrining_polygon.iter(&start_node){
-                    let vertex = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
-                    vertices.push(vertex);
-                    edges.push([vertices.len()-1,vertices.len()]);
-                    computed_vertecies.insert(node.ndx);
-                }
-                let last_index = edges.len()-1;
-                edges[last_index] = [last_index,first_index];
-            }
-
-        let contour = StraightSkeleton{
-            vertices,
-            edges,
-        };
-        return contour;
     }
 }
 fn compute_intersection_time(
@@ -718,9 +677,9 @@ pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32
     return Some(Point2::new(xi,yi))
 }
 
-pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton3d, SkeletonError> {
+pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton, SkeletonError> {
     let builder = SkeletonBuilder::from_polygon(polygon)?;
-    let (skeleton, _debug_contours) = builder.compute_skeleton3d()?;
+    let (skeleton, _debug_contours) = builder.compute_skeleton()?;
     return Ok(skeleton);
 }
 
