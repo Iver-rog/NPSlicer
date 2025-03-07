@@ -14,6 +14,7 @@ mod test;
 
 mod error;
 use error::SkeletonError;
+use error::BisectorError;
 
 mod nodes;
 use nodes::{Nodes,Node};
@@ -69,11 +70,7 @@ impl SkeletonBuilder {
         return Ok(builder)
     }
     pub fn add_loop(&mut self, points: Vec<Point2<f32>>) -> Result<(), SkeletonError> {
-        if points.len() < 3 {
-            return Err(SkeletonError::InvalidPolygon(
-                "Polygon must have at least 3 vertices".to_string(),
-            ));
-        }
+        if points.len() < 3 { return Err(SkeletonError::InvalidInput) }
         info!("\x1b[034m========================== Initializing Polygon ==========================\x1b[0m");
 
         let offset = self.shrining_polygon.len();
@@ -87,7 +84,7 @@ impl SkeletonBuilder {
 
             let bisector = match bisector(p_current, p_next, p_prev){
                 Ok(bisector) => bisector,
-                Err(error) => return Err(SkeletonError::InitializationError(format!("Could not construct bisector for node {i}\n{error}")))
+                Err(error) => return Err(SkeletonError::InitializationError{node:i,error})
             };
 
             self.shrining_polygon.insert(Node {
@@ -116,9 +113,7 @@ impl SkeletonBuilder {
     pub fn new(points: Vec<Point2<f32>>) -> Result<Self, SkeletonError> {
         if points.len() < 3 {
             error!("Polygon must have at least 3 vertices");
-            return Err(SkeletonError::InvalidPolygon(
-                "Polygon must have at least 3 vertices".to_string(),
-            ));
+            return Err(SkeletonError::InvalidInput);
         }
         info!("\x1b[034m========================== Initializing Polygon ==========================\x1b[0m");
         let mut nodes = Vec::new();
@@ -135,7 +130,7 @@ impl SkeletonBuilder {
 
             let bisector = match bisector(p_current, p_next, p_prev){
                 Ok(bisector) => bisector,
-                Err(error) => return Err(SkeletonError::InitializationError(format!("Could not construct bisector for node {i}\n{error}")))
+                Err(error) => return Err(SkeletonError::InitializationError{node:i, error})
             };
 
             nodes.push(Node {
@@ -440,9 +435,7 @@ impl SkeletonBuilder {
 
         let bisector = match bisector(new_vertex,edge_end_next_p,edge_start_prev_p){
             Ok(bisector) => bisector,
-            Err(error) => return Err(SkeletonError::EdgeEventError(
-                    format!("could not calculate bisector for newly created vertex: {error}")
-                    ))
+            Err(error) => return Err(SkeletonError::EdgeEventError(error))
         };
         //let bisector = 0.5*(edge_start.bisector() + edge_end.bisector());
         let new_node = Node::new()
@@ -619,7 +612,7 @@ pub fn bisector(
     current_point: Point2<f32>,
     next_point: Point2<f32>,
     prev_point: Point2<f32>,
-) -> Result<Vector2<f32>, SkeletonError> {
+) -> Result<Vector2<f32>, BisectorError> {
     let v1 = (next_point - current_point).normalize();
     let v2 = (prev_point - current_point).normalize();
 
@@ -628,11 +621,12 @@ pub fn bisector(
     let t = Vector2::new(-v1[1], v1[0]);
     match a.try_inverse_mut() {
         true => (),
-        false => Err(SkeletonError::BisectorError( 
-            format!("invertable matrix {a}  current_point: {current_point}
-  next_point: {next_point}
-  prev_point: {prev_point}"
-                    ) ) )?
+        false => return Err(BisectorError{
+            matrix:a,
+            current_p:current_point,
+            next_p:next_point,
+            prev_p:prev_point,
+         })
     }
 
     let s = a * t;
