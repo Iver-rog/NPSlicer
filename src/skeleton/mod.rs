@@ -112,21 +112,23 @@ impl SkeletonBuilder {
 
         return Ok(())
     }
+    fn handle_event(&mut self,events:&mut PriorityQueue<Event,OrderedFloat<f32>>,event:Event) -> Result<bool,SkeletonError>{
+        match event.event_type {
+            EventType::Edge => self.handle_edge_event(events,event),
+            EventType::Split(_) => self.handle_split_event(events,event),
+        }
+    }
     pub fn polygon_at_time(mut self,stop_time:f32) -> Result<Vec<Polygon>, SkeletonError> {
         let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
         //initialize events 
         for node in self.shrining_polygon.nodes.iter() {
             self.find_events(&mut events,*node)?;
         }
-        while let Some((event, _)) = events.pop() {
+        while let Some((event, priority)) = events.pop() {
+            let time = -priority.0;
+            if stop_time < time { break }
             if self.shrining_polygon.len() == 0 { break }
-            if stop_time < *event.time { break }
-
-            let result = match event.event_type {
-                EventType::Edge => self.handle_edge_event(&mut events,event),
-                EventType::Split(_) => self.handle_split_event(&mut events,event),
-            };
-            match result {
+            match self.handle_event(&mut events, event){
                 Ok(_valid_event) => (),
                 Err(error) => { 
                     println!("\x1b[031m{error}\x1b[0m"); 
@@ -145,14 +147,11 @@ impl SkeletonBuilder {
         info!("\x1b[034m========================== Computing Skeleton ==========================\x1b[0m");
         let mut debug_contours: Vec<Vec<Polygon>> = Vec::new();
         let mut handled_events = 0;
-        while let Some((event, _)) = events.pop() {
+        while let Some((event, priority)) = events.pop() {
+            let time = -priority.0;
             if self.shrining_polygon.len() == 0 { break }
-            let current_time = *event.time;
-            let result = match event.event_type {
-                EventType::Edge => self.handle_edge_event(&mut events,event),
-                EventType::Split(_) => self.handle_split_event(&mut events,event),
-            };
-            match result {
+            let current_time = time;
+            match self.handle_event(&mut events, event) {
                 Ok(valid_event) => {
                     if valid_event { 
                         debug_contours.push(self.offset_active_vertices(current_time));
