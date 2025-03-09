@@ -54,7 +54,7 @@ pub struct Vertex {
     coords: Point2<f32>,
     time: f32,
 }
-#[derive(Debug)]
+#[derive(Debug,Default)]
 pub struct SkeletonBuilder {
     shrining_polygon: Nodes,
     original_polygon: Nodes,
@@ -62,8 +62,10 @@ pub struct SkeletonBuilder {
     edges: Vec<Edge>,
 }
 impl SkeletonBuilder {
+    pub fn new() -> Self { Self::default() }
     pub fn from_polygon(polygon:Polygon) -> Result<Self,SkeletonError> {
-        let mut builder = SkeletonBuilder::new(polygon.outer_loop.points)?;
+        let mut builder = SkeletonBuilder::new();
+        builder.add_loop(polygon.outer_loop.points)?;
         for hole in polygon.holes.into_iter(){
             builder.add_loop(hole.points)?;
         }
@@ -71,7 +73,7 @@ impl SkeletonBuilder {
     }
     pub fn add_loop(&mut self, points: Vec<Point2<f32>>) -> Result<(), SkeletonError> {
         if points.len() < 3 { return Err(SkeletonError::InvalidInput) }
-        info!("\x1b[034m========================== Initializing Polygon ==========================\x1b[0m");
+        info!("\x1b[034m========================== Adding Contour ==========================\x1b[0m");
 
         let offset = self.shrining_polygon.len();
         for i in 0..points.len() {
@@ -110,51 +112,6 @@ impl SkeletonBuilder {
 
         return Ok(())
     }
-    pub fn new(points: Vec<Point2<f32>>) -> Result<Self, SkeletonError> {
-        if points.len() < 3 {
-            error!("Polygon must have at least 3 vertices");
-            return Err(SkeletonError::InvalidInput);
-        }
-        info!("\x1b[034m========================== Initializing Polygon ==========================\x1b[0m");
-        let mut nodes = Vec::new();
-        let mut edges = Vec::new();
-
-        //builder.initialize_polygon(weights)?;
-        for i in 0..points.len() {
-            let next_ndx = (i + 1) % points.len();
-            let prev_ndx = if i == 0 {points.len()-1} else { i-1 };
-
-            let p_current = points[i];
-            let p_next = points[next_ndx];
-            let p_prev = points[prev_ndx];
-
-            let bisector = match bisector(p_current, p_next, p_prev){
-                Ok(bisector) => bisector,
-                Err(error) => return Err(SkeletonError::InitializationError{node:i, error})
-            };
-
-            nodes.push(Node {
-                ndx: i,
-                next_ndx,
-                prev_ndx,
-                bisector:[OrderedFloat(bisector[0]), OrderedFloat(bisector[1])],
-                vertex_ndx: i
-            });
-            edges.push(Edge {
-                start: i,
-                end: next_ndx,
-            });
-        }
-
-        let builder = SkeletonBuilder {
-            shrining_polygon: Nodes::from_closed_curve(nodes.clone()),
-            original_polygon: Nodes::from_closed_curve(nodes),
-            edges,
-            vertices:points.into_iter().map(|p| Vertex{coords:p,time:0.0}).collect(),
-        };
-
-        Ok(builder)
-    }
     pub fn polygon_at_time(mut self,stop_time:f32) -> Result<Vec<Polygon>, SkeletonError> {
         let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
         //initialize events 
@@ -176,7 +133,7 @@ impl SkeletonBuilder {
                     println!("{self}");}
             }
         }
-        return Ok(self.shrinking_polygon_at_time(stop_time))
+        return Ok(self.offset_active_vertices(stop_time))
     }
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<Vec<Polygon>>), SkeletonError> {
 
@@ -198,14 +155,14 @@ impl SkeletonBuilder {
             match result {
                 Ok(valid_event) => {
                     if valid_event { 
-                        debug_contours.push(self.shrinking_polygon_at_time(current_time));
+                        debug_contours.push(self.offset_active_vertices(current_time));
                         debug!("\n{self}");
                         handled_events += 1;
                     };
                 },
                 Err(error) => {
                     println!("\x1b[031mevent number: {handled_events} {error}\x1b[0m");
-                    debug_contours.push(self.shrinking_polygon_at_time(current_time));
+                    debug_contours.push(self.offset_active_vertices(current_time));
                     break 
                 }
             }
@@ -566,7 +523,7 @@ impl SkeletonBuilder {
         self.find_edge_event(events,right_node.prev_ndx)?;
         Ok(true)
     }
-    pub fn shrinking_polygon_at_time(&self, time:f32) -> Vec<Polygon> {
+    pub fn offset_active_vertices(&self, time:f32) -> Vec<Polygon> {
         let mut computed_vertecies:HashSet<usize> = HashSet::new();
         let mut contours = Vec::new();
         for node_ndx in self.shrining_polygon.active_nodes_iter() {
