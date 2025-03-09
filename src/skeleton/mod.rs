@@ -41,7 +41,7 @@ struct Event {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum EventType {
     Edge,  // A edge shrinks to zero lenght
-    Split([OrderedFloat<f32>;2]), // A region is split into two parts
+    Split{ split_point:[OrderedFloat<f32>;2]}, // A region is split into two parts
 }
 impl Display for Event {
     fn fmt(&self, b:&mut std::fmt::Formatter<'_>) -> Result<(),std::fmt::Error>{
@@ -108,14 +108,14 @@ impl SkeletonBuilder {
                 end: next_ndx + offset,
             });
         }
-        self.vertices.append(& mut points.into_iter().map(|p| Vertex{coords:p,time:0.0}).collect());
+        self.vertices.extend(points.into_iter().map(|p| Vertex{coords:p,time:0.0}));
 
         return Ok(())
     }
     fn handle_event(&mut self,events:&mut PriorityQueue<Event,OrderedFloat<f32>>,event:Event) -> Result<bool,SkeletonError>{
         match event.event_type {
             EventType::Edge => self.handle_edge_event(events,event),
-            EventType::Split(_) => self.handle_split_event(events,event),
+            EventType::Split{..} => self.handle_split_event(events,event),
         }
     }
     pub fn polygon_at_time(mut self,stop_time:f32) -> Result<Vec<Polygon>, SkeletonError> {
@@ -179,7 +179,7 @@ impl SkeletonBuilder {
         return Ok((skeleton,debug_contours))
     }
 
-    fn find_events(& self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>, node:Node) -> Result<(), SkeletonError> {
+    fn find_events(&self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>, node:Node) -> Result<(), SkeletonError> {
         // Edge event between node and next_node
         let edge_event = self.compute_edge_event(
             node.ndx, 
@@ -197,7 +197,7 @@ impl SkeletonBuilder {
         }
         Ok(())
     }
-    fn find_edge_event(&mut self, events:&mut PriorityQueue<Event, OrderedFloat<f32>> ,node_ndx:usize) -> Result<(), SkeletonError> {
+    fn find_edge_event(&self, events:&mut PriorityQueue<Event, OrderedFloat<f32>> ,node_ndx:usize) -> Result<(), SkeletonError> {
         // Edge events
         let edge_event = self.compute_edge_event(
             node_ndx,
@@ -235,7 +235,7 @@ impl SkeletonBuilder {
             Ok(None)
         }
     }
-    fn compute_split_events<'a>(&'a self, node: &'a Node) -> Result<Vec<Event>, SkeletonError> {
+    fn compute_split_events(&self, node: &Node) -> Result<Vec<Event>, SkeletonError> {
         let mut events = Vec::new();
         // Check if edge is a reflex angle
 
@@ -337,12 +337,12 @@ impl SkeletonBuilder {
 
 
                 let t = (node_p - b).magnitude() / node.bisector().magnitude();
-                let split = [OrderedFloat(b[0]),OrderedFloat(b[1])];
+                let b = [OrderedFloat(b[0]),OrderedFloat(b[1])];
 
                 events.push(Event {
                     time: OrderedFloat(t+node_v.time),
                     node: *node,
-                    event_type: EventType::Split(split),
+                    event_type: EventType::Split{split_point: b},
                 });
             }
         Ok(events)
@@ -416,7 +416,7 @@ impl SkeletonBuilder {
     }
     fn handle_split_event(&mut self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>,event: Event) -> Result<bool, SkeletonError> {
         let b = match event.event_type { 
-            EventType::Split(split) => Point2::new(split[0].0,split[1].0),
+            EventType::Split{split_point: b} => Point2::new(b[0].0,b[1].0),
             _ => panic!("wrong event type sendt to handle split event funcion")
         };
 
@@ -435,7 +435,7 @@ impl SkeletonBuilder {
         for [edge_start, edge_end] in self.shrining_polygon.nodes.iter()
             .filter(|n| self.shrining_polygon.contains(&n.ndx))
             .map(|n| [n, &self.shrining_polygon.nodes[n.next_ndx]] )
-            // split event has become a vertex event since split event calculation, a vertex event is expected to follow
+            // split event has become a edge event since split event calculation, a edge event is expected to follow
             .filter(|[edge_start,edge_end]| edge_start.ndx != node.next_ndx && edge_end.ndx != node.prev_ndx )
             .filter(|[edge_start,edge_end]| edge_start.ndx != node.ndx && edge_end.ndx != node.ndx ){
                 let start_v = &self.vertices[edge_start.vertex_ndx];
@@ -637,7 +637,7 @@ impl Display for EventType{
     fn fmt(&self, b:&mut fmt::Formatter) -> Result<(),fmt::Error> {
         match self {
             EventType::Edge => write!(b,"Edge")?,
-            EventType::Split(split_p) => write!(b,"Split Event at {}{}",split_p[0],split_p[0])?,
+            EventType::Split{split_point:split_p} => write!(b,"Split Event at {}{}",split_p[0],split_p[0])?,
         }
         Ok(())
     }

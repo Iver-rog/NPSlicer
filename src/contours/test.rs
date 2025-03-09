@@ -1,5 +1,6 @@
 use crate::contours::*;
 use crate::stl_op::area_contour2d;
+use crate::data;
 #[test]
 fn simplify_contour(){
     //let mut blender = Blender::new();
