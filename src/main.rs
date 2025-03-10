@@ -130,7 +130,7 @@ fn boolean_layers2(blender:&mut Blender){
         let new_support1 = boolean(additional_sup.clone(), prev_layer.clone(), OverlayRule::Union);
         let new_support2 = boolean(new_support1.clone(), offset_sup.clone(), OverlayRule::Intersect);
         let mut new_support3 = boolean(new_support2.clone(), layer.clone(), OverlayRule::Intersect);
-        new_support3.iter_mut().for_each(|p|p.simplify(min_a));
+        new_support3.iter_mut().for_each(|p|p.simplify(min_a/2.0));
         let new_support4:Vec<Polygon> = new_support3.clone().into_iter().filter(|p|p.area().abs() > min_a).collect();
         let new_support5 = i_simplify(new_support4.clone(), min_a);
 
@@ -180,6 +180,7 @@ fn boolean_layers2(blender:&mut Blender){
             (i, polygon)
         })
         .filter_map(|(i,polygon)|{
+            println!("skeleton for layer {i}");
             match skeleton::skeleton_from_polygon(polygon.clone()){
                 Ok(skeleton) => Some((i,skeleton)),
                 Err(err) => {

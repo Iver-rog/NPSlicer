@@ -637,7 +637,7 @@ impl Display for EventType{
     fn fmt(&self, b:&mut fmt::Formatter) -> Result<(),fmt::Error> {
         match self {
             EventType::Edge => write!(b,"Edge")?,
-            EventType::Split{split_point:split_p} => write!(b,"Split Event at {}{}",split_p[0],split_p[0])?,
+            EventType::Split{split_point:split_p} => write!(b,"Split Event at {}{}",split_p[0],split_p[1])?,
         }
         Ok(())
     }

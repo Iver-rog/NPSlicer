@@ -8,7 +8,7 @@ use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
 use nalgebra::Point2;
 use stl_io::{IndexedTriangle, Triangle, Vector};
-use crate::contours;
+use crate::contours::{self, Contour};
 
 #[derive(Debug)]
 pub struct Blender<'a> {
@@ -121,6 +121,9 @@ impl <'a> Blender<'a> {
             edges.push([offset,points.len()-1]);
         }
         self.line_objects.push( (points, edges) );
+    }
+    pub fn contour(&mut self, contour:&Contour,h:f32){
+        self.edge_loop_points(&contour.clone().points.into_iter().map(|p|[p.x,p.y,h]).collect());
     }
 
     pub fn edge_loop(&mut self, edge_loop:&Vec<usize>,stl:&stl_io::IndexedMesh){
