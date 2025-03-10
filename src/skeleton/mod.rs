@@ -225,7 +225,12 @@ impl SkeletonBuilder {
             .filter_map(|(i,(edge_start,edge_end))|{
                 let edge_vec = edge_end - edge_start;
                 match intersect(node_p, node.bisector(), *edge_start, edge_vec){
-                    Some(intersection) => Some((i, intersection)),
+                    Some(intersection) => {
+                        let p_vec = intersection - edge_start;
+                        let s = if edge_vec.x.abs() > edge_vec.y.abs() {p_vec.x/edge_vec.x}
+                            else {p_vec.y/edge_vec.y};
+                         
+                    if ((0.0<s) && (s<=1.0)) {Some((i, intersection))} else {None}},
                     None => None,
                 }
             })

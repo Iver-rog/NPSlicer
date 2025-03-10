@@ -57,10 +57,10 @@ fn straight_skeleton_with_bounds(blender:&mut Blender) {
         Point2::new( 4.5,-38.0),
         Point2::new(54.0,-38.0),
         // not
-        Point2::new(54.0, 8.5),
-        Point2::new(46.0, 8.5),
-        Point2::new(46.0,13.8),
-        Point2::new(54.0,13.8),
+        Point2::new(54.0, 4.5),
+        Point2::new(30.0, 4.5),
+        Point2::new(30.0,9.8),
+        Point2::new(54.0,9.8),
     ]);
     let p = Contour::new(vec![
         Point2::new(30.0, -4.0),
@@ -82,7 +82,7 @@ fn straight_skeleton_with_bounds(blender:&mut Blender) {
             match builder.compute_skeleton() {
                 Err(error) => error!("{error}"),
                 Ok((skeleton,debug_contours)) => {
-                    blender.line_body2d(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
+                    blender.line_body3d(skeleton.vertices.into_iter().map(|v| [v[0],v[1],-0.3*v[2]]).collect(), skeleton.edges);
                     for polygon in debug_contours.iter().flatten() {
                         blender.polygon(polygon,0.0);
                     }
