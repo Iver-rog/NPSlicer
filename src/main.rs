@@ -10,7 +10,7 @@ use utils::Blender;
 mod data;
 
 use std::f32::consts::PI;
-use nalgebra::{Point2, Point3};
+use nalgebra::{Point2, Point3,Vector2};
 use log::{error, Level};
 use std::io::{Write, BufReader};
 use std::fs::File;
@@ -25,10 +25,11 @@ fn main(){
     //straight_skeleton(&mut blender);
     //offset_polygon(&mut blender);
     //polygon_boolean(&mut blender);
+    straight_skeleton_with_bounds(&mut blender);
  
     //offset_layers(&mut blender);
     //skeleton_layers(&mut blender);
-    boolean_layers2(&mut blender);
+    //boolean_layers2(&mut blender);
 
     blender.show();
 }
@@ -41,6 +42,54 @@ fn polygon_boolean(blender:&mut Blender) {
 
     let boolean = poly.subtract(clip).into_iter().next().unwrap();
     blender.polygon(&boolean,0.0);
+}
+fn straight_skeleton_with_bounds(blender:&mut Blender) {
+    let mut polygon = data::test_poly8();
+    let bounds = Contour::new(vec![
+        Point2::new( 4.5, 11.0),
+        Point2::new( 4.5,-38.0),
+        Point2::new(54.0,-38.0),
+        Point2::new(54.0, 11.0),
+    ]);
+    let bounds = Contour::new(vec![
+        Point2::new(54.0, 61.0),
+        Point2::new( 4.5, 61.0),
+        Point2::new( 4.5,-38.0),
+        Point2::new(54.0,-38.0),
+        // not
+        Point2::new(54.0, 8.5),
+        Point2::new(46.0, 8.5),
+        Point2::new(46.0,13.8),
+        Point2::new(54.0,13.8),
+    ]);
+    let p = Contour::new(vec![
+        Point2::new(30.0, -4.0),
+        Point2::new(20.0,-13.5),
+        Point2::new(30.0,-23.0),
+        Point2::new(38.0,-13.4),
+    ]);
+    //let mut polygon = Polygon::new(p,vec![]);
+    polygon.invert();
+    blender.polygon(&polygon, 0.0);
+    blender.contour(&bounds, 0.0);
+    let secound_polygon = polygon.outer_loop.points.iter().map(|p|p+Vector2::new(1.0,50.0)).collect();
+
+    match skeleton::SkeletonBuilder::from_polygon(polygon){
+        Err(error) => error!("\x1b[031m{error}\x1b[0m"),
+        Ok(mut builder) => {
+            builder.bounding_contour(bounds);
+            builder.add_loop(secound_polygon).unwrap();
+            match builder.compute_skeleton() {
+                Err(error) => error!("{error}"),
+                Ok((skeleton,debug_contours)) => {
+                    blender.line_body2d(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
+                    for polygon in debug_contours.iter().flatten() {
+                        blender.polygon(polygon,0.0);
+                    }
+                } 
+            }
+        }
+    }
 }
 #[allow(dead_code)]
 fn straight_skeleton(blender:&mut Blender) {

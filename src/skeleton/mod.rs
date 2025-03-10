@@ -5,7 +5,8 @@ use priority_queue::PriorityQueue;
 use std::{
     collections::HashSet, 
     f32::EPSILON, 
-    fmt::{self, Display, Formatter}
+    fmt::{self, Display, Formatter}, 
+    iter
 };
 use log::{debug, error, info, trace};
 
@@ -42,6 +43,7 @@ struct Event {
 enum EventType {
     Edge,  // A edge shrinks to zero lenght
     Split{ split_point:[OrderedFloat<f32>;2]}, // A region is split into two parts
+    Bound{ edge_ndx:usize, intersect_p:[OrderedFloat<f32>;2] }, // node travels outside the bounding shape
 }
 impl Display for Event {
     fn fmt(&self, b:&mut std::fmt::Formatter<'_>) -> Result<(),std::fmt::Error>{
@@ -60,6 +62,7 @@ pub struct SkeletonBuilder {
     original_polygon: Nodes,
     vertices: Vec<Vertex>,
     edges: Vec<Edge>,
+    bounding_contour: Option<Contour>,
 }
 impl SkeletonBuilder {
     pub fn new() -> Self { Self::default() }
@@ -112,10 +115,15 @@ impl SkeletonBuilder {
 
         return Ok(())
     }
+    pub fn bounding_contour(&mut self, mut contour:Contour){
+        if contour.area.is_sign_positive() { contour.reverse_order() }
+        self.bounding_contour = Some(contour)
+    }
     fn handle_event(&mut self,events:&mut PriorityQueue<Event,OrderedFloat<f32>>,event:Event) -> Result<bool,SkeletonError>{
         match event.event_type {
             EventType::Edge => self.handle_edge_event(events,event),
             EventType::Split{..} => self.handle_split_event(events,event),
+            EventType::Bound{..} => self.handle_bound_event(events,event),
         }
     }
     pub fn polygon_at_time(mut self,stop_time:f32) -> Result<Vec<Polygon>, SkeletonError> {
@@ -195,7 +203,55 @@ impl SkeletonBuilder {
             event.time = time;
             events.push(event, -time);
         }
+        // Bounds event
+        if let Some(event) = self.compute_bounds_event(&node){
+            let time = event.time;
+            events.push(event, -time);
+        }
         Ok(())
+    }
+    fn compute_bounds_event(&self, node:&Node) -> Option<Event>{
+        let node_v = &self.vertices[node.vertex_ndx];
+        let node_p = node_v.coords;
+        let bounds = match &self.bounding_contour{
+            Some(contour) => &contour.points,
+            None => return None,
+        };
+        let edge_start = iter::once(&bounds[bounds.len()-1])
+            .chain(bounds.iter());
+        let edge_end = bounds.iter();
+        let edges = edge_start.zip(edge_end);
+        let intersection = edges.enumerate()
+            .filter_map(|(i,(edge_start,edge_end))|{
+                let edge_vec = edge_end - edge_start;
+                match intersect(node_p, node.bisector(), *edge_start, edge_vec){
+                    Some(intersection) => Some((i, intersection)),
+                    None => None,
+                }
+            })
+            .filter(|(i,intersection)|{
+                ((intersection - node_p).normalize() - node.bisector().normalize()).magnitude() < 0.01
+            })
+            .reduce(|(prev_i,prev_intersection),(i,intersection)|{
+                let prev_d = (prev_intersection - node_p).magnitude();
+                let new_d = (intersection - node_p).magnitude();
+                if prev_d > new_d {(i,intersection)} else {(prev_i,prev_intersection)}
+            });
+        match intersection {
+            None => None,
+            Some((edge_ndx,i_p)) => {
+                let intersection_time = (i_p-node_p).magnitude()/node.bisector().magnitude();
+                let event = Event{
+                    time: OrderedFloat(intersection_time + node_v.time),
+                    node: *node,
+                    event_type:EventType::Bound { 
+                        edge_ndx, 
+                        intersect_p:[OrderedFloat(i_p.x),OrderedFloat(i_p.y)] 
+                    }
+                };
+                Some(event)
+            }
+        }
     }
     fn find_edge_event(&self, events:&mut PriorityQueue<Event, OrderedFloat<f32>> ,node_ndx:usize) -> Result<(), SkeletonError> {
         // Edge events
@@ -207,6 +263,9 @@ impl SkeletonBuilder {
             events.push(event, -time);
         }
         Ok(())
+    }
+    fn find_bound_event(&self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>, node_ndx:usize){
+
     }
     fn compute_edge_event(&self, vert_ndx:usize) -> Result<Option<Event>, SkeletonError> {
 
@@ -538,6 +597,23 @@ impl SkeletonBuilder {
             }
         return polygons_from_contours(contours)
     }
+    fn handle_bound_event(&mut self,events:&mut PriorityQueue<Event,OrderedFloat<f32>>,event:Event)->Result<bool,SkeletonError>{
+        if !self.shrining_polygon.contains(&event.node.ndx) {return Ok(false);}
+        let (edge_ndx,intersect_p) = match event.event_type {
+            EventType::Bound { edge_ndx, intersect_p } => (edge_ndx,intersect_p),
+            _ => panic!("wrong event sendt to handle_bound_event"),
+        };
+        self.shrining_polygon.deactivate(&event.node.ndx);
+        self.edges.push(Edge{
+            start: event.node.vertex_ndx,
+            end: self.vertices.len()
+        });
+        self.vertices.push(Vertex{
+            coords: Point2::new(intersect_p[0].0,intersect_p[1].0),
+            time:*event.time,
+        });
+        Ok(true)
+    }
 }
 fn compute_intersection_time(
     p1: &Point2<f32>,
@@ -638,6 +714,7 @@ impl Display for EventType{
         match self {
             EventType::Edge => write!(b,"Edge")?,
             EventType::Split{split_point:split_p} => write!(b,"Split Event at {}{}",split_p[0],split_p[1])?,
+            EventType::Bound{edge_ndx, intersect_p} => write!(b,"Bound Event node hit edge {edge_ndx} at {}{}",intersect_p[0],intersect_p[1])?,
         }
         Ok(())
     }
