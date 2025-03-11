@@ -74,7 +74,7 @@ fn nodes_forwards_iterator_test(){
     let nodes = skeleton::Nodes::from_closed_curve(vec![node0,node1,node2]);
     println!("{nodes}");
         
-    let forward_iter:Vec<skeleton::Node> = nodes.iter(&node0)
+    let forward_iter:Vec<skeleton::Node> = nodes.iter_from(&node0)
         .into_iter()
         .collect();
     assert_eq!(vec![node1,node2,node0],forward_iter);
@@ -105,7 +105,7 @@ fn nodes_backwards_iterator_test(){
     let nodes = skeleton::Nodes::from_closed_curve(vec![node0,node1,node2]);
     println!("{nodes}");
         
-    let backwards_iter:Vec<skeleton::Node> = nodes.back_iter(&node0)
+    let backwards_iter:Vec<skeleton::Node> = nodes.back_iter_from(&node0)
         .into_iter()
         .collect();
     assert_eq!(vec![node2,node1,node0],backwards_iter);
@@ -115,5 +115,5 @@ fn is_point_on_edge_test(){
     let p1 = Point2::new(1.0,1.0);
     let e0 = Point2::new(0.0,0.0);
     let e1 = Point2::new(4.0,4.0);
-    assert!(skeleton::is_point_on_edge(&p1,&e0,&e1).unwrap())
+    assert!(is_point_on_edge(&p1,&e0,&e1).unwrap())
 }

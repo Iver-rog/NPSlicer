@@ -129,7 +129,11 @@ impl SkeletonBuilder {
             EventType::Bound{..} => self.handle_bound_event(events,event),
         }
     }
-    pub fn polygon_at_time(mut self,stop_time:f32) -> Result<Vec<Polygon>, SkeletonError> {
+    pub fn offset_polygon(mut self,stop_time:f32) -> Result<Vec<Polygon>, SkeletonError> {
+        let _ = self.compute_untill(stop_time)?;
+        return Ok(self.offset_active_vertices(stop_time))
+    }
+    fn compute_untill(&mut self,stop_time:f32) -> Result<PriorityQueue<Event, OrderedFloat<f32>>, SkeletonError> {
         let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
         //initialize events 
         for node in self.shrining_polygon.nodes.iter() {
@@ -146,7 +150,7 @@ impl SkeletonBuilder {
                     println!("{self}");}
             }
         }
-        return Ok(self.offset_active_vertices(stop_time))
+        return Ok(events)
     }
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<Vec<Polygon>>), SkeletonError> {
 
@@ -221,7 +225,7 @@ impl SkeletonBuilder {
                 if computed_vertecies.contains(&node_ndx){continue};
                 let mut contour = Vec::new();
                 let start_node = self.shrining_polygon.nodes[*node_ndx];
-                for node in self.shrining_polygon.iter(&start_node){
+                for node in self.shrining_polygon.iter_from(&start_node){
                     let vertex = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
                     contour.push(vertex);
                     computed_vertecies.insert(node.ndx);

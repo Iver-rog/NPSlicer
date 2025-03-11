@@ -133,7 +133,7 @@ impl Nodes {
     pub fn active_nodes_iter(&self) -> std::collections::hash_set::Iter<'_, usize> {
         self.active_nodes.iter()
     }
-    pub fn iter(&self,starting_node:&Node) -> NodesIntoIterator {
+    pub fn iter_from(&self,starting_node:&Node) -> NodesIntoIterator {
         NodesIntoIterator{
             starting:starting_node.ndx,
             nodes:&self,
@@ -141,7 +141,7 @@ impl Nodes {
             stop: false,
         }
     }
-    pub fn back_iter(&self,starting_node:&Node) -> NodesIntoBackwardsIterator {
+    pub fn back_iter_from(&self,starting_node:&Node) -> NodesIntoBackwardsIterator {
         NodesIntoBackwardsIterator{
             starting:starting_node.ndx,
             nodes:&self,

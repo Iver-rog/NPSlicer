@@ -130,7 +130,7 @@ fn offset_polygon(blender:&mut Blender){
         Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
             return }
         };
-    let offset_poly = match skeleton.polygon_at_time(2.0){
+    let offset_poly = match skeleton.offset_polygon(2.0){
         Ok(polygons) => polygons,
         Err(err) => {println!("{err}"); return;},
         };
