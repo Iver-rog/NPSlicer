@@ -1,6 +1,7 @@
 use nalgebra::{ Point2, Vector2};
 use ordered_float::OrderedFloat;
 use crate::*;
+use crate::skeleton::split_event::is_point_on_edge;
 
 #[test]
 fn bisector_test(){
