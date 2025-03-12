@@ -16,7 +16,7 @@ pub struct Blender<'a> {
     mesh_path:Box<Path>,
     pub input_mesh:Option<&'a Path>,
     pub output_meshes:Vec<&'a Path>,
-    pub line_objects:Vec<(Vec<[f32;3]>,Vec<[usize;2]>)>
+    pub line_objects:Vec<(Vec<[f32;3]>,Vec<[usize;2]>,Vec<Vec<usize>>)>
 }
 
 impl <'a> Blender<'a> {
@@ -78,7 +78,6 @@ impl <'a> Blender<'a> {
             .arg(python_launch_script)
             .exec();
     }
-
     fn create_python_lib(self) -> Result<(),io::Error>{
         let path_name = self.tmp_path.join("layer_gen_data.py");
         let file = File::create(path_name)
@@ -93,8 +92,8 @@ impl <'a> Blender<'a> {
             if i != self.line_objects.len()-1 { writeln!(f,",")?; } 
             else { writeln!(f,"")?; }
         }
-
         writeln!(f,"    ]")?;
+
         writeln!(f,"def get_lines():")?;
         writeln!(f,"    return [")?;
         for (i,line_object) in self.line_objects.iter().enumerate(){
@@ -104,12 +103,25 @@ impl <'a> Blender<'a> {
         }
         writeln!(f,"    ]")?;
 
+        writeln!(f,"def get_faces():")?;
+        writeln!(f,"    return [")?;
+        for (i,line_object) in self.line_objects.iter().enumerate(){
+            write_faces(&mut f,line_object.2.to_vec());
+            if i != self.line_objects.len()-1 { writeln!(f,",")?;} 
+            else { writeln!(f,"")?; }
+        }
+        writeln!(f,"    ]")?;
         // ============ mesh directory ==============
         writeln!(f,"def get_mesh_dir():")?;
         let mesh_path = self.mesh_path.to_str().unwrap();
         writeln!(f,"    return '{mesh_path}' ")?;
         return Ok(())
     }
+    pub fn n_gon(&mut self,points:Vec<[f32;3]>, edges:Vec<[usize;2]>,face:Vec<Vec<usize>> ){
+        let face = 
+        self.line_objects.push( (points, edges, face) );
+    }
+
     pub fn polygon(&mut self, polygon:&contours::Polygon,h:f32) {
         let mut points:Vec<[f32;3]> = polygon.outer_loop.points.iter().map(|p|[p.x,p.y,h]).collect::<Vec<[f32;3]>>();
         let mut edges:Vec<[usize;2]> = (0..(points.len()-1)).map(|i|[i,i+1]).collect();
@@ -120,7 +132,7 @@ impl <'a> Blender<'a> {
             edges.extend((offset..(points.len()-1)).map(|i|[i,i+1]));
             edges.push([offset,points.len()-1]);
         }
-        self.line_objects.push( (points, edges) );
+        self.line_objects.push( (points, edges,vec![]) );
     }
     pub fn contour(&mut self, contour:&Contour,h:f32){
         self.edge_loop_points(&contour.clone().points.into_iter().map(|p|[p.x,p.y,h]).collect());
@@ -139,7 +151,7 @@ impl <'a> Blender<'a> {
             .collect();
         edges.push([edges.len(),0]);
 
-        self.line_objects.push( (points, edges) );
+        self.line_objects.push( (points, edges, vec![]) );
     }
 
     pub fn edge_loop_points(&mut self, edge_loop:&Vec<[f32;3]>){
@@ -152,19 +164,19 @@ impl <'a> Blender<'a> {
             .collect();
         edges.push([edges.len(),0]);
 
-        self.line_objects.push( (points, edges) );
+        self.line_objects.push( (points, edges,vec![]) );
     }
     pub fn line(&mut self, points:&Vec<Point2<f32>>,z_height:f32){
         let edges = (0..(points.len()-1)).map(|i|[i,i+1]).collect();
         let points = points.into_iter().map(|p|[p.x,p.y,z_height]).collect();
-        self.line_objects.push((points,edges));
+        self.line_objects.push((points,edges,vec![]));
     }
     pub fn line_body2d(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
         let points3d = points.clone().into_iter().map(|[p1,p2]|[p1,p2,0.0]).collect();
-        self.line_objects.push((points3d,edges.clone()));
+        self.line_objects.push((points3d,edges.clone(),vec![]));
     }
     pub fn line_body3d(&mut self,points:Vec<[f32;3]>,edges:Vec<[usize;2]>) {
-        self.line_objects.push((points,edges.clone()));
+        self.line_objects.push((points,edges.clone(),vec![]));
     }
     pub fn line_body_points(&mut self, edges:&Vec<[[f32;2];2]>) {
         let points3d: Vec<[f32;3]> = edges.iter().flatten()
@@ -176,7 +188,7 @@ impl <'a> Blender<'a> {
             .map(|i| [2*i ,2*i+1] )
             .collect();
 
-        self.line_objects.push((points3d,edges_as_ref));
+        self.line_objects.push((points3d,edges_as_ref,vec![]));
     }
 }
 
@@ -213,6 +225,25 @@ fn write_lines<W: ?Sized + Write>(f:&mut io::BufWriter<W>, edges:Vec<[usize;2]>)
             edge[1]
             )?;
         if i != edges.len()-1 { writeln!(f,",")?; }
+        else { writeln!(f,"")?; }
+    }
+    write!(f,"        ]")?;
+    return Ok(())
+}
+fn write_faces<W: ?Sized + Write>(f:&mut io::BufWriter<W>, faces:Vec<Vec<usize>>)->Result<(),io::Error>{
+    writeln!(f,"        [")?;
+    for (i,face) in faces.iter().enumerate() {
+        write!(f,"            [")?;
+        let mut verts = face.iter();
+        match verts.next() {
+            Some(index) => write!(f,"{index}")?,
+            None => (),
+        }
+        for vertex_ndx in verts {
+            write!(f,",{vertex_ndx}")?;
+        }
+        write!(f,"]")?;
+        if i != faces.len()-1 { writeln!(f,",")?; }
         else { writeln!(f,"")?; }
     }
     write!(f,"        ]")?;

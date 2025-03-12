@@ -93,6 +93,7 @@ def import_stl_files( collection_name='STL_Imports', color=(1.0,0.2,0.2,1.0)):
 def import_edge_loops():
     points = layer_gen_data.get_points()
     lines = layer_gen_data.get_lines()
+    faces = layer_gen_data.get_faces()
     edge_loop_collection = bpy.data.collections.new("Edge loops")
     bpy.context.collection.children.link(edge_loop_collection)
 
@@ -120,7 +121,7 @@ def import_edge_loops():
     # Create the object
     for i in range(0,len(points)):
         name = "loop" + str(i)
-        pc = point_cloud(name, points[i], lines[i])
+        pc = point_cloud(name, points[i], lines[i], faces[i])
 
         # Link object to the active collection
         edge_loop_collection.objects.link(pc)
