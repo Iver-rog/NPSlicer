@@ -25,10 +25,10 @@ fn main(){
     //straight_skeleton(&mut blender);
     //offset_polygon(&mut blender);
     //polygon_boolean(&mut blender);
-    straight_skeleton_with_bounds(&mut blender);
+    //straight_skeleton_with_bounds(&mut blender);
  
     //offset_layers(&mut blender);
-    //skeleton_layers(&mut blender);
+    skeleton_layers(&mut blender);
     //boolean_layers2(&mut blender);
 
     blender.show();
@@ -107,7 +107,13 @@ fn straight_skeleton(blender:&mut Blender) {
         Ok(builder) => match builder.compute_skeleton() {
             Err(error) => error!("{error}"),
             Ok((skeleton,debug_contours)) => {
-                blender.line_body2d(&skeleton.vertices.into_iter().map(|v| [v[0],v[1]]).collect(), skeleton.edges);
+                let mesh = skeleton.generate_mesh();
+                //dbg!(&mesh);
+                blender.n_gon(
+                    skeleton.vertices.into_iter().map(|v| [v[0],v[1],v[2]]).collect(), 
+                    skeleton.edges,
+                    mesh
+                    );
                 for polygon in debug_contours.iter().flatten() {
                     blender.polygon(polygon,0.0);
                 }
@@ -356,13 +362,12 @@ fn skeleton_layers(blender:&mut Blender){
     let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
     blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
 
-    let layers = stl_op::extract_planar_layers(&mesh, 0.2 ,blender);
+    let layers = stl_op::extract_planar_layers(&mesh, 2.0 ,blender);
     let nr_layers = layers.len();
     for (i, layer) in layers.into_iter().enumerate() {
+        println!("layer {i} of {nr_layers}");
         for polygon in layer {
-            let layer_height = i as f32 * 0.2;
-            println!("contour {i} of {}",nr_layers);
-
+            let layer_height = i as f32 * 2.0;
             //blender.edge_loop_points(
             //    &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
             //    );
@@ -377,11 +382,15 @@ fn skeleton_layers(blender:&mut Blender){
                 Err(err) =>{ println!("\x1b[031m{err}\x1b[0m");
                     dbg!(&polygon);continue }
             };
+            //blender.line_body3d(
+            //    skeleton.vertices.iter().map(|p| [p[0],p[1],p[2]*0.5+layer_height]).collect(),
+            //    skeleton.edges.clone()
+            //    );
+            let mesh = skeleton.generate_mesh();
+            let points = skeleton.vertices.into_iter().map(|p|[p.x,p.y,p.z*0.5+layer_height]).collect();
+            let edges = skeleton.edges;
+            blender.n_gon(points, edges, mesh);
 
-            blender.line_body3d(
-                skeleton.vertices.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
-                skeleton.edges
-                );
         }
     }
 }

@@ -2,8 +2,9 @@ use nalgebra::{Matrix2, Point2, Point3, Vector2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
+use core::usize;
 use std::{
-    collections::HashSet, 
+    collections::{HashMap, HashSet}, 
     f32::EPSILON, 
     fmt::{self, Display, Formatter}, 
     iter
@@ -31,11 +32,85 @@ pub struct Edge {
     pub start: usize,
     pub end: usize,
 }
-#[derive(Debug,Default)]
+#[derive(Debug,Default,Clone)]
 pub struct StraightSkeleton {
     pub vertices: Vec<Point3<f32>>,
     pub edges: Vec<[usize;2]>,
+    pub input_polygons: Vec<PolygonNDXs>
 }
+impl StraightSkeleton {
+    pub fn input_polygons(&self)->Vec<PolygonIterator>{
+        self.input_polygons.iter()
+            .map(|polygon| PolygonIterator::from(polygon) )
+            .collect()
+    }
+    pub fn generate_mesh(&self) -> Vec<Vec<usize>>{
+        let mut vertex_connections:HashMap<usize,Vec<usize>> = HashMap::with_capacity((self.vertices.len()+5)*3);
+        self.edges.iter()
+            .for_each(|[edge_start,edge_end]|{
+                match vertex_connections.get_mut(edge_start){
+                    None => {vertex_connections.insert(*edge_start, vec![*edge_end]);},
+                    Some(connections) => {connections.push(*edge_end);},
+                }
+                match vertex_connections.get_mut(&edge_end){
+                    None => {vertex_connections.insert(*edge_end, vec![*edge_start]);},
+                    Some(connections) => {connections.push(*edge_start);},
+                }
+            });
+        let mut faces = Vec::new();
+        for polygon in &self.input_polygons {
+            let polygon_iter = PolygonIterator::from(polygon);
+            let outer_loop = polygon_iter.outer_loop.clone().zip(polygon_iter.outer_loop.skip(1).cycle());
+            let holes = polygon_iter.holes.into_iter()
+                .map(|hole| { hole.clone().zip( hole.skip(1).cycle() ) })
+                .flatten();
+            for (start_vert,last_vert) in outer_loop.chain(holes) {
+                let mut face:Vec<usize> = vec![start_vert];
+                let mut prev_vert = last_vert;
+                while face[face.len()-1] != last_vert {
+                    let vertex = *face.last().unwrap();
+                    //let v_connections:&Vec<usize> = vertex_connections.get(&vertex).unwrap();
+                    let v_connections:&Vec<usize> = match vertex_connections.get(&vertex){
+                        Some(v_connections) => v_connections,
+                        None => {error!("Skeleton Meshing: missing edge detected in skeleton"); break },
+                    };
+                    let vertex_coords = self.vertices[vertex];
+                    let next_vertex_coords = self.vertices[prev_vert];
+                    let edge_vec = next_vertex_coords.xy() - vertex_coords.xy();
+                    let next = v_connections.iter()
+                        .filter(|v_ndx|**v_ndx != prev_vert)
+                        .map(|(v_ndx)|{
+                            let v = self.vertices[*v_ndx].xy();
+                            let angle = ccw_angle(&(v-vertex_coords.xy()),&edge_vec);
+                            (*v_ndx,angle)
+                        })
+                        .reduce(|(p_v,p_angle),(v,angle)|
+                            if angle < p_angle {(v,angle)}else{(p_v,p_angle)}
+                            );
+                    prev_vert = vertex;
+                    match next{
+                        None => break,
+                        Some((v,angle)) => face.push(v),
+                            }
+                }
+                //assert!(3 <= face.len() );
+                if face.len() < 3 {
+                    error!("Skeleton Meshing: face has less than 3 vertices");
+                } else {
+                faces.push(face);
+                }
+            }
+        }
+        return faces
+    }
+}
+fn ccw_angle(v1:&Vector2<f32>, v2:&Vector2<f32>) -> f32 {
+    let dot = v1.dot(&v2);
+    let det = v1.x * v2.y - v1.y * v2.x;
+    let angle = det.atan2(dot); // atan2(det, dot) gives the counterclockwise angle
+    if angle.is_sign_negative() {2.0*std::f32::consts::PI+angle} else {angle}
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct Event {
     time: OrderedFloat<f32>,
@@ -54,15 +129,34 @@ impl Display for Event {
         Ok(())
     }
 }
+#[derive(Debug,Clone)]
+pub struct PolygonNDXs( Vec<usize> );
 #[derive(Debug)]
 pub struct Vertex {
     coords: Point2<f32>,
     time: f32,
 }
+#[derive(Debug)]
+pub struct PolygonIterator {
+    outer_loop:std::ops::Range<usize>,
+    holes: Vec<std::ops::Range<usize>>
+} 
+impl From<&PolygonNDXs> for PolygonIterator {
+    fn from(pndx:&PolygonNDXs)-> Self {
+        let end = pndx.0.iter().cloned();
+        let start = iter::once(0usize).chain(end.clone());
+        let mut ndxs = start.zip(end).map(|(start,end)|start..end);
+        PolygonIterator{
+            outer_loop: ndxs.next().unwrap(),
+            holes: ndxs.collect(),
+        }
+    }
+}
 #[derive(Debug,Default)]
 pub struct SkeletonBuilder {
     shrining_polygon: Nodes,
     original_polygon: Nodes,
+    input_polygon_refs: Vec<PolygonNDXs>,
     vertices: Vec<Vertex>,
     edges: Vec<Edge>,
     bounding_contour: Option<Contour>,
@@ -71,6 +165,14 @@ impl SkeletonBuilder {
     pub fn new() -> Self { Self::default() }
     pub fn from_polygon(polygon:Polygon) -> Result<Self,SkeletonError> {
         let mut builder = SkeletonBuilder::new();
+        builder.input_polygon_refs = vec![PolygonNDXs(
+            iter::once(&polygon.outer_loop)
+            .chain(polygon.holes.iter())
+            //.inspect(|c|println!("{}",c.points.len()))
+            .map(|c|c.points.len())
+            .scan(0,|state,ndx|{ *state += ndx; Some(state.clone()) })
+            .collect()
+            )];
         builder.add_loop(polygon.outer_loop.points)?;
         for hole in polygon.holes.into_iter(){
             builder.add_loop(hole.points)?;
@@ -109,10 +211,10 @@ impl SkeletonBuilder {
                 bisector:[OrderedFloat(bisector[0]), OrderedFloat(bisector[1])],
                 vertex_ndx: i + offset
             });
-            self.edges.push(Edge {
-                start: i + offset,
-                end: next_ndx + offset,
-            });
+            //self.edges.push(Edge {
+            //    start: i + offset,
+            //    end: next_ndx + offset,
+            //});
         }
         self.vertices.extend(points.into_iter().map(|p| Vertex{coords:p,time:0.0}));
 
@@ -190,6 +292,7 @@ impl SkeletonBuilder {
         let skeleton = StraightSkeleton {
             vertices,
             edges,
+            input_polygons: self.input_polygon_refs,
         };
         return Ok((skeleton,debug_contours))
     }

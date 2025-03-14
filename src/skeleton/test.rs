@@ -2,6 +2,19 @@ use nalgebra::{ Point2, Vector2};
 use ordered_float::OrderedFloat;
 use crate::*;
 use crate::skeleton::split_event::is_point_on_edge;
+use super::*;
+
+#[test]
+fn ccw_angle_test() {
+    let v1 = Vector2::new(4.0, 0.0);
+    let v2 = Vector2::new(0.0, 1.0);
+    
+    let angle1: f32 = ccw_angle(&v1, &v2);
+    let angle2: f32 = ccw_angle(&v2, &v1);
+    assert!(angle1 != angle2);
+    let pi = std::f32::consts::PI;
+    assert_eq!(angle1 + angle2, 2.0*pi );
+}
 
 #[test]
 fn bisector_test(){
