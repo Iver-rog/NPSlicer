@@ -130,8 +130,8 @@ impl Nodes {
 // Itterators
 #[allow(unused)]
 impl Nodes {
-    pub fn active_nodes_iter(&self) -> std::collections::hash_set::Iter<'_, usize> {
-        self.active_nodes.iter()
+    pub fn active_nodes_iter(&self) -> std::iter::Cloned<std::collections::hash_set::Iter<'_, usize>> {//-> std::collections::hash_set::Cloned<Iter<usize>> {
+        self.active_nodes.iter().cloned()
     }
     pub fn iter_from(&self,starting_node:&Node) -> NodesIntoIterator {
         NodesIntoIterator{

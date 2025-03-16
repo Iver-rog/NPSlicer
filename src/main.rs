@@ -28,8 +28,8 @@ fn main(){
     //straight_skeleton_with_bounds(&mut blender);
  
     //offset_layers(&mut blender);
-    skeleton_layers(&mut blender);
-    //boolean_layers2(&mut blender);
+    //skeleton_layers(&mut blender);
+    boolean_layers2(&mut blender);
 
     blender.show();
 }
@@ -107,7 +107,7 @@ fn straight_skeleton(blender:&mut Blender) {
         Ok(builder) => match builder.compute_skeleton() {
             Err(error) => error!("{error}"),
             Ok((skeleton,debug_contours)) => {
-                let mesh = skeleton.generate_mesh();
+                let mesh = skeleton.skeleton_mesh();
                 //dbg!(&mesh);
                 blender.n_gon(
                     skeleton.vertices.into_iter().map(|v| [v[0],v[1],v[2]]).collect(), 
@@ -171,7 +171,7 @@ fn boolean_layers2(blender:&mut Blender){
     let mut layers = layers.into_iter();
     let mut prev_layer = layers.next().unwrap();
     let mut new_overhangs = Vec::new();
-    for (i, layer) in layers.enumerate(){//.skip(5){
+    for (i, layer) in layers.enumerate().skip(5){
         println!("layer {i}");
 
         let offset_sup = offset(prev_layer.clone(),d_x);
@@ -189,34 +189,12 @@ fn boolean_layers2(blender:&mut Blender){
         let new_support4:Vec<Polygon> = new_support3.clone().into_iter().filter(|p|p.area().abs() > min_a).collect();
         let new_support5 = i_simplify(new_support4.clone(), min_a);
 
-        //if new_support5.len() == 0 {
-        //    println!("Error");
-        //    dbg!{&prev_layer};
-        //    prev_layer.iter().for_each(|p|blender.polygon(p, 0.0));
-        //    offset_sup.iter().for_each(|p|blender.polygon(p, 0.0));
-        //    layer.iter().for_each(|p|blender.polygon(p, 1.0));
-        //    clip_lines.iter().for_each(|line|blender.line(line,2.0));
-        //    additional_sup.iter().for_each(|p|blender.polygon(p, 3.0));
-        //    new_support1.iter().for_each(|p|blender.polygon(p, 4.0));
-        //    new_support2.iter().for_each(|p|blender.polygon(p, 5.0));
-        //    new_support3.iter().for_each(|p|blender.polygon(p, 6.0));
-        //    new_support4.iter().for_each(|p|blender.polygon(p, 7.0));
-        //    new_support5.iter().for_each(|p|blender.polygon(p, 7.0));
-        //    break
-        //}
-
         new_overhangs.push(new_support5.clone());
         prev_layer = new_support5;
     }
 
     println!("created {} layers",new_overhangs.len());
 
-    for (i,merged_overhang) in new_overhangs.iter().enumerate() {
-        let layer_height = layer_h*((i+1) as f32);
-        for polygon in merged_overhang {
-            blender.polygon(&polygon, layer_height);
-        }
-    }
     let bounding_box = Contour::new(
             vec![
             Point2::new( 32.4, 36.1),
@@ -247,10 +225,17 @@ fn boolean_layers2(blender:&mut Blender){
         })
         .for_each(|(i,skeleton)|{ 
             let layer_height = (i+1) as f32 * layer_h;
-            blender.line_body3d(
-                skeleton.vertices.iter().map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()]).collect::<Vec<[f32;3]>>(),
-                skeleton.edges
-                );
+            let mut input_polygon_mesh = skeleton.input_polygons_mesh();
+
+            let mut mesh = skeleton.skeleton_mesh();
+            mesh.append(&mut input_polygon_mesh);
+            let edges = skeleton.edges;
+            let points = skeleton.vertices.into_iter()
+                .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
+                .collect();
+
+            blender.n_gon(points, edges, mesh);
+            //blender.line_body3d( points, edges );
          });
 }
 #[allow(dead_code)]
@@ -386,7 +371,7 @@ fn skeleton_layers(blender:&mut Blender){
             //    skeleton.vertices.iter().map(|p| [p[0],p[1],p[2]*0.5+layer_height]).collect(),
             //    skeleton.edges.clone()
             //    );
-            let mesh = skeleton.generate_mesh();
+            let mesh = skeleton.skeleton_mesh();
             let points = skeleton.vertices.into_iter().map(|p|[p.x,p.y,p.z*0.5+layer_height]).collect();
             let edges = skeleton.edges;
             blender.n_gon(points, edges, mesh);

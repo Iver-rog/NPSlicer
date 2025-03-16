@@ -44,7 +44,16 @@ impl StraightSkeleton {
             .map(|polygon| PolygonIterator::from(polygon) )
             .collect()
     }
-    pub fn generate_mesh(&self) -> Vec<Vec<usize>>{
+    pub fn input_polygons_mesh(&self) -> Vec<Vec<usize>> {
+        self.input_polygons()
+            .iter()
+            .map(|p|p.holes[0].clone())
+            .map(|p|{
+                ((p.start)..(p.end)).rev().collect::<Vec<usize>>()
+            })
+            .collect()
+    }
+    pub fn skeleton_mesh(&self) -> Vec<Vec<usize>>{
         let mut vertex_connections:HashMap<usize,Vec<usize>> = HashMap::with_capacity((self.vertices.len()+5)*3);
         self.edges.iter()
             .for_each(|[edge_start,edge_end]|{
@@ -327,7 +336,7 @@ impl SkeletonBuilder {
         for node_ndx in self.shrining_polygon.active_nodes_iter() {
                 if computed_vertecies.contains(&node_ndx){continue};
                 let mut contour = Vec::new();
-                let start_node = self.shrining_polygon.nodes[*node_ndx];
+                let start_node = self.shrining_polygon.nodes[node_ndx];
                 for node in self.shrining_polygon.iter_from(&start_node){
                     let vertex = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
                     contour.push(vertex);
