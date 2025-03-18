@@ -24,7 +24,7 @@ fn main(){
 
     //straight_skeleton(&mut blender);
     //offset_polygon(&mut blender);
-    //polygon_boolean(&mut blender);
+    //polygon_bolean(&mut blender);
     //straight_skeleton_with_bounds(&mut blender);
  
     //offset_layers(&mut blender);
@@ -171,7 +171,7 @@ fn boolean_layers2(blender:&mut Blender){
     let mut layers = layers.into_iter();
     let mut prev_layer = layers.next().unwrap();
     let mut new_overhangs = Vec::new();
-    for (i, layer) in layers.enumerate().skip(5){
+    for (i, layer) in layers.enumerate(){
         println!("layer {i}");
 
         let offset_sup = offset(prev_layer.clone(),d_x);

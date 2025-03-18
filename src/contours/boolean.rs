@@ -48,7 +48,7 @@ impl FloatPointCompatible<f32> for IOverlayCompatibleType {
      fn y(&self) -> f32 {
          self.0.y
      }
- }
+}
 impl Polygon{
     pub fn subtract(self, sub_shape:Self) -> Vec<Polygon>{
         // subtracts sub_shape from self

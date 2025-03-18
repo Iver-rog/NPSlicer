@@ -94,6 +94,7 @@ impl Contour {
         self.area = self.area * -1.0;
     }
     pub fn new(points:Vec<Point2<f32>>) -> Self {
+        debug_assert!(3 <= points.len());
         let first_point = points[0];
         let last_point = points[points.len()-1];
 
