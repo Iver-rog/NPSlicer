@@ -167,17 +167,64 @@ fn contour_reverse_order_test(){
 pub fn point_is_inside_contour_test(){
     let contour = Contour::new( vec![
         Point2::new(0.0,0.0),
+        Point2::new(0.5,-0.2),
         Point2::new(1.0,0.0),
+        Point2::new(1.0,0.5),
+        Point2::new(0.5,0.5),
+        Point2::new(0.4,0.7),
         Point2::new(0.0,1.0),
     ]);
-    assert!(   contour.point_is_inside(&Point2::new( 0.2,0.2 )),"test 1");
-    assert!(   contour.point_is_inside(&Point2::new( 0.5,0.5 )),"test 2");
-    assert!(   contour.point_is_inside(&Point2::new( 0.0,0.0 )),"test 3");
-    assert!( ! contour.point_is_inside(&Point2::new( 0.9,0.9 )),"test 4");
-    assert!( ! contour.point_is_inside(&Point2::new( 0.5,1.0 )),"test 5");
-    assert!( ! contour.point_is_inside(&Point2::new( 2.0,0.6 )),"test 6");
-    assert!( ! contour.point_is_inside(&Point2::new(-1.0,0.5 )),"test 7");
-    assert!( ! contour.point_is_inside(&Point2::new( 1.0,1.0 )),"test 8");
+    //let mut b = crate::Blender::new(); b.contour(&contour, 0.0); b.show();
+    //for point in &contour.points {
+    //    assert!( contour.point_is_inside(point),"point: {point} should be inside");
+    //}
+    assert!(   contour.point_is_inside(&Point2::new( 0.4,0.5 )),"test 1");
+    assert!(   contour.point_is_inside(&Point2::new( 0.2,0.7 )),"test 2");
+    assert!( ! contour.point_is_inside(&Point2::new(-0.1,1.0 )),"test 3");
+    assert!( ! contour.point_is_inside(&Point2::new(-0.1,-0.2)),"test 4");
+    assert!( ! contour.point_is_inside(&Point2::new( 1.1,0.5 )),"test 5");
+    assert!( ! contour.point_is_inside(&Point2::new( 1.1,0.4 )),"test 6");
+    assert!( ! contour.point_is_inside(&Point2::new( 0.5,1.1 )),"test 7");
+    assert!( ! contour.point_is_inside(&Point2::new( 0.1,1.0 )),"test 8");
+    assert!( ! contour.point_is_inside(&Point2::new( 0.0,1.1 )),"test 9");
+}
+#[test]
+fn point_is_inside_polygon_test(){
+    let p = Polygon::new(
+        Contour::new(vec![
+                Point2::new(0.0,0.0),
+                Point2::new(3.6,0.3),
+                Point2::new(3.8,1.6),
+                Point2::new(0.4,2.4),
+            ]),
+            vec![
+                Contour::new(vec![
+                    Point2::new(0.5,0.4),
+                    Point2::new(1.5,0.6),
+                    Point2::new(1.3,1.7),
+                    ]),
+                Contour::new(vec![
+                    Point2::new(2.7,0.5),
+                    Point2::new(3.3,1.0),
+                    Point2::new(2.4,1.2),
+                    ]),
+            ]
+        );
+    //let mut b = crate::Blender::new(); b.polygon(&p, 0.0); b.show();
+    //for point in &p.outer_loop.points {
+    //    assert!(p.point_is_inside(point),"point {point} should be inside")
+    //}
+
+    assert!(!p.point_is_inside(&Point2::new(-1.0,0.0)),"test 1");
+    assert!(!p.point_is_inside(&Point2::new( 1.0,1.0)),"test 2");
+    assert!(!p.point_is_inside(&Point2::new( 2.7,0.8)),"test 3");
+    assert!( p.point_is_inside(&Point2::new( 0.2,0.2)),"test 4");
+    assert!(!p.point_is_inside(&Point2::new( 3.8,0.6)),"test 5");
+    assert!(!p.point_is_inside(&Point2::new( 3.8,1.1)),"test 6");
+    assert!( p.point_is_inside(&Point2::new( 3.1,1.6)),"test 7");
+    assert!( p.point_is_inside(&Point2::new( 1.9,1.6)),"test 8");
+    assert!(!p.point_is_inside(&Point2::new( 0.1,1.6)),"test 9");
+
 }
 #[test]
 pub fn polygons_from_contours_test(){

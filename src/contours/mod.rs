@@ -63,6 +63,13 @@ impl Polygon {
         a.push(self.outer_loop);
         a
     }
+    pub fn point_is_inside(&self,point:&Point2<f32>) -> bool {
+        if !self.outer_loop.point_is_inside(point) {println!("outside outer_loop");return false}
+        for hole in &self.holes{
+            if hole.point_is_inside(point) {println!("inside hole");return false}
+        }
+        return true;
+    }
 }
 #[derive(Debug,Clone,PartialEq)]
 pub struct Contour{
@@ -125,27 +132,47 @@ impl Contour {
     }
     pub fn point_is_inside(&self,point:&Point2<f32>)->bool{
         // returns true if a point is on or inside the contour
-        if !self.aabb.point_is_inside(&point) { return false }
+        // TODO: points on a line on the left side of polygons are
+        // counted as outside even thoug they should not be.
+        //if !self.aabb.point_is_inside(&point) { return false }
 
         let points_offset_by_one = self.points.iter()
-            .skip(1)
-            .chain( self.points.iter() );
+            .cycle()
+            .skip(1);
 
+        #[cfg(test)]
+        println!("is {point} inside {:?}?",self.points);
         let intersections: usize = self.points.iter()
             .zip(points_offset_by_one)
-            // cast a ray from the test point towards the right direction allong 
-            // the x-axis and check if the ray intersects the edge
             .map(|(p1,p2)|{
-                // check if the two points of the edge are on opposite sides of 
-                // the horizontal line at test point's x value
-                ((p1.y < point.y) != (p2.y <= point.y)) && 
-                // find where the edge intersects the horizontal line at test point's x value 
-                // and check if the crossing point lies on the right side of the test point
-                point.x <= ((point.y-p1.y)*(p2.x-p1.x)/(p2.y-p1.y) + p1.x)
+                // special case: check if the ray intersects both vertices of the edge
+                let ray_is_parallel_to_the_line = ((point.y == p1.y) && (point.y == p2.y));
+                // check if the ray will intersect the line
+                let ray_crosses_the_edge = ((p1.y <= point.y) != (p2.y <= point.y));
+                // check if the intersection point is on the correct side of the point
+                let intersection_is_infront_of_ray = point.x <= ((point.y-p1.y)*(p2.x-p1.x)/(p2.y-p1.y) + p1.x);
+                #[cfg(test)]
+                {
+                    println!("edge ({p1}-{p2}) ");
+                    println!("{}ray_is_parallel_to_the_line\x1b[0m",
+                        if ray_is_parallel_to_the_line {"\x1b[032m"}else{""});
+                    println!("{}ray_crosses_the_edge\x1b[0m",
+                        if ray_crosses_the_edge {"\x1b[032m"}else{""});
+                    println!("{}intersection_is_infront_of_ray {}\x1b[0m",
+                        if intersection_is_infront_of_ray {"\x1b[032m"}else{""},
+                        ((point.y-p1.y)*(p2.x-p1.x)/(p2.y-p1.y) + p1.x) );
+                    println!("");
+                }
+
+                if ray_is_parallel_to_the_line {false}//(point.x <= p1.x) || (point.x <= p2.x) }
+                else{ ray_crosses_the_edge && intersection_is_infront_of_ray }
             })
             .map(|bool| match bool { true => 1, false => 0, } )
             .sum();
-        return intersections % 2 == 1
+            #[cfg(test)]
+            println!("\x1b[033mintersections: {intersections}\x1b[0m");
+
+            return intersections % 2 == 1
     }
     pub fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
         // returns true if a point is on or inside the contour
