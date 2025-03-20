@@ -204,31 +204,32 @@ fn boolean_layers2(blender:&mut Blender){
             ]);
     let skeletons = new_overhangs.iter()
         .enumerate()
-        .flat_map(|(i,layer)| layer.iter().map(move|polygon|(i,polygon)))
-        .map(|(i,p)|{
-            let polygon = Polygon::new(
-                bounding_box.clone(),
-                vec![p.outer_loop.clone()],
-            );
-            (i, polygon)
+        .map(|(i,layer)|{
+            let mut polygons:Vec<Polygon> = layer.into_iter()
+                .map(|p|{let mut p = p.clone(); p.invert(); p})
+                .collect();
+            polygons.push(Polygon::new(bounding_box.clone(),vec![]));
+            (i,polygons)
         })
-        .filter_map(|(i,polygon)|{
+        .filter_map(|(i,polygons)|{
             println!("skeleton for layer {i}");
-            match skeleton::skeleton_from_polygon(polygon.clone()){
+            match skeleton::skeleton_from_polygons(polygons.clone()){
                 Ok(skeleton) => Some((i,skeleton)),
                 Err(err) => {
                     println!("\x1b[031m{err}\x1b[0m");
-                    dbg!(&polygon); 
+                    dbg!(&polygons); 
                     None
                 }
             }
         })
         .for_each(|(i,skeleton)|{ 
+            println!("iter for layer {i}");
             let layer_height = (i+1) as f32 * layer_h;
             let mut input_polygon_mesh = skeleton.input_polygons_mesh();
 
+            println!("mesh for layer {i}");
             let mut mesh = skeleton.skeleton_mesh();
-            mesh.append(&mut input_polygon_mesh);
+            //mesh.append(&mut input_polygon_mesh);
             let edges = skeleton.edges;
             let points = skeleton.vertices.into_iter()
                 .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])

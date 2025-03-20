@@ -2,7 +2,6 @@ use nalgebra::{Matrix2, Point2, Point3, Vector2};
 use nalgebra_glm::cross2d;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
-use core::usize;
 use std::{
     collections::{HashMap, HashSet}, 
     f32::EPSILON, 
@@ -187,6 +186,22 @@ impl SkeletonBuilder {
             builder.add_loop(hole.points)?;
         }
         return Ok(builder)
+    }
+    pub fn add_polygon(&mut self,polygon:Polygon) -> Result<(),SkeletonError> {
+        let len = self.vertices.len();
+        self.input_polygon_refs = vec![PolygonNDXs(
+            iter::once(&polygon.outer_loop)
+            .chain(polygon.holes.iter())
+            //.inspect(|c|println!("{}",c.points.len()))
+            .map(|c|c.points.len())
+            .scan(len,|state,ndx|{ *state += ndx; Some(state.clone()) })
+            .collect()
+            )];
+        self.add_loop(polygon.outer_loop.points)?;
+        for hole in polygon.holes.into_iter(){
+            self.add_loop(hole.points)?;
+        }
+        return Ok(())
     }
     pub fn add_loop(&mut self, points: Vec<Point2<f32>>) -> Result<(), SkeletonError> {
         if points.len() < 3 { return Err(SkeletonError::InvalidInput) }
@@ -437,6 +452,14 @@ pub fn intersect(p1:Point2<f32>, v1:Vector2<f32>, p2:Point2<f32>, v2:Vector2<f32
 
 pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton, SkeletonError> {
     let builder = SkeletonBuilder::from_polygon(polygon)?;
+    let (skeleton, _debug_contours) = builder.compute_skeleton()?;
+    return Ok(skeleton);
+}
+pub fn skeleton_from_polygons( polygons:Vec<Polygon> ) -> Result<StraightSkeleton, SkeletonError> {
+    let mut builder = SkeletonBuilder::new();
+    for polygon in polygons{
+        builder.add_polygon(polygon)?
+    }
     let (skeleton, _debug_contours) = builder.compute_skeleton()?;
     return Ok(skeleton);
 }
