@@ -5,6 +5,49 @@ use crate::skeleton::split_event::is_point_on_edge;
 use super::*;
 
 #[test]
+fn polygon_iterator_test(){
+    let polygon = Polygon::new(Contour::new(vec![
+            Point2::new(0.0,0.0),
+            Point2::new(1.0,0.0),
+            Point2::new(1.0,1.0),
+            Point2::new(0.0,1.0),
+            ]),
+            vec![
+                Contour::new(vec![
+                    Point2::new(0.1,0.1),
+                    Point2::new(0.2,0.1),
+                    Point2::new(0.2,0.2),
+                ]),
+                Contour::new(vec![
+                    Point2::new(0.3,0.3),
+                    Point2::new(0.4,0.3),
+                    Point2::new(0.4,0.4),
+                ]),
+            ]
+        );
+    let mut skeleton = SkeletonBuilder::new();
+        skeleton.add_polygon(polygon);
+
+    dbg!(&skeleton.input_polygon_refs);
+    let mut polygon_iterator = PolygonIterator::from(&skeleton.input_polygon_refs[0]);
+    assert_eq!(polygon_iterator.outer_loop.next(),Some(0));
+    assert_eq!(polygon_iterator.outer_loop.next(),Some(1));
+    assert_eq!(polygon_iterator.outer_loop.next(),Some(2));
+    assert_eq!(polygon_iterator.outer_loop.next(),Some(3));
+    assert_eq!(polygon_iterator.outer_loop.next(),None);
+
+    assert_eq!(polygon_iterator.holes[0].next(),Some(4));
+    assert_eq!(polygon_iterator.holes[0].next(),Some(5));
+    assert_eq!(polygon_iterator.holes[0].next(),Some(6));
+    assert_eq!(polygon_iterator.holes[0].next(),None);
+
+    assert_eq!(polygon_iterator.holes[1].next(),Some(7));
+    assert_eq!(polygon_iterator.holes[1].next(),Some(8));
+    assert_eq!(polygon_iterator.holes[1].next(),Some(9));
+    assert_eq!(polygon_iterator.holes[1].next(),None);
+}
+
+#[test]
 fn ccw_angle_test() {
     let v1 = Vector2::new(4.0, 0.0);
     let v2 = Vector2::new(0.0, 1.0);
