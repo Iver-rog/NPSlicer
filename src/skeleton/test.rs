@@ -26,10 +26,12 @@ fn polygon_iterator_test(){
             ]
         );
     let mut skeleton = SkeletonBuilder::new();
-        skeleton.add_polygon(polygon);
+        skeleton.add_polygon(polygon.clone());
+        skeleton.add_polygon(polygon.clone());
 
     dbg!(&skeleton.input_polygon_refs);
-    let mut polygon_iterator = PolygonIterator::from(&skeleton.input_polygon_refs[0]);
+    //let mut polygon_iterator = PolygonIterator::from(&skeleton.input_polygon_refs[0]);
+    let mut polygon_iterator = &mut skeleton.input_polygon_refs[0];
     assert_eq!(polygon_iterator.outer_loop.next(),Some(0));
     assert_eq!(polygon_iterator.outer_loop.next(),Some(1));
     assert_eq!(polygon_iterator.outer_loop.next(),Some(2));
@@ -44,6 +46,22 @@ fn polygon_iterator_test(){
     assert_eq!(polygon_iterator.holes[1].next(),Some(7));
     assert_eq!(polygon_iterator.holes[1].next(),Some(8));
     assert_eq!(polygon_iterator.holes[1].next(),Some(9));
+    assert_eq!(polygon_iterator.holes[1].next(),None);
+    let mut polygon_iterator = &mut skeleton.input_polygon_refs[1];
+    assert_eq!(polygon_iterator.outer_loop.next(),Some(10));
+    assert_eq!(polygon_iterator.outer_loop.next(),Some(11));
+    assert_eq!(polygon_iterator.outer_loop.next(),Some(12));
+    assert_eq!(polygon_iterator.outer_loop.next(),Some(13));
+    assert_eq!(polygon_iterator.outer_loop.next(),None);
+
+    assert_eq!(polygon_iterator.holes[0].next(),Some(14));
+    assert_eq!(polygon_iterator.holes[0].next(),Some(15));
+    assert_eq!(polygon_iterator.holes[0].next(),Some(16));
+    assert_eq!(polygon_iterator.holes[0].next(),None);
+
+    assert_eq!(polygon_iterator.holes[1].next(),Some(17));
+    assert_eq!(polygon_iterator.holes[1].next(),Some(18));
+    assert_eq!(polygon_iterator.holes[1].next(),Some(19));
     assert_eq!(polygon_iterator.holes[1].next(),None);
 }
 

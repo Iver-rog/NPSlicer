@@ -35,18 +35,20 @@ pub struct Edge {
 pub struct StraightSkeleton {
     pub vertices: Vec<Point3<f32>>,
     pub edges: Vec<[usize;2]>,
-    pub input_polygons: Vec<PolygonNDXs>
+    pub input_polygons: Vec<PolygonIterator>
 }
 impl StraightSkeleton {
-    pub fn input_polygons(&self)->Vec<PolygonIterator>{
+    pub fn input_polygons_mesh_holes(&self) -> Vec<Vec<usize>> {
         self.input_polygons.iter()
-            .map(|polygon| PolygonIterator::from(polygon) )
+            .flat_map(|p|p.holes.iter())
+            .map(|p|{
+                ((p.start)..(p.end)).rev().collect::<Vec<usize>>()
+            })
             .collect()
     }
-    pub fn input_polygons_mesh(&self) -> Vec<Vec<usize>> {
-        self.input_polygons()
-            .iter()
-            .map(|p|p.holes[0].clone())
+    pub fn input_polygons_mesh_outer_loop(&self) -> Vec<Vec<usize>> {
+        self.input_polygons.iter()
+            .map(|p|p.outer_loop.clone())
             .map(|p|{
                 ((p.start)..(p.end)).rev().collect::<Vec<usize>>()
             })
@@ -66,10 +68,9 @@ impl StraightSkeleton {
                 }
             });
         let mut faces = Vec::new();
-        for polygon in &self.input_polygons {
-            let polygon_iter = PolygonIterator::from(polygon);
-            let outer_loop = polygon_iter.outer_loop.clone().zip(polygon_iter.outer_loop.skip(1).cycle());
-            let holes = polygon_iter.holes.into_iter()
+        for polygon in self.input_polygons.iter().cloned() {
+            let outer_loop = polygon.outer_loop.clone().zip(polygon.outer_loop.skip(1).cycle());
+            let holes = polygon.holes.into_iter()
                 .map(|hole| { hole.clone().zip( hole.skip(1).cycle() ) })
                 .flatten();
             for (start_vert,last_vert) in outer_loop.chain(holes) {
@@ -137,34 +138,37 @@ impl Display for Event {
         Ok(())
     }
 }
-#[derive(Debug,Clone)]
-pub struct PolygonNDXs( Vec<usize> );
 #[derive(Debug)]
 pub struct Vertex {
     coords: Point2<f32>,
     time: f32,
 }
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct PolygonIterator {
     outer_loop:std::ops::Range<usize>,
     holes: Vec<std::ops::Range<usize>>
 } 
-impl From<&PolygonNDXs> for PolygonIterator {
-    fn from(pndx:&PolygonNDXs)-> Self {
-        let end = pndx.0.iter().cloned();
-        let start = iter::once(0usize).chain(end.clone());
-        let mut ndxs = start.zip(end).map(|(start,end)|start..end);
-        PolygonIterator{
-            outer_loop: ndxs.next().unwrap(),
-            holes: ndxs.collect(),
-        }
+fn polygon_iterator_from_polygon(polygon:&Polygon, offset:usize) -> PolygonIterator {
+    let len = offset;
+    let mut polygon_ndxs = iter::once(&polygon.outer_loop)
+        .chain(polygon.holes.iter())
+        .map(|c|c.points.len())
+        .scan(len,|state,ndx|{
+            let start = state.clone();
+            *state += ndx;
+            Some(start..state.clone())
+        });
+
+    PolygonIterator{
+        outer_loop:polygon_ndxs.next().unwrap(),
+        holes:polygon_ndxs.collect(),
     }
 }
 #[derive(Debug,Default)]
 pub struct SkeletonBuilder {
     shrining_polygon: Nodes,
     original_polygon: Nodes,
-    input_polygon_refs: Vec<PolygonNDXs>,
+    input_polygon_refs: Vec<PolygonIterator>,
     vertices: Vec<Vertex>,
     edges: Vec<Edge>,
     bounding_contour: Option<Contour>,
@@ -173,30 +177,13 @@ impl SkeletonBuilder {
     pub fn new() -> Self { Self::default() }
     pub fn from_polygon(polygon:Polygon) -> Result<Self,SkeletonError> {
         let mut builder = SkeletonBuilder::new();
-        builder.input_polygon_refs = vec![PolygonNDXs(
-            iter::once(&polygon.outer_loop)
-            .chain(polygon.holes.iter())
-            //.inspect(|c|println!("{}",c.points.len()))
-            .map(|c|c.points.len())
-            .scan(0,|state,ndx|{ *state += ndx; Some(state.clone()) })
-            .collect()
-            )];
-        builder.add_loop(polygon.outer_loop.points)?;
-        for hole in polygon.holes.into_iter(){
-            builder.add_loop(hole.points)?;
-        }
+        builder.add_polygon(polygon)?;
         return Ok(builder)
     }
     pub fn add_polygon(&mut self,polygon:Polygon) -> Result<(),SkeletonError> {
-        let len = self.vertices.len();
-        self.input_polygon_refs = vec![PolygonNDXs(
-            iter::once(&polygon.outer_loop)
-            .chain(polygon.holes.iter())
-            //.inspect(|c|println!("{}",c.points.len()))
-            .map(|c|c.points.len())
-            .scan(len,|state,ndx|{ *state += ndx; Some(state.clone()) })
-            .collect()
-            )];
+        self.input_polygon_refs.push(
+            polygon_iterator_from_polygon(&polygon, self.vertices.len())
+            );
         self.add_loop(polygon.outer_loop.points)?;
         for hole in polygon.holes.into_iter(){
             self.add_loop(hole.points)?;
