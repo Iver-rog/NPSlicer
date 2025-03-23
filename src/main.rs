@@ -170,7 +170,7 @@ fn boolean_layers2(blender:&mut Blender){
 
     let mut layers = layers.into_iter();
     let mut prev_layer = layers.next().unwrap();
-    let mut new_overhangs = Vec::new();
+    let mut new_overhangs:Vec<Vec<Polygon>> = Vec::new();
     for (i, layer) in layers.enumerate(){
         println!("layer {i}");
 
@@ -212,7 +212,7 @@ fn boolean_layers2(blender:&mut Blender){
             (i,polygons)
         })
         .filter_map(|(i,polygons)|{
-            println!("skeleton for layer {i}");
+            print!("layer {i}: skeleton");
             match skeleton::skeleton_from_polygons(polygons.clone()){
                 Ok(skeleton) => Some((i,skeleton)),
                 Err(err) => {
@@ -223,19 +223,20 @@ fn boolean_layers2(blender:&mut Blender){
             }
         })
         .for_each(|(i,skeleton)|{ 
-            println!("iter for layer {i}");
+            print!(" => crating iterator");
             let layer_height = (i+1) as f32 * layer_h;
-            let mut input_polygon_mesh = skeleton.input_polygons_mesh();
+            let mut input_polygon_mesh = skeleton.input_polygons_mesh_outer_loop();
 
-            println!("mesh for layer {i}");
+            println!(" => meshing");
             let mut mesh = skeleton.skeleton_mesh();
-            //mesh.append(&mut input_polygon_mesh);
+            mesh.append(&mut input_polygon_mesh);
             let edges = skeleton.edges;
             let points = skeleton.vertices.into_iter()
                 .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
                 .collect();
 
             blender.n_gon(points, edges, mesh);
+            //blender.n_gon(points, edges, input_polygon_mesh);
             //blender.line_body3d( points, edges );
          });
 }
