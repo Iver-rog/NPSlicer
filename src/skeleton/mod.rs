@@ -265,6 +265,11 @@ impl SkeletonBuilder {
         }
         return Ok(events)
     }
+    pub fn compute_skeleton_with_limit(mut self, stop_time:f32) -> Result<StraightSkeleton, SkeletonError> {
+        self.compute_untill(stop_time)?;
+        self.add_offset_active_vertices(stop_time);
+        return Ok(StraightSkeleton::from(self))
+    }
     pub fn compute_skeleton(mut self) -> Result<(StraightSkeleton,Vec<Vec<Polygon>>), SkeletonError> {
 
         let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
@@ -294,17 +299,7 @@ impl SkeletonBuilder {
                 }
             }
         }
-        let vertices = self.vertices.into_iter()
-            .map(|n| Point3::new(n.coords.x,n.coords.y,n.time))
-            .collect();
-        let edges = self.edges.into_iter()
-            .map(|edge| [edge.start,edge.end] )
-            .collect();
-        let skeleton = StraightSkeleton {
-            vertices,
-            edges,
-            input_polygons: self.input_polygon_refs,
-        };
+        let skeleton = StraightSkeleton::from(self);
         return Ok((skeleton,debug_contours))
     }
 
@@ -332,6 +327,26 @@ impl SkeletonBuilder {
         Ok(())
     }
 
+    pub fn add_offset_active_vertices(&mut self, time:f32) {
+        let mut computed_vertecies:HashSet<usize> = HashSet::new();
+        for node_ndx in self.shrining_polygon.active_nodes_iter() {
+            if computed_vertecies.contains(&node_ndx){continue}
+            let start_node = self.shrining_polygon.nodes[node_ndx];
+            let index_of_first_new_point = self.vertices.len();
+            for node in self.shrining_polygon.iter_from(&start_node){
+                let coords = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
+                self.edges.push(Edge{start:node.vertex_ndx, end:self.vertices.len()});
+                //self.edges.push(Edge{start:self.vertices.len(), end:self.vertices.len()+1});
+                self.edges.push(Edge{start:self.vertices.len(), end:self.vertices.len()+1});
+                self.vertices.push(Vertex{coords,time});
+                computed_vertecies.insert(node.ndx);
+            }
+            let last_edge = self.edges.len() -1;
+            if self.edges[last_edge].start > index_of_first_new_point{
+                self.edges[last_edge].end = index_of_first_new_point;
+            };
+        }
+    }
     pub fn offset_active_vertices(&self, time:f32) -> Vec<Polygon> {
         let mut computed_vertecies:HashSet<usize> = HashSet::new();
         let mut contours = Vec::new();
@@ -347,6 +362,21 @@ impl SkeletonBuilder {
                 contours.push(Contour::new(contour));
             }
         return polygons_from_contours(contours)
+    }
+}
+impl From<SkeletonBuilder> for StraightSkeleton {
+    fn from(s_builder:SkeletonBuilder) -> Self {
+        let vertices = s_builder.vertices.into_iter()
+            .map(|n| Point3::new(n.coords.x,n.coords.y,n.time))
+            .collect();
+        let edges = s_builder.edges.into_iter()
+            .map(|edge| [edge.start,edge.end] )
+            .collect();
+        return StraightSkeleton {
+            vertices,
+            edges,
+            input_polygons: s_builder.input_polygon_refs,
+        }
     }
 }
 fn compute_intersection_time(

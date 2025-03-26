@@ -97,26 +97,28 @@ fn straight_skeleton(blender:&mut Blender) {
     //let vertices = data::test_poly2();
     //let vertices:Vec<Point2<f32>> = data::test_poly3().into_iter().rev().collect();
     //let vertices = data::test_poly5();
-    let vertices = data::test_poly8();
+    let mut vertices = data::test_poly8();
+    vertices.invert();
 
     blender.polygon(&vertices, 0.0);
 
     //match skeleton::SkeletonBuilder::new(vertices){
     match skeleton::SkeletonBuilder::from_polygon(vertices){
         Err(error) => error!("\x1b[031m{error}\x1b[0m"),
-        Ok(builder) => match builder.compute_skeleton() {
+        Ok(builder) => match builder.compute_skeleton_with_limit(40.) {
             Err(error) => error!("{error}"),
-            Ok((skeleton,debug_contours)) => {
+            //Ok((skeleton,debug_contours)) => {
+            Ok(skeleton) => {
+                //blender.line_body3d(
+                //    skeleton.vertices.into_iter().map(|p|[p.x,p.y,p.z]).collect(), 
+                //    skeleton.edges
+                //    );
                 let mesh = skeleton.skeleton_mesh();
-                //dbg!(&mesh);
                 blender.n_gon(
                     skeleton.vertices.into_iter().map(|v| [v[0],v[1],v[2]]).collect(), 
                     skeleton.edges,
                     mesh
                     );
-                for polygon in debug_contours.iter().flatten() {
-                    blender.polygon(polygon,0.0);
-                }
             } 
         }
     }
