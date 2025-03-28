@@ -472,6 +472,14 @@ pub fn skeleton_from_polygon( polygon:Polygon ) -> Result<StraightSkeleton, Skel
     let (skeleton, _debug_contours) = builder.compute_skeleton()?;
     return Ok(skeleton);
 }
+pub fn skeleton_from_polygons_with_limit( polygons:Vec<Polygon>, limit:f32 ) -> Result<StraightSkeleton, SkeletonError> {
+    let mut builder = SkeletonBuilder::new();
+    for polygon in polygons{
+        builder.add_polygon(polygon)?
+    }
+    let skeleton = builder.compute_skeleton_with_limit(limit)?;
+    return Ok(skeleton);
+}
 pub fn skeleton_from_polygons( polygons:Vec<Polygon> ) -> Result<StraightSkeleton, SkeletonError> {
     let mut builder = SkeletonBuilder::new();
     for polygon in polygons{
