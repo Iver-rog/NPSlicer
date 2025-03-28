@@ -22,6 +22,7 @@ use nodes::{Nodes,Node};
 mod bound_event;
 mod split_event;
 mod edge_event;
+mod vertex_tree;
 
 use crate::contours::{ polygons_from_contours, Polygon, Contour};
 
