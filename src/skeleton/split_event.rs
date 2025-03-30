@@ -55,7 +55,7 @@ impl SkeletonBuilder{
 
                 let i = match intersect( edge_start_p, edge_vec, node_p, self_edge ){
                     Some(i) => i,
-                    None => {error!("cant compute i: parallel bisectors"); continue }
+                    None => {debug!("cant compute i: parallel bisectors"); continue }
                 };
 
                 if (i-node_p).magnitude() < 1e-5{
@@ -73,7 +73,7 @@ impl SkeletonBuilder{
 
                 let b = match intersect(i, bisector, node_p, node.bisector() ){
                     Some(b)=> b,
-                    None => { error!("cant compute b: parallel bisectors"); continue },
+                    None => { debug!("cant compute b: parallel bisectors"); continue },
                 };
                 // Check eligebility of b
                 // a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
