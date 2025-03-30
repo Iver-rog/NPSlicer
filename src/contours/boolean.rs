@@ -1,6 +1,7 @@
 use crate::contours::{Polygon,Contour,polygons_from_contours};
 use std::iter;
 use std::fmt::Display;
+use log::warn;
 use nalgebra::Point2;
 use i_overlay::i_float::float::compatible::FloatPointCompatible;
 use i_overlay::string::clip::ClipRule;
@@ -122,11 +123,12 @@ impl From<Vec<Vec<IOverlayCompatibleType>>> for Polygon{
 
 pub fn offset_line(line:Vec<Point2<f32>>,d_x:f32)->Vec<Polygon>{
     let style = StrokeStyle::new(d_x)
-        .line_join(LineJoin::Miter(1.0))
+        // Miter: corners with a edge sharper than the input min_angle (in degrees) are beveled 
+        .line_join(LineJoin::Miter(0.0))// <- don't bevel corners (ever)
         .start_cap(LineCap::Butt)
         .end_cap(LineCap::Butt);
     let line:Vec<IOverlayCompatibleType> = line.into_iter().map(|p|p.into()).collect();
-    let polygons = line.stroke(style, false);
+    let polygons = line.stroke(style, true);
     let p:Vec<Contour> = polygons.into_iter()
         .flatten()
         .map(|c| Contour::new( c.into_iter().map(|p|p.into()).collect() ) )
@@ -154,7 +156,7 @@ pub fn offset(polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
         .map(|p|p.into_ioverlay_type())
         .collect();
 
-    let style = OutlineStyle::new(distance).line_join(LineJoin::Round(0.5));
+    let style = OutlineStyle::new(distance).line_join(LineJoin::Miter(0.0));
     let shapes = shapes.outline(style);
 
     let p:Vec<Contour> = shapes.into_iter()
