@@ -1,4 +1,6 @@
-use nalgebra::Point2;
+use nalgebra::{wrap, Point2};
+
+use super::Enclosed;
 
 #[derive(Debug,Clone,PartialEq)]
 pub (super) struct AABB{
@@ -7,8 +9,11 @@ pub (super) struct AABB{
     pub (super) y_max:f32,
     pub (super) y_min:f32,
 }
-impl AABB {
-    pub fn point_is_inside(&self,point:&Point2<f32>) -> bool {
+impl Enclosed for AABB {
+    fn area(&self) -> f32 {
+        (self.x_max - self.x_min) * (self.y_max - self.y_min)
+    }
+    fn point_is_inside(&self,point:&Point2<f32>) -> bool {
         self.x_min <= point.x && point.x <= self.x_max &&
         self.y_min <= point.y && point.y <= self.y_max
     }

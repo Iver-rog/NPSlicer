@@ -120,7 +120,7 @@ fn extract_layer(
                     .expect("contour was initialized with one point");
 
                 let (new_point,edge) = match ( intersection1, intersection2 ) {
-                    ( None, None ) => { if contour.len() > 3 {contours.push(Contour::new(contour))}; break },
+                    ( None, None ) => { if contour.len() > 3 {contours.push(Contour::from(contour))}; break },
                     ( Some((intersect1_p,edge1)), None ) => ( intersect1_p.xy(), edge1 ), 
                     ( Some((intersect1_p,edge1)), Some((intersect2_p,edge2)) ) => {
                         if (intersect1_p.xy() - previous_p).magnitude() < 

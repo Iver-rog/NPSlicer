@@ -1,11 +1,12 @@
-use crate::contours::*;
+use nalgebra::Point2;
+use crate::geo::{Enclosed,Contour,Polygon,polygons_from_contours};
 use crate::stl_op::area_contour2d;
 use crate::data;
 #[test]
 fn simplify_contour(){
     //let mut blender = Blender::new();
 
-    let mut c = Contour::new(data::test_poly());
+    let mut c = Contour::from(data::test_poly());
     //blender.polygon(&Polygon::new(c.clone(),vec![]), 0.0);
 
     let len = c.points.len();
@@ -19,7 +20,7 @@ fn simplify_contour(){
 }
 pub fn i_offset_test(){
     let contours = vec![
-        Contour::new(vec![
+        Contour::from(vec![
             Point2::new(1.0, 2.0),
             //Point2::new(1.0, 3.0),
             Point2::new(1.0, 4.0),
@@ -48,7 +49,7 @@ pub fn i_offset_test(){
 }
 #[test]
 fn reverse_order(){
-    let mut contour = Contour::new(vec![
+    let mut contour = Contour::from(vec![
         Point2::new(0.0,0.0),
         Point2::new(1.0,0.0),
         Point2::new(1.0,1.0),
@@ -59,7 +60,7 @@ fn reverse_order(){
     assert!(contour.area < 0.0);
     assert_eq!(
         contour,
-        Contour::new(vec![
+        Contour::from(vec![
             Point2::new(0.0,1.0),
             Point2::new(1.0,1.0),
             Point2::new(1.0,0.0),
@@ -70,25 +71,25 @@ fn reverse_order(){
 #[test]
 fn polygon_from_contours_2(){
     let contours = vec![
-            Contour::new(vec![
+            Contour::from(vec![
                 Point2::new(0.0,0.0),
                 Point2::new(1.0,0.0),
                 Point2::new(1.0,1.0),
                 Point2::new(0.0,1.0),
             ]),
-            Contour::new(vec![
+            Contour::from(vec![
                 Point2::new(0.1,0.1),
                 Point2::new(0.4,0.0),
                 Point2::new(0.4,0.9),
                 Point2::new(0.1,0.9),
             ]),
-            Contour::new(vec![
+            Contour::from(vec![
                 Point2::new(0.5,0.1),
                 Point2::new(0.9,0.1),
                 Point2::new(0.9,0.9),
                 Point2::new(0.5,0.9),
             ]),
-            Contour::new(vec![
+            Contour::from(vec![
                 Point2::new(2.0,0.0),
                 Point2::new(3.0,0.0),
                 Point2::new(3.0,1.9),
@@ -143,12 +144,12 @@ fn equivalent_area_calculations_test(){
         Point2::new(1.0,0.0),
         Point2::new(0.0,1.0),
     ];
-    let contour = Contour::new(points);
+    let contour = Contour::from(points);
     assert_eq!(area_contour2d(&contour.points),contour.area);
 }
 #[test]
 fn contour_reverse_order_test(){
-    let mut contour = Contour::new(vec![
+    let mut contour = Contour::from(vec![
         Point2::new(0.0,0.0),
         Point2::new(1.0,0.0),
         Point2::new(0.0,1.0),
@@ -165,7 +166,7 @@ fn contour_reverse_order_test(){
 }
 #[test]
 pub fn point_is_inside_contour_test(){
-    let contour = Contour::new( vec![
+    let contour = Contour::from( vec![
         Point2::new(0.0,0.0),
         Point2::new(0.5,-0.2),
         Point2::new(1.0,0.0),
@@ -191,19 +192,19 @@ pub fn point_is_inside_contour_test(){
 #[test]
 fn point_is_inside_polygon_test(){
     let p = Polygon::new(
-        Contour::new(vec![
+        Contour::from(vec![
                 Point2::new(0.0,0.0),
                 Point2::new(3.6,0.3),
                 Point2::new(3.8,1.6),
                 Point2::new(0.4,2.4),
             ]),
             vec![
-                Contour::new(vec![
+                Contour::from(vec![
                     Point2::new(0.5,0.4),
                     Point2::new(1.5,0.6),
                     Point2::new(1.3,1.7),
                     ]),
-                Contour::new(vec![
+                Contour::from(vec![
                     Point2::new(2.7,0.5),
                     Point2::new(3.3,1.0),
                     Point2::new(2.4,1.2),
@@ -228,17 +229,17 @@ fn point_is_inside_polygon_test(){
 }
 #[test]
 pub fn polygons_from_contours_test(){
-    let mut contour0 = Contour::new(vec![
+    let mut contour0 = Contour::from(vec![
         Point2::new(0.0,0.0),
         Point2::new(1.0,0.0),
         Point2::new(0.0,1.0),
     ]);
-    let contour1 = Contour::new(vec![
+    let contour1 = Contour::from(vec![
         Point2::new(-1.0,-1.0),
         Point2::new( 3.0,-1.0),
         Point2::new(-1.0, 3.0),
     ]);
-    let contour2 = Contour::new(vec![
+    let contour2 = Contour::from(vec![
         Point2::new(0.1,0.1),
         Point2::new(0.9,0.1),
         Point2::new(0.1,0.9),

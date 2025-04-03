@@ -6,19 +6,19 @@ use super::*;
 
 #[test]
 fn polygon_iterator_test(){
-    let polygon = Polygon::new(Contour::new(vec![
+    let polygon = Polygon::new(Contour::from(vec![
             Point2::new(0.0,0.0),
             Point2::new(1.0,0.0),
             Point2::new(1.0,1.0),
             Point2::new(0.0,1.0),
             ]),
             vec![
-                Contour::new(vec![
+                Contour::from(vec![
                     Point2::new(0.1,0.1),
                     Point2::new(0.2,0.1),
                     Point2::new(0.2,0.2),
                 ]),
-                Contour::new(vec![
+                Contour::from(vec![
                     Point2::new(0.3,0.3),
                     Point2::new(0.4,0.3),
                     Point2::new(0.4,0.4),

@@ -1,11 +1,27 @@
 use nalgebra::Point2;
 use super::Contour;
+pub use super::Enclosed;
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct Polygon{
     pub outer_loop: Contour,
     pub holes: Vec<Contour>,
 }
+impl Enclosed for Polygon {
+    fn area(&self) -> f32 {
+        let area = self.outer_loop.area();
+        let hole_area: f32 = self.holes.iter().map(|contour| contour.area() ).sum();
+        return area - hole_area
+    }
+    fn point_is_inside(&self,point:&Point2<f32>) -> bool {
+        if !self.outer_loop.point_is_inside(point) {println!("outside outer_loop");return false}
+        for hole in &self.holes{
+            if hole.point_is_inside(point) {println!("inside hole");return false}
+        }
+        return true;
+    }
+}
+
 impl Polygon {
     pub fn invert(&mut self){
         self.outer_loop.reverse_order();
@@ -25,11 +41,6 @@ impl Polygon {
             holes,
         }
     }
-    pub fn area(&self) -> f32 {
-        let area = self.outer_loop.area;
-        let hole_area: f32 = self.holes.iter().map(|contour| contour.area ).sum();
-        return area - hole_area
-    }
     pub fn simplify(&mut self, min_a:f32){
         self.outer_loop.simplify(min_a);
         if (self.outer_loop.area < min_a) | (self.outer_loop.points.len() < 3){
@@ -44,13 +55,6 @@ impl Polygon {
         let mut a = self.holes;
         a.push(self.outer_loop);
         a
-    }
-    pub fn point_is_inside(&self,point:&Point2<f32>) -> bool {
-        if !self.outer_loop.point_is_inside(point) {println!("outside outer_loop");return false}
-        for hole in &self.holes{
-            if hole.point_is_inside(point) {println!("inside hole");return false}
-        }
-        return true;
     }
 }
 

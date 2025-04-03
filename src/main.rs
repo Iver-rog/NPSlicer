@@ -4,7 +4,7 @@ mod stl_op;
 mod skeleton;
 mod utils;
 mod geo;
-use geo::{Contour,Polygon};
+use geo::{Enclosed,Contour,Polygon};
 use contours::boolean::{boolean, clip_poly, i_simplify, offset, offset_line};
 use i_overlay::core::overlay_rule::OverlayRule;
 use utils::Blender;

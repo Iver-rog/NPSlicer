@@ -360,7 +360,7 @@ impl SkeletonBuilder {
                     contour.push(vertex);
                     computed_vertecies.insert(node.ndx);
                 }
-                contours.push(Contour::new(contour));
+                contours.push(Contour::from(contour));
             }
         return polygons_from_contours(contours)
     }

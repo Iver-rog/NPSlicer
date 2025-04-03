@@ -68,7 +68,7 @@ impl Polygon{
         return result.into_iter()
             .map(|polygon|{
                 let contours = polygon.into_iter()
-                    .map(|contour| Contour::new(contour.into_iter().map(|p|p.into()).collect()) )
+                    .map(|contour| Contour::from_points(contour.into_iter().map(|p|p.into()).collect()) )
                     .collect();
                 polygons_from_contours(contours).into_iter().next().unwrap()
             }).collect()
@@ -88,7 +88,7 @@ impl Polygon{
 
         let p:Vec<Contour> = shapes.into_iter()
             .flatten()
-            .map(|c| Contour::new( c.into_iter().map(|p|p.into()).collect() ) )
+            .map(|c| Contour::from_points( c.into_iter().map(|p|p.into()).collect() ) )
             .collect();
         polygons_from_contours(p)
     }
@@ -109,10 +109,10 @@ impl From<Vec<Vec<IOverlayCompatibleType>>> for Polygon{
     fn from(c:Vec<Vec<IOverlayCompatibleType>>)-> Self{
         let mut contours = c.into_iter();
         let outer_loop = match contours.next() {
-            Some(contour) => Contour::new(contour.into_iter().rev().map(|p|p.into()).collect()),
-            None => return Polygon::new(Contour::new(vec![]),vec![]),
+            Some(contour) => Contour::from_points(contour.into_iter().rev().map(|p|p.into()).collect()),
+            None => return Polygon::new(Contour::from_points(vec![]),vec![]),
         };
-        let holes:Vec<Contour> = contours.map(|c| Contour::new(
+        let holes:Vec<Contour> = contours.map(|c| Contour::from_points(
                     c.into_iter().map(|p|p.into()).collect()
                     )
                 ).collect();
@@ -131,7 +131,7 @@ pub fn offset_line(line:Vec<Point2<f32>>,d_x:f32)->Vec<Polygon>{
     let polygons = line.stroke(style, true);
     let p:Vec<Contour> = polygons.into_iter()
         .flatten()
-        .map(|c| Contour::new( c.into_iter().map(|p|p.into()).collect() ) )
+        .map(|c| Contour::from_points( c.into_iter().map(|p|p.into()).collect() ) )
         .collect();
     polygons_from_contours(p)
 }
@@ -161,7 +161,7 @@ pub fn offset(polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
 
     let p:Vec<Contour> = shapes.into_iter()
         .flatten()
-        .map(|c| Contour::new( c.into_iter().map(|p|p.into()).collect() ) )
+        .map(|c| Contour::from_points( c.into_iter().map(|p|p.into()).collect() ) )
         .collect();
     polygons_from_contours(p)
 }
@@ -194,7 +194,7 @@ pub fn boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Pol
     return result.into_iter()
         .map(|p_loop|{
             let contours = p_loop.into_iter()
-                .map(|contour| Contour::new(
+                .map(|contour| Contour::from_points(
                     contour.into_iter()
                     .map(|p| Point2::new(p[0],p[1]) )
                     .collect()

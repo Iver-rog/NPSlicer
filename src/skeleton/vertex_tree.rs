@@ -1,5 +1,6 @@
 use core::{option::Option, unreachable};
 use std::os::unix::process;
+use crate::geo::Enclosed;
 
 use crate::skeleton::*;
 
@@ -51,7 +52,7 @@ impl SkeletonBuilder {
                 return Some(vertex_loop)
             })
             .filter(|contour| contour.len() >= 3)
-            .map(|conotour|Contour::new(conotour))
+            .map(|conotour|Contour::from(conotour))
             .collect();
         println!("there are {} contours", offset_contours.len());
 
@@ -95,13 +96,13 @@ fn vertex_tree_test(){
         Point2::new(0.95,1.05),
         Point2::new(0.1,0.9),
     ]);
-    let hole1 = Contour::new(vec![
+    let hole1 = Contour::from(vec![
         Point2::new(0.3,0.2),
         Point2::new(0.6,0.2),
         Point2::new(0.6,0.55),
         Point2::new(0.3,0.5),
     ]);
-    let hole2 = Contour::new(vec![
+    let hole2 = Contour::from(vec![
         Point2::new(0.1,0.1),
         Point2::new(0.2,0.1),
         Point2::new(0.2,0.15),

@@ -1,5 +1,6 @@
 use nalgebra::Point2;
 use nalgebra_glm::cross2d;
+use super::Enclosed;
 use super::AABB;
 
 #[derive(Debug,Clone,PartialEq)]
@@ -8,60 +9,11 @@ pub struct Contour{
     aabb:AABB,
     pub points: Vec<Point2<f32>>
 }
-impl Contour {
-    pub fn simplify(&mut self, min_a:f32){
-        let len = self.points.len();
-        for i in (0..len).rev(){
-            let i_pluss = (i+1)%self.points.len();
-            let i_minus = if i == 0 {self.points.len().saturating_sub(1)}else{i.saturating_sub(1)};
-
-            let p = self.points[i];
-            let p_p = self.points[i_pluss];
-            let p_m = self.points[i_minus];
-
-            let v1 = p_p - p;
-            let v2 = p_m - p;
-
-            let area_x2 = cross2d(&v1, &v2);
-            if area_x2.abs() < min_a*2. {self.points.remove(i);}
-        }
-        if self.points.len() < 3 {self.points.clear(); self.area = 0.0;}
+impl Enclosed for Contour{
+    fn area(&self) -> f32 {
+        self.area
     }
-    pub fn reverse_order(&mut self) {
-        self.points.reverse();
-        self.area = self.area * -1.0;
-    }
-    pub fn new(points:Vec<Point2<f32>>) -> Self {
-        debug_assert!(3 <= points.len());
-        let first_point = points[0];
-        let last_point = points[points.len()-1];
-
-        let mut aabb = AABB{
-            x_max: first_point.x,
-            x_min: first_point.x,
-            y_max: first_point.y,
-            y_min: first_point.y,
-        };
-        let mut area = last_point.x*first_point.y-first_point.x*last_point.y;
-
-        let mut prev_point = first_point.clone();
-        for point in points.iter().skip(1) {
-            aabb.x_max = aabb.x_max.max(point.x);
-            aabb.x_min = aabb.x_min.min(point.x);
-            aabb.y_max = aabb.y_max.max(point.y);
-            aabb.y_min = aabb.y_min.min(point.y);
-            
-            area += prev_point.x*point.y-point.x*prev_point.y;
-            prev_point = *point;
-        }
-
-        return Contour{
-            area: area/2.0,
-            aabb,
-            points,
-        }
-    }
-    pub fn point_is_inside(&self,point:&Point2<f32>)->bool{
+    fn point_is_inside(&self,point:&Point2<f32>)->bool{
         // returns true if a point is on or inside the contour
         // TODO: points on a line on the left side of polygons are
         // counted as outside even thoug they should not be.
@@ -104,6 +56,66 @@ impl Contour {
             //println!("\x1b[033mintersections: {intersections}\x1b[0m");
 
             return intersections % 2 == 1
+    }
+}
+impl From<Vec<Point2<f32>>> for Contour {
+    fn from(points:Vec<Point2<f32>>) -> Self {
+        debug_assert!(3 <= points.len());
+        let first_point = points[0];
+        let last_point = points[points.len()-1];
+
+        let mut aabb = AABB{
+            x_max: first_point.x,
+            x_min: first_point.x,
+            y_max: first_point.y,
+            y_min: first_point.y,
+        };
+        let mut area = last_point.x*first_point.y-first_point.x*last_point.y;
+
+        let mut prev_point = first_point.clone();
+        for point in points.iter().skip(1) {
+            aabb.x_max = aabb.x_max.max(point.x);
+            aabb.x_min = aabb.x_min.min(point.x);
+            aabb.y_max = aabb.y_max.max(point.y);
+            aabb.y_min = aabb.y_min.min(point.y);
+
+            area += prev_point.x*point.y-point.x*prev_point.y;
+            prev_point = *point;
+        }
+
+        return Self{
+            area: area/2.0,
+            aabb,
+            points,
+        }
+    }
+}
+
+impl Contour {
+    pub fn simplify(&mut self, min_a:f32){
+        let len = self.points.len();
+        for i in (0..len).rev(){
+            let i_pluss = (i+1)%self.points.len();
+            let i_minus = if i == 0 {self.points.len().saturating_sub(1)}else{i.saturating_sub(1)};
+
+            let p = self.points[i];
+            let p_p = self.points[i_pluss];
+            let p_m = self.points[i_minus];
+
+            let v1 = p_p - p;
+            let v2 = p_m - p;
+
+            let area_x2 = cross2d(&v1, &v2);
+            if area_x2.abs() < min_a*2. {self.points.remove(i);}
+        }
+        if self.points.len() < 3 {self.points.clear(); self.area = 0.0;}
+    }
+    pub fn reverse_order(&mut self) {
+        self.points.reverse();
+        self.area = self.area * -1.0;
+    }
+    pub fn from_points(points:Vec<Point2<f32>>) -> Self {
+        Self::from(points)
     }
     pub fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
         // returns true if a point is on or inside the contour
