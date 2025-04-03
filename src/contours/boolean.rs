@@ -1,4 +1,4 @@
-use crate::contours::{Polygon,Contour,polygons_from_contours};
+use crate::geometry::{Polygon,Contour,polygons_from_contours};
 use std::iter;
 use std::fmt::Display;
 use log::warn;

@@ -1,5 +1,5 @@
 use crate::utils::Blender;
-use crate::contours::{Contour,Polygon,polygons_from_contours};
+use crate::geometry::{Contour,Polygon,polygons_from_contours};
 
 use std::iter::{IntoIterator, Iterator};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};

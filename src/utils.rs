@@ -8,7 +8,7 @@ use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
 use nalgebra::Point2;
 use stl_io::{IndexedTriangle, Triangle, Vector};
-use crate::contours::{self, Contour};
+use crate::geometry::{self, Contour, Polygon};
 
 #[derive(Debug)]
 pub struct Blender<'a> {
@@ -122,7 +122,7 @@ impl <'a> Blender<'a> {
         self.line_objects.push( (points, edges, face) );
     }
 
-    pub fn polygon(&mut self, polygon:&contours::Polygon,h:f32) {
+    pub fn polygon(&mut self, polygon:&Polygon,h:f32) {
         let mut points:Vec<[f32;3]> = polygon.outer_loop.points.iter().map(|p|[p.x,p.y,h]).collect::<Vec<[f32;3]>>();
         let mut edges:Vec<[usize;2]> = (0..(points.len()-1)).map(|i|[i,i+1]).collect();
         edges.push([0,points.len()-1]);

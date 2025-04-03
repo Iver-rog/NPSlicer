@@ -1,5 +1,5 @@
 #![allow(unused)]
-use crate::contours::{Polygon,Contour};
+use crate::geometry::{Polygon,Contour};
 use nalgebra::Point2;
 
 pub fn test_poly() -> Vec<Point2<f32>>{
