@@ -267,6 +267,68 @@ impl Edge {
 }
 
 
+pub fn extract_perimeters(triangles: &Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
+    // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
+    let mut edge_count: HashMap<Edge, bool> = HashMap::new(); 
+
+    for tri in triangles{
+        let [v1, v2, v3] = tri.vertices;
+        let edges = [
+            Edge::new(v1,v2),
+            Edge::new(v2,v3),
+            Edge::new(v3,v1)
+        ];
+        for edge in edges { 
+            edge_count.entry(edge)
+                .and_modify(|only_1_ref| *only_1_ref = false)
+                .or_insert(true);
+        }
+    }
+
+    let mut vertex_connections: HashMap<usize,(usize,Option<usize>)> = HashMap::new();
+    for edge in edge_count.into_iter()
+        .filter_map(|(edge,only_1_ref)| if only_1_ref {Some(edge)}else{None} )
+        {
+        vertex_connections.entry(edge.0)
+            .and_modify(|connections|{
+                assert!(connections.1.is_none(),"vertex is part of multiple edge loops");
+                connections.1 = Some(edge.1)
+            }).or_insert((edge.1,None));
+
+        vertex_connections.entry(edge.1)
+            .and_modify(|connections|{
+                assert!(connections.1.is_none(),"vertex is part of multiple edge loops");
+                connections.1 = Some(edge.0)
+            }).or_insert((edge.0,None));
+    }
+    let mut vertex_connections: HashMap<usize,(usize,usize)> = vertex_connections.into_iter()
+        .map(|(key,connections)|(key,(connections.0,connections.1.unwrap())) )
+        .collect();
+    println!("{}",vertex_connections.len());
+    let mut contours = Vec::new();
+    while vertex_connections.len() != 0 {
+        // find a vertex to start the loop
+        let next_key:Option<usize> = vertex_connections.keys().cloned().next();
+
+        if let Some(start_vertex) = vertex_connections.keys().cloned().next(){
+            let connections = vertex_connections.remove(&start_vertex).unwrap();
+            let mut next = if vertex_connections.contains_key(&connections.0) {connections.0}
+            else if vertex_connections.contains_key(&connections.1) {connections.1}
+            else {unreachable!()};
+
+            let mut contour = vec![start_vertex];
+            while let Some(connections) = vertex_connections.remove(&next){
+                contour.push(next);
+                next = if vertex_connections.contains_key(&connections.0) {connections.0}
+                else if vertex_connections.contains_key(&connections.1) {connections.1}
+                else {break};
+            }
+            contours.push(contour);
+        }
+    }
+    dbg!(&contours);
+    return contours 
+}
 fn extract_perimeter(triangles: Vec<IndexedTriangle>) -> Vec<usize> {
     // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
     let mut edge_count: HashMap<Edge, bool> = HashMap::new(); 
