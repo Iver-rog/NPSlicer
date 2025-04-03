@@ -24,7 +24,7 @@ mod split_event;
 mod edge_event;
 mod vertex_tree;
 
-use crate::geometry::{Polygon, Contour, polygons_from_contours};
+use crate::geo::{Polygon, Contour, polygons_from_contours};
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

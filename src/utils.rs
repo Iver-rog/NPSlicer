@@ -8,7 +8,7 @@ use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
 use nalgebra::Point2;
 use stl_io::{IndexedTriangle, Triangle, Vector};
-use crate::geometry::{self, Contour, Polygon};
+use crate::geo::{self, Contour, Polygon};
 
 #[derive(Debug)]
 pub struct Blender<'a> {
