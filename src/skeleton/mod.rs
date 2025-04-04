@@ -79,8 +79,9 @@ impl StraightSkeleton {
                 let mut prev_vert = last_vert;
                 let mut i = 0;
                 while face[face.len()-1] != last_vert {
+                    // NOTE: temporary fix to prevent infinite loops on erroneous skeleton layers
                     i +=1;
-                    // if i == 100 {break}
+                    if i == 100 {break}
                     
                     let vertex = *face.last().unwrap();
                     //let v_connections:&Vec<usize> = vertex_connections.get(&vertex).unwrap();
