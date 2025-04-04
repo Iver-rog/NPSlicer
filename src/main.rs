@@ -23,16 +23,15 @@ fn main(){
 
     let mut blender = Blender::new();
     gcode::main(&mut blender);
-    //pipe_line(&mut blender);
+    // pipe_line(&mut blender);
 
-    //straight_skeleton(&mut blender);
-    //offset_polygon(&mut blender);
-    //polygon_bolean(&mut blender);
-    //straight_skeleton_with_bounds(&mut blender);
+    // straight_skeleton(&mut blender);
+    // offset_polygon(&mut blender);
+    // straight_skeleton_with_bounds(&mut blender);
 
-    //offset_layers(&mut blender);
-    //skeleton_layers(&mut blender);
-    //boolean_layers2(&mut blender);
+    // offset_layers(&mut blender);
+    // skeleton_layers(&mut blender);
+    // boolean_layers2(&mut blender);
 
     blender.show();
 }
@@ -75,7 +74,7 @@ fn straight_skeleton_with_bounds(blender:&mut Blender) {
     polygon.invert();
     blender.polygon(&polygon, 0.0);
     blender.contour(&bounds, 0.0);
-    let secound_polygon = polygon.outer_loop.points.iter().map(|p|p+Vector2::new(1.0,50.0)).collect();
+    let secound_polygon = polygon.outer_loop().points.iter().map(|p|p+Vector2::new(1.0,50.0)).collect();
 
     match skeleton::SkeletonBuilder::from_polygon(polygon){
         Err(error) => error!("\x1b[031m{error}\x1b[0m"),
@@ -310,12 +309,10 @@ fn offset_layers(blender:&mut Blender){
             print!("layer {i} of {} ",nr_layers);
             println!("contour {}",blender.line_objects.len());
 
-            blender.edge_loop_points(
-                &polygon.outer_loop.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>(),
-                );
-            for hole in polygon.holes.iter(){
+
+            for contour in polygon.contours(){
                 blender.edge_loop_points(
-                    &hole.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>()
+                    &contour.points.iter().map(|x| [x[0],x[1],layer_height]).collect::<Vec<[f32;3]>>()
                     );
                 }
 

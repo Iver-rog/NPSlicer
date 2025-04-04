@@ -171,9 +171,8 @@ pub fn test_poly5()-> Vec<Point2<f32>>{
         ]
 }
 pub fn test_poly6()-> Polygon {
-Polygon {
-    holes: vec![],
-    outer_loop: Contour::from(
+Polygon(vec![
+    Contour::from(
         vec![
            Point2::new(-22.17883,11.363643),
            Point2::new(-23.898323,9.304462),
@@ -799,7 +798,7 @@ Polygon {
            Point2::new(-22.01974,11.608144),
            ],
         )
-    }
+    ])
 }
 pub fn test_poly7_5()-> Polygon{
     let outer_loop = vec![
@@ -808,10 +807,7 @@ pub fn test_poly7_5()-> Polygon{
         Point2::new( 3.0, 3.0),
         Point2::new( 0.0, 3.0),
     ];
-    Polygon{
-        outer_loop: Contour::from( outer_loop ),
-        holes: Vec::new(),//vec![Contour::new(hole)],
-        }
+    Polygon(vec![ Contour::from( outer_loop ) ])
 }
 pub fn test_poly7()-> Polygon{
     let outer_loop = vec![
@@ -827,10 +823,7 @@ pub fn test_poly7()-> Polygon{
         Point2::new( -1.1,  1.1),
         Point2::new( -0.1,  1.2),
     ];
-    Polygon{
-        outer_loop: Contour::from( outer_loop ),
-        holes: Vec::new(),//vec![Contour::new(hole)],
-        }
+    Polygon(vec![Contour::from( outer_loop )])
 }
 pub fn test_poly8()-> Polygon{
 let outer_loop = Contour::from(vec![
@@ -978,10 +971,8 @@ let outer_loop = Contour::from(vec![
         Point2::new(23.072807,-18.847067),
       ]),
     ];
-    Polygon{
-        outer_loop,
-        holes,
-        }
+
+    return Polygon::new( outer_loop, holes )
 }
 
 pub fn test_poly9()-> Polygon{
@@ -1411,9 +1402,6 @@ let outer_loop = Contour::from(vec![
       Point2::new(36.9731,-12.652816),
     ]);
     let holes = vec![];
-    Polygon{
-        outer_loop,
-        holes,
-        }
+    Polygon::new( outer_loop, holes )
 }
 

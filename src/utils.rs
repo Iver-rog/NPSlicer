@@ -123,10 +123,9 @@ impl <'a> Blender<'a> {
     }
 
     pub fn polygon(&mut self, polygon:&Polygon,h:f32) {
-        let mut points:Vec<[f32;3]> = polygon.outer_loop.points.iter().map(|p|[p.x,p.y,h]).collect::<Vec<[f32;3]>>();
-        let mut edges:Vec<[usize;2]> = (0..(points.len()-1)).map(|i|[i,i+1]).collect();
-        edges.push([0,points.len()-1]);
-        for hole in polygon.holes.iter(){
+        let mut points:Vec<[f32;3]> = Vec::new();
+        let mut edges:Vec<[usize;2]> = Vec::new();
+        for hole in polygon.contours(){
             let offset = points.len();
             points.extend(hole.points.iter().map(|p|[p.x,p.y,h]));
             edges.extend((offset..(points.len()-1)).map(|i|[i,i+1]));

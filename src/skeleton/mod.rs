@@ -156,8 +156,7 @@ pub struct PolygonIterator {
 } 
 fn polygon_iterator_from_polygon(polygon:&Polygon, offset:usize) -> PolygonIterator {
     let len = offset;
-    let mut polygon_ndxs = iter::once(&polygon.outer_loop)
-        .chain(polygon.holes.iter())
+    let mut polygon_ndxs = polygon.iter()
         .map(|c|c.points.len())
         .scan(len,|state,ndx|{
             let start = state.clone();
@@ -190,9 +189,8 @@ impl SkeletonBuilder {
         self.input_polygon_refs.push(
             polygon_iterator_from_polygon(&polygon, self.vertices.len())
             );
-        self.add_loop(polygon.outer_loop.points)?;
-        for hole in polygon.holes.into_iter(){
-            self.add_loop(hole.points)?;
+        for contour in polygon.0.into_iter(){
+            self.add_loop(contour.points)?
         }
         return Ok(())
     }

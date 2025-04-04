@@ -149,14 +149,14 @@ fn vertex_tree_end_points_test(){
     let time = 10.0;
     let mut polygon1 = crate::data::test_poly8();
     polygon1.invert();
-    let polygon2 = Polygon{
-        outer_loop:Contour::from_points(
-            polygon1.outer_loop.points.iter()
+    let polygon2 = Polygon::new(
+        Contour::from_points(
+            polygon1.outer_loop().points.iter()
             .map(|p|p+Vector2::new(-30.0,0.0))
             .collect()
             ),
-        holes:vec![]
-    };
+        vec![]
+    );
 
     let mut blender = crate::Blender::new();
     blender.polygon(&polygon1,0.0);
@@ -173,7 +173,7 @@ fn vertex_tree_end_points_test(){
     let vertex_tree = skeleton.vertex_tree();
     let endpoints = vertex_tree.end_points( 6 );
     dbg!(endpoints);
-    blender.show();
+    // blender.show();
     assert!(false);
 }
 #[test]

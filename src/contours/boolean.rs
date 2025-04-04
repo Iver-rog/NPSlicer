@@ -75,9 +75,8 @@ impl Polygon{
     }
 
     pub fn offset(self,distance:f32)->Vec<Polygon>{
-        if self.outer_loop.points.len() == 0 {panic!("BBBBB Bad input shape no outerloop")}
-        let shape:Vec<Vec<IOverlayCompatibleType>>= iter::once(self.outer_loop)
-            .chain( self.holes.into_iter() )
+        if self.outer_loop().points.len() == 0 {panic!("BBBBB Bad input shape no outerloop")}
+        let shape:Vec<Vec<IOverlayCompatibleType>> =  self.0.into_iter()
             .map(|c|c.points.into_iter().rev().map(|p|p.into()).collect() )
             .collect();
         //dbg!(&shape);
@@ -93,8 +92,7 @@ impl Polygon{
         polygons_from_contours(p)
     }
     fn into_ioverlay_type(self)->Vec<Vec<IOverlayCompatibleType>>{
-        iter::once(self.outer_loop)
-            .chain( self.holes.into_iter() )
+        self.0.into_iter()
             .map(|c|c.points.into_iter().rev().map(|p|p.into()).collect() )
             .collect()
     }

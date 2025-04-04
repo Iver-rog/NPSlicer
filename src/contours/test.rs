@@ -101,16 +101,16 @@ fn polygon_from_contours_2(){
         assert_eq!(polygons.len(),2);
 
         let polygon1 = polygons[0].clone();
-        assert_eq!(polygon1.holes.len(),2);
+        assert_eq!(polygon1.holes().len(),2);
 
-        assert_eq!(polygon1.outer_loop,contours[0]);
-        assert!(polygon1.outer_loop.area > 0.0);
-        assert!(polygon1.holes[0].area < 0.0);
-        assert!(polygon1.holes[1].area < 0.0);
+        assert_eq!(polygon1[0],contours[0]);
+        assert!(polygon1.outer_loop().area > 0.0);
+        assert!(polygon1.holes()[0].area < 0.0);
+        assert!(polygon1.holes()[1].area < 0.0);
 
         let polygon2 = polygons[1].clone();
-        assert_eq!(polygon2.outer_loop,contours[3]);
-        assert!(polygon2.outer_loop.area > 0.0);
+        assert_eq!(polygon2[0],contours[3]);
+        assert!(polygon2.outer_loop().area > 0.0);
     }
 
     let mut contours_random_orientation = contours.clone();
@@ -124,16 +124,16 @@ fn polygon_from_contours_2(){
         assert_eq!(polygons.len(),2);
 
         let polygon1 = polygons[0].clone();
-        assert_eq!(polygon1.holes.len(),2);
+        assert_eq!(polygon1.holes().len(),2);
 
-        assert_eq!(polygon1.outer_loop,contours[0]);
-        assert!(polygon1.outer_loop.area > 0.0);
-        assert!(polygon1.holes[0].area < 0.0);
-        assert!(polygon1.holes[1].area < 0.0);
+        assert_eq!(polygon1[0],contours[0]);
+        assert!(polygon1.outer_loop().area > 0.0);
+        assert!(polygon1.holes()[0].area < 0.0);
+        assert!(polygon1.holes()[1].area < 0.0);
 
         let polygon2 = polygons[1].clone();
-        assert_eq!(polygon2.outer_loop,contours[3]);
-        assert!(polygon2.outer_loop.area > 0.0);
+        assert_eq!(polygon2[0],contours[3]);
+        assert!(polygon2.outer_loop().area > 0.0);
     }
 }
 
@@ -255,14 +255,14 @@ pub fn polygons_from_contours_test(){
     assert_eq!(polygons_from_contours(contours.clone()).len(),2);
     assert_eq!(
     polygons_from_contours(contours),vec![
-    Polygon{
-        outer_loop:contour1,
-        holes:vec![contour0],
-        },
-    Polygon{
-        outer_loop:contour2,
-        holes:vec![],
-        },
+    Polygon::new(
+        contour1,
+        vec![contour0],
+        ),
+    Polygon::new(
+        contour2,
+        vec![],
+        ),
     ]
     );
 }
