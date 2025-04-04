@@ -131,30 +131,30 @@ fn extract_layer(
                     };
 
                 // avoid adding points that are in close proximity to simplify the contour
-                //{ // remove paralllel_points
-                //    let mut points = contour.iter().rev();
-                //    match (points.next(),points.next()) {
-                //        (Some(p2),Some(p1))=> {
-                //            let p3 = new_point;
-                //            let v1 = p1-p2;
-                //            let v2 = p3-p2;
-                //            if (v1.normalize() + v2.normalize()).magnitude() < 0.05{contour.pop();}
-                //        },
-                //        _=>(),
-                //    }
-                //}
-                { // remove points that dont contribute meningfully to the area of the contour
-                    let mut points = contour.iter().rev();
-                    match (points.next(),points.next()) {
-                        (Some(p2),Some(p1))=> {
-                            let p3 = new_point;
-                            let v1 = p1-p2;
-                            let v2 = p3-p2;
-                            if cross2d(&v1, &v2).abs() < 0.15{contour.pop();}
-                        },
-                        _=>(),
-                    }
+                { // remove paralllel_points
+                   let mut points = contour.iter().rev();
+                   match (points.next(),points.next()) {
+                       (Some(p2),Some(p1))=> {
+                           let p3 = new_point;
+                           let v1 = p1-p2;
+                           let v2 = p3-p2;
+                           if (v1.normalize() + v2.normalize()).magnitude() < 0.05{contour.pop();}
+                       },
+                       _=>(),
+                   }
                 }
+                // { // remove points that dont contribute meningfully to the area of the contour
+                //     let mut points = contour.iter().rev();
+                //     match (points.next(),points.next()) {
+                //         (Some(p2),Some(p1))=> {
+                //             let p3 = new_point;
+                //             let v1 = p1-p2;
+                //             let v2 = p3-p2;
+                //             if cross2d(&v1, &v2).abs() < 0.15{contour.pop();}
+                //         },
+                //         _=>(),
+                //     }
+                // }
                 contour.push(new_point);
                 handled_edges.insert(edge.clone());
                 prev_edge = edge.clone();

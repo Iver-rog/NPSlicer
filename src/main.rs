@@ -30,7 +30,7 @@ fn main(){
 
     //offset_layers(&mut blender);
     //skeleton_layers(&mut blender);
-    boolean_layers2(&mut blender);
+    //boolean_layers2(&mut blender);
 
     blender.show();
 }
@@ -146,9 +146,8 @@ fn offset_polygon(blender:&mut Blender){
 
     offset_poly.iter().for_each(|p|blender.polygon(p, 0.0));
 }
-#[allow(dead_code)]
 fn boolean_layers2(blender:&mut Blender){
-    //let file_path = "../mesh/bunny2.stl";
+    // let file_path = "../mesh/bunny2.stl";
     //let file_path = "../mesh/stanford-armadillo.stl";
     let file_path = "../mesh/curved overhang.stl";
 
@@ -158,7 +157,7 @@ fn boolean_layers2(blender:&mut Blender){
     let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
     blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
 
-    let min_a = 0.1;   // min area for contour simplification
+    let min_a = 0.05;   // min area for contour simplification
     let layer_h = 0.2; // layer height in mm
     let theta = PI/6.; // overhang angle
     let d_x = layer_h/theta.tan();
@@ -167,9 +166,9 @@ fn boolean_layers2(blender:&mut Blender){
 
     layers.iter_mut().for_each(|layer| layer.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
     println!("model has {} layers",layers.iter().filter(|n|n.len()!=0).count());
-    //layers.iter().enumerate()
-    //    .flat_map(|(i,layer)| layer.iter().map(move|l|(i,l) ) )
-    //    .for_each(|(i,l)|{ blender.polygon(&l,i as f32 * 1.0) });
+    layers.iter().enumerate()
+        .flat_map(|(i,layer)| layer.iter().map(move|l|(i,l) ) )
+        .for_each(|(i,l)|{ blender.polygon(&l,i as f32 * layer_h) });
 
     let mut layers = layers.into_iter();
     let mut prev_layer = layers.next().unwrap();
@@ -188,7 +187,7 @@ fn boolean_layers2(blender:&mut Blender){
         let new_support1 = boolean(additional_sup.clone(), prev_layer.clone(), OverlayRule::Union);
         let new_support2 = boolean(new_support1.clone(), offset_sup.clone(), OverlayRule::Intersect);
         let mut new_support3 = boolean(new_support2.clone(), layer.clone(), OverlayRule::Intersect);
-        new_support3.iter_mut().for_each(|p|p.simplify(min_a/2.0));
+        //new_support3.iter_mut().for_each(|p|p.simplify(min_a/2.0));
         let new_support4:Vec<Polygon> = new_support3.clone().into_iter().filter(|p|p.area().abs() > min_a).collect();
         let new_support5 = i_simplify(new_support4.clone(), min_a);
 
@@ -198,13 +197,6 @@ fn boolean_layers2(blender:&mut Blender){
 
     println!("created {} layers",new_overhangs.len());
 
-    let bounding_box = Contour::new(
-            vec![
-            Point2::new( 32.4, 36.1),
-            Point2::new(-39.1, 36.2),
-            Point2::new(-39.0,-31.3),
-            Point2::new( 31.6,-31.4),
-            ]);
     let skeletons = new_overhangs.iter()
         .enumerate()
         .map(|(i,layer)|{

@@ -77,7 +77,11 @@ impl StraightSkeleton {
             for (start_vert,last_vert) in outer_loop.chain(holes) {
                 let mut face:Vec<usize> = vec![start_vert];
                 let mut prev_vert = last_vert;
+                let mut i = 0;
                 while face[face.len()-1] != last_vert {
+                    i +=1;
+                    // if i == 100 {break}
+                    
                     let vertex = *face.last().unwrap();
                     //let v_connections:&Vec<usize> = vertex_connections.get(&vertex).unwrap();
                     let v_connections:&Vec<usize> = match vertex_connections.get(&vertex){
