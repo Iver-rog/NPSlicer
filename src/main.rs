@@ -3,6 +3,7 @@ mod contours;
 mod stl_op;
 mod skeleton;
 mod utils;
+mod gcode;
 mod geo;
 use geo::{Enclosed,Contour,Polygon};
 use contours::boolean::{boolean, clip_poly, i_simplify, offset, offset_line};
@@ -21,6 +22,7 @@ fn main(){
     init_logger();
 
     let mut blender = Blender::new();
+    gcode::main(&mut blender);
     //pipe_line(&mut blender);
 
     //straight_skeleton(&mut blender);

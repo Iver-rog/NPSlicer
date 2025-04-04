@@ -2,6 +2,7 @@ use nalgebra::{wrap, Point2};
 
 use super::Enclosed;
 
+/// Axis Aligned Bounding Box
 #[derive(Debug,Clone,PartialEq)]
 pub (super) struct AABB{
     pub (super) x_max:f32,

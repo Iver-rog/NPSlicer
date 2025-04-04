@@ -15,6 +15,9 @@ pub use polygon::*;
 mod polygon3d;
 pub use polygon3d::*;
 
+mod layer;
+pub use layer::*;
+
 /// The Enclosed trait defines that the struct encloses an area.
 /// structs that implement Enclosed therefore have an interior and an exterior.
 /// The enclosed trait is most sutable for 2d shapes, however 3d shapes can also 
