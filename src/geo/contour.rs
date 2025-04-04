@@ -1,13 +1,24 @@
 use nalgebra::Point2;
+use nalgebra::Point3;
 use nalgebra_glm::cross2d;
 use super::Enclosed;
 use super::AABB;
+use super::Contour3d;
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct Contour{
     pub area:f32,
     aabb:AABB,
     pub points: Vec<Point2<f32>>
+}
+impl From<Contour3d> for Contour{
+    fn from(contour3d:Contour3d) -> Self {
+        Self::from(
+            contour3d.0.into_iter()
+            .map(|point3| point3.xy()) 
+            .collect::<Vec<Point2<f32>>>()
+        )
+    }
 }
 impl Enclosed for Contour{
     fn area(&self) -> f32 {

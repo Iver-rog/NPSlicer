@@ -1,6 +1,6 @@
 use nalgebra::Point2;
 use stl_io::Vector;
-use super::{contour, Contour};
+use super::{contour, Contour, Polygon3d};
 pub use super::Enclosed;
 
 use std::ops::{Deref,DerefMut};
@@ -30,6 +30,14 @@ impl Polygon {
     }
     pub fn holes_mut(&mut self) -> &mut[Contour]{
         self.0.get_mut(1..).unwrap_or(&mut[])
+    }
+}
+impl From<Polygon3d> for Polygon {
+    fn from(polygon3d:Polygon3d) -> Self {
+        Self(polygon3d.into_contours()
+            .map(|contour| contour.into())
+            .collect()
+        )
     }
 }
 #[test]
