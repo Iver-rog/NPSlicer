@@ -8,13 +8,6 @@ use std::ops::{Deref,DerefMut};
 #[derive(Debug,Clone,PartialEq)]
 pub struct Polygon(pub Vec<Contour>);
 
-impl Deref for Polygon {
-    type Target = Vec<Contour>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 impl Polygon {
     pub fn contours<'a>(&'a self) -> core::slice::Iter<'a,Contour> {
         self.0.iter()
@@ -81,7 +74,7 @@ fn polygon_holes_test(){
 // }
 impl Enclosed for Polygon {
     fn area(&self) -> f32 {
-        self.iter().map(|contour| contour.area).sum()
+        self.0.iter().map(|contour| contour.area).sum()
         // let area = self.outer_loop().area();
         // let hole_area: f32 = self.holes.iter().map(|contour| contour.area() ).sum();
         // return area - hole_area

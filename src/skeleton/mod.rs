@@ -156,7 +156,7 @@ pub struct PolygonIterator {
 } 
 fn polygon_iterator_from_polygon(polygon:&Polygon, offset:usize) -> PolygonIterator {
     let len = offset;
-    let mut polygon_ndxs = polygon.iter()
+    let mut polygon_ndxs = polygon.0.iter()
         .map(|c|c.points.len())
         .scan(len,|state,ndx|{
             let start = state.clone();
