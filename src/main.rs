@@ -46,13 +46,13 @@ fn polygon_boolean(blender:&mut Blender) {
 }
 fn straight_skeleton_with_bounds(blender:&mut Blender) {
     let mut polygon = data::test_poly8();
-    let bounds = Contour::new(vec![
+    let bounds = Contour::from(vec![
         Point2::new( 4.5, 11.0),
         Point2::new( 4.5,-38.0),
         Point2::new(54.0,-38.0),
         Point2::new(54.0, 11.0),
     ]);
-    let bounds = Contour::new(vec![
+    let bounds = Contour::from(vec![
         Point2::new(54.0, 61.0),
         Point2::new( 4.5, 61.0),
         Point2::new( 4.5,-38.0),
@@ -63,7 +63,7 @@ fn straight_skeleton_with_bounds(blender:&mut Blender) {
         Point2::new(30.0,9.8),
         Point2::new(54.0,9.8),
     ]);
-    let p = Contour::new(vec![
+    let p = Contour::from(vec![
         Point2::new(30.0, -4.0),
         Point2::new(20.0,-13.5),
         Point2::new(30.0,-23.0),
@@ -409,7 +409,7 @@ fn pipe_line(blender:&mut Blender){
     for (i,contour) in edge_loops_points.into_iter()
         .map(|loop_of_points| 
             Polygon::new(
-                Contour::new( loop_of_points.into_iter().map(|p|p.xy()).collect() ),
+                Contour::from_points( loop_of_points.into_iter().map(|p|p.xy()).collect() ),
                     vec![]
                     )
             )
