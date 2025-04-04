@@ -255,7 +255,7 @@ fn edges_to_triangles_map<'a>( stl_data:&'a stl_io::IndexedMesh ) -> HashMap<Edg
     return edge_to_tri
 }
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-struct Edge(usize,usize);
+pub struct Edge(usize,usize);
 impl Edge {
     fn new(v1:usize, v2:usize) -> Self {
         if v1 < v2 {
@@ -267,7 +267,7 @@ impl Edge {
 }
 
 
-pub fn extract_perimeters(triangles: &Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
+pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Vec<usize>>,Vec<Edge>) {
     // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
     let mut edge_count: HashMap<Edge, bool> = HashMap::new(); 
 
@@ -285,10 +285,12 @@ pub fn extract_perimeters(triangles: &Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
         }
     }
 
+    let mut other_edges:Vec<Edge> = Vec::new();
     let mut vertex_connections: HashMap<usize,(usize,Option<usize>)> = HashMap::new();
-    for edge in edge_count.into_iter()
-        .filter_map(|(edge,only_1_ref)| if only_1_ref {Some(edge)}else{None} )
-        {
+
+    for (edge,only_1_ref) in edge_count.into_iter() {
+        if !only_1_ref {other_edges.push(edge); continue }
+
         vertex_connections.entry(edge.0)
             .and_modify(|connections|{
                 assert!(connections.1.is_none(),"vertex is part of multiple edge loops");
@@ -327,7 +329,7 @@ pub fn extract_perimeters(triangles: &Vec<IndexedTriangle>) -> Vec<Vec<usize>> {
         }
     }
     dbg!(&contours);
-    return contours 
+    return (contours,other_edges)
 }
 fn extract_perimeter(triangles: Vec<IndexedTriangle>) -> Vec<usize> {
     // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
