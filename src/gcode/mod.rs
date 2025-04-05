@@ -151,7 +151,7 @@ pub fn main(blender:&mut crate::Blender) {
     let polygons = polygons_from_contours(contours);
 
     let perimeter1:Vec<Polygon> = polygons.clone().into_iter()
-        .flat_map(|polygon| polygon.offset(settings.layer_thickness*0.5).into_iter())
+        .flat_map(|polygon:Polygon| polygon.offset(settings.layer_thickness*0.5).into_iter())
         .collect();
     let perimeter2:Vec<Polygon> = polygons.into_iter()
         .flat_map(|polygon| polygon.offset(settings.layer_thickness*1.5).into_iter())

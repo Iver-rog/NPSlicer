@@ -1,6 +1,7 @@
 use nalgebra::Point2;
 use nalgebra::Point3;
 use nalgebra_glm::cross2d;
+use super::ContorTrait;
 use super::Enclosed;
 use super::AABB;
 use super::Contour3d;
@@ -101,34 +102,13 @@ impl From<Vec<Point2<f32>>> for Contour {
         }
     }
 }
+impl ContorTrait for Contour {
+    type PointType = Point2<f32>;
 
-impl Contour {
-    pub fn simplify(&mut self, min_a:f32){
-        let len = self.points.len();
-        for i in (0..len).rev(){
-            let i_pluss = (i+1)%self.points.len();
-            let i_minus = if i == 0 {self.points.len().saturating_sub(1)}else{i.saturating_sub(1)};
-
-            let p = self.points[i];
-            let p_p = self.points[i_pluss];
-            let p_m = self.points[i_minus];
-
-            let v1 = p_p - p;
-            let v2 = p_m - p;
-
-            let area_x2 = cross2d(&v1, &v2);
-            if area_x2.abs() < min_a*2. {self.points.remove(i);}
-        }
-        if self.points.len() < 3 {self.points.clear(); self.area = 0.0;}
+    fn points<'a>(&'a self) -> core::slice::Iter<'a,Point2<f32>>{
+        self.points.iter()
     }
-    pub fn reverse_order(&mut self) {
-        self.points.reverse();
-        self.area = self.area * -1.0;
-    }
-    pub fn from_points(points:Vec<Point2<f32>>) -> Self {
-        Self::from(points)
-    }
-    pub fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
+    fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
         // returns true if a point is on or inside the contour
         if !self.aabb.point_is_inside(&point) { return None }
 
@@ -159,5 +139,33 @@ impl Contour {
                 )
         }
         else { return None }
+    }
+}
+
+impl Contour {
+    pub fn simplify(&mut self, min_a:f32){
+        let len = self.points.len();
+        for i in (0..len).rev(){
+            let i_pluss = (i+1)%self.points.len();
+            let i_minus = if i == 0 {self.points.len().saturating_sub(1)}else{i.saturating_sub(1)};
+
+            let p = self.points[i];
+            let p_p = self.points[i_pluss];
+            let p_m = self.points[i_minus];
+
+            let v1 = p_p - p;
+            let v2 = p_m - p;
+
+            let area_x2 = cross2d(&v1, &v2);
+            if area_x2.abs() < min_a*2. {self.points.remove(i);}
+        }
+        if self.points.len() < 3 {self.points.clear(); self.area = 0.0;}
+    }
+    pub fn reverse_order(&mut self) {
+        self.points.reverse();
+        self.area = self.area * -1.0;
+    }
+    pub fn from_points(points:Vec<Point2<f32>>) -> Self {
+        Self::from(points)
     }
 }
