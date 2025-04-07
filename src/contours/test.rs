@@ -43,7 +43,7 @@ pub fn i_offset_test(){
             Point2::new(2.0, 1.0),
         ]),
     ];
-    let shape = polygons_from_contours(contours).into_iter().next().unwrap();
+    let shape:Polygon = polygons_from_contours(contours).into_iter().next().unwrap();
     let p = shape.offset(0.2);
     assert!(p.len()!=0)
 }
@@ -97,19 +97,19 @@ fn polygon_from_contours_2(){
             ]),
         ];
     {
-        let mut polygons = polygons_from_contours(contours.clone());
+        let mut polygons:Vec<Polygon> = polygons_from_contours(contours.clone());
         assert_eq!(polygons.len(),2);
 
         let polygon1 = polygons[0].clone();
         assert_eq!(polygon1.holes().len(),2);
 
-        assert_eq!(polygon1[0],contours[0]);
+        assert_eq!(polygon1.0[0],contours[0]);
         assert!(polygon1.outer_loop().area > 0.0);
         assert!(polygon1.holes()[0].area < 0.0);
         assert!(polygon1.holes()[1].area < 0.0);
 
         let polygon2 = polygons[1].clone();
-        assert_eq!(polygon2[0],contours[3]);
+        assert_eq!(polygon2.0[0],contours[3]);
         assert!(polygon2.outer_loop().area > 0.0);
     }
 
@@ -120,19 +120,19 @@ fn polygon_from_contours_2(){
     assert!(contours_random_orientation != contours);
 
     {
-        let mut polygons = polygons_from_contours(contours_random_orientation.clone());
+        let mut polygons:Vec<Polygon> = polygons_from_contours(contours_random_orientation.clone());
         assert_eq!(polygons.len(),2);
 
         let polygon1 = polygons[0].clone();
         assert_eq!(polygon1.holes().len(),2);
 
-        assert_eq!(polygon1[0],contours[0]);
+        assert_eq!(polygon1.0[0],contours[0]);
         assert!(polygon1.outer_loop().area > 0.0);
         assert!(polygon1.holes()[0].area < 0.0);
         assert!(polygon1.holes()[1].area < 0.0);
 
         let polygon2 = polygons[1].clone();
-        assert_eq!(polygon2[0],contours[3]);
+        assert_eq!(polygon2.0[0],contours[3]);
         assert!(polygon2.outer_loop().area > 0.0);
     }
 }
@@ -250,11 +250,11 @@ pub fn polygons_from_contours_test(){
         contour1.clone(),
         contour2.clone()
     ];
-    dbg!(polygons_from_contours(contours.clone()));
     contour0.reverse_order();
-    assert_eq!(polygons_from_contours(contours.clone()).len(),2);
+    let polygons:Vec<Polygon> = polygons_from_contours(contours.clone());
+    assert_eq!(polygons.len(),2);
     assert_eq!(
-    polygons_from_contours(contours),vec![
+    polygons,vec![
     Polygon::new(
         contour1,
         vec![contour0],
