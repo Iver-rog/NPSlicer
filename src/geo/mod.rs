@@ -45,7 +45,7 @@ pub trait ContorTrait {
 
 /// Used To Create Polygon/Polygon3d from vectors without checking hierarchy of input Contours
 pub trait FromUnChecked<T> {
-    fn from_uncheced(raw_parts:T) -> Self;
+    fn from_unchecked(raw_parts:T) -> Self;
 }
 
 pub fn polygons_from_contours<C,T>(mut contours:Vec<C>) -> Vec<T> 
@@ -96,7 +96,7 @@ where
         })
         .map(|(outer_loop, mut holes)|{
             holes.insert(0,outer_loop);
-            T::from_uncheced(holes) 
+            T::from_unchecked(holes)
         })
         .collect()
 }

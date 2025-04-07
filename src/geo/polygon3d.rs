@@ -4,7 +4,7 @@ use super::{Contour3d,FromUnChecked};
 pub struct Polygon3d(pub Vec<Contour3d>);
 
 impl FromUnChecked<Vec<Contour3d>> for Polygon3d {
-    fn from_uncheced(contours:Vec<Contour3d>) -> Self {
+    fn from_unchecked(contours:Vec<Contour3d>) -> Self {
         Self(contours)
     }
 }

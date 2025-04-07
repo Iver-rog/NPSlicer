@@ -9,7 +9,7 @@ use std::ops::{Deref,DerefMut};
 pub struct Polygon(pub Vec<Contour>);
 
 impl FromUnChecked<Vec<Contour>> for Polygon {
-    fn from_uncheced(contours:Vec<Contour>) -> Self {
+    fn from_unchecked(contours:Vec<Contour>) -> Self {
         Self(contours)
     }
 }
