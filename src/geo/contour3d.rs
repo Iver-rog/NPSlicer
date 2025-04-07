@@ -9,8 +9,11 @@ impl From<Vec<Point3<f32>>> for Contour3d{
     }
 }
 
-/// returns true if the point is on or inside the projection of the contour onto the xy-plane
 impl Contour3d{
+    pub fn from_unchecked(raw_parts:Vec<Point3<f32>>) -> Self{
+        Self(raw_parts)
+    }
+    /// returns true if the point is on or inside the projection of the contour onto the xy-plane
     pub fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
 
         let points_offset_by_one = self.0.iter()
