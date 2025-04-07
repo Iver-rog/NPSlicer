@@ -1,3 +1,5 @@
+use core::array::IntoIter;
+
 use nalgebra::Point2;
 use nalgebra::Point3;
 use nalgebra_glm::cross2d;
@@ -141,8 +143,26 @@ impl ContorTrait for Contour {
         else { return None }
     }
 }
+impl IntoIterator for Contour {
+    type Item = Point2<f32>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter{
+        self.points.into_iter()
+    }
+}
 
 impl Contour {
+    // returns a iterator over pairs of edges (pairs of points)
+    pub fn into_edges(self) -> std::iter::Zip<
+        std::vec::IntoIter<Point2<f32>>,
+        std::iter::Skip<std::iter::Cycle<std::vec::IntoIter<Point2<f32>>>>
+        >
+    {
+        let points = self.points.into_iter();
+        let points_offset_by_one = points.clone().cycle().skip(1);
+        points.zip(points_offset_by_one)
+    }
     pub fn simplify(&mut self, min_a:f32){
         let len = self.points.len();
         for i in (0..len).rev(){
