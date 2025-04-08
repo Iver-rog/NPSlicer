@@ -1,7 +1,5 @@
 use crate::geo::{Polygon,Contour,polygons_from_contours};
-use std::iter;
 use std::fmt::Display;
-use log::warn;
 use nalgebra::Point2;
 use i_overlay::i_float::float::compatible::FloatPointCompatible;
 use i_overlay::string::clip::ClipRule;

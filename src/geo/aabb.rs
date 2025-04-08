@@ -1,4 +1,4 @@
-use nalgebra::{wrap, Point2};
+use nalgebra::Point2;
 
 use super::Enclosed;
 

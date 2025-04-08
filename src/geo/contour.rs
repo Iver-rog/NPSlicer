@@ -1,7 +1,4 @@
-use core::array::IntoIter;
-
 use nalgebra::Point2;
-use nalgebra::Point3;
 use nalgebra_glm::cross2d;
 use super::ContorTrait;
 use super::Enclosed;
@@ -43,9 +40,9 @@ impl Enclosed for Contour{
             .zip(points_offset_by_one)
             .map(|(p1,p2)|{
                 // special case: check if the ray intersects both vertices of the edge
-                let ray_is_parallel_to_the_line = ((point.y == p1.y) && (point.y == p2.y));
+                let ray_is_parallel_to_the_line = (point.y == p1.y) && (point.y == p2.y);
                 // check if the ray will intersect the line
-                let ray_crosses_the_edge = ((p1.y <= point.y) != (p2.y <= point.y));
+                let ray_crosses_the_edge = (p1.y <= point.y) != (p2.y <= point.y);
                 // check if the intersection point is on the correct side of the point
                 let intersection_is_infront_of_ray = point.x <= ((point.y-p1.y)*(p2.x-p1.x)/(p2.y-p1.y) + p1.x);
                 //#[cfg(test)]

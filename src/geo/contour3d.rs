@@ -1,5 +1,4 @@
 use nalgebra::{Point2,Point3};
-use super::ContorTrait;
 
 #[derive(Debug,Clone)]
 pub struct Contour3d(pub Vec<Point3<f32>>);

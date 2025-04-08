@@ -1,4 +1,3 @@
-use nalgebra::Point3;
 use super::{Contour3d,FromUnChecked};
 
 pub struct Polygon3d(pub Vec<Contour3d>);
@@ -10,9 +9,6 @@ impl FromUnChecked<Vec<Contour3d>> for Polygon3d {
 }
 
 impl Polygon3d{
-    pub fn from_contours() -> Self {
-        todo!()
-    }
     pub fn invert(&mut self) {
         todo!()
     }

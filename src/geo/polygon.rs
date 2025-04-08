@@ -1,9 +1,6 @@
 use nalgebra::Point2;
-use stl_io::Vector;
-use super::{contour, ContorTrait, Contour, FromUnChecked, Polygon3d};
+use super::{ContorTrait, Contour, FromUnChecked, Polygon3d};
 pub use super::Enclosed;
-
-use std::ops::{Deref,DerefMut};
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct Polygon(pub Vec<Contour>);

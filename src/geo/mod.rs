@@ -1,4 +1,4 @@
-use nalgebra::{Point2, Vector};
+use nalgebra::Point2;
 
 mod aabb;
 pub use aabb::*;

@@ -94,7 +94,7 @@ impl StraightSkeleton {
                     let edge_vec = next_vertex_coords.xy() - vertex_coords.xy();
                     let next = v_connections.iter()
                         .filter(|v_ndx|**v_ndx != prev_vert)
-                        .map(|(v_ndx)|{
+                        .map(|v_ndx|{
                             let v = self.vertices[*v_ndx].xy();
                             let angle = ccw_angle(&(v-vertex_coords.xy()),&edge_vec);
                             (*v_ndx,angle)

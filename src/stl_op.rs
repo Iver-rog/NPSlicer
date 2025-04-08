@@ -4,8 +4,7 @@ use crate::geo::{Contour,Polygon,polygons_from_contours};
 use std::iter::{IntoIterator, Iterator};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
-use nalgebra::{Point2, Point3, Vector3};
-use nalgebra_glm::cross2d;
+use nalgebra::{Point2, Point3};
 
 
 pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Polygon>> {
@@ -190,7 +189,6 @@ fn edge_zplane_intersection(edge_start:Point3<f32>,edge_end:Point3<f32>,z_plane:
     if edge_vec.z == 0.0 {return None} // edge is parrallel to the z plane inf intersections
     let scale = (z_plane - p1.z) / edge_vec.z;
     if !( (0.0 < scale) && (scale <= 1.0) ) {return None}
-    let result = p1 + edge_vec*scale;
     return Some(p1 + edge_vec*scale);
 }
 
@@ -279,7 +277,7 @@ impl From<Edge> for IndexedEdge{
 }
 
 pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Vec<usize>>,Vec<IndexedEdge>) {
-    // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
+    // NOTE: default hashmap is not optimized for integers, a different hashmap will likley preforme better
     let mut edge_count: HashMap<Edge,(usize,Option<usize>)> = HashMap::new(); 
 
     for (i,tri) in triangles.iter().enumerate(){
@@ -326,7 +324,6 @@ pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Ve
     let mut contours = Vec::new();
     while vertex_connections.len() != 0 {
         // find a vertex to start the loop
-        let next_key:Option<usize> = vertex_connections.keys().cloned().next();
 
         if let Some(start_vertex) = vertex_connections.keys().cloned().next(){
             let connections = vertex_connections.remove(&start_vertex).unwrap();
