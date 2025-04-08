@@ -8,7 +8,7 @@ use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
 use nalgebra::Point2;
 use stl_io::{IndexedTriangle, Triangle, Vector};
-use crate::geo::{self, Contour, Polygon};
+use crate::geo::{self, Contour, Polygon, Contour3d, Polygon3d};
 
 #[derive(Debug)]
 pub struct Blender<'a> {
@@ -122,6 +122,17 @@ impl <'a> Blender<'a> {
         self.line_objects.push( (points, edges, face) );
     }
 
+    pub fn polygon3d(&mut self, polygon:&Polygon3d) {
+        let mut points:Vec<[f32;3]> = Vec::new();
+        let mut edges:Vec<[usize;2]> = Vec::new();
+        for contour in polygon.contours(){
+            let offset = points.len();
+            points.extend(contour.points().map(|p|[p.x,p.y,p.z]));
+            edges.extend((offset..(points.len()-1)).map(|i|[i,i+1]));
+            edges.push([offset,points.len()-1]);
+        }
+        self.line_objects.push( (points, edges,vec![]) );
+    }
     pub fn polygon(&mut self, polygon:&Polygon,h:f32) {
         let mut points:Vec<[f32;3]> = Vec::new();
         let mut edges:Vec<[usize;2]> = Vec::new();
@@ -135,6 +146,9 @@ impl <'a> Blender<'a> {
     }
     pub fn contour(&mut self, contour:&Contour,h:f32){
         self.edge_loop_points(&contour.clone().points.into_iter().map(|p|[p.x,p.y,h]).collect());
+    }
+    pub fn contour3d(&mut self, contour:&Contour3d){
+        self.edge_loop_points(&contour.clone().0.into_iter().map(|p|[p.x,p.y,p.z]).collect());
     }
 
     pub fn edge_loop(&mut self, edge_loop:&Vec<usize>,stl:&stl_io::IndexedMesh){
