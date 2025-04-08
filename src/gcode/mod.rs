@@ -1,11 +1,16 @@
-use nalgebra::{Point3,Point2,Vector3,Vector2};
+use nalgebra::{Matrix3, Point2, Point3, Vector2, Vector3};
+use nalgebra_glm::{cross2d,cross};
+use stl_io::{IndexedMesh, IndexedTriangle};
 
 use std::io::{self,prelude,Write,BufWriter,BufReader};
 use std::fs::File;
 
-use std::env;
-use crate::geo::{polygons_from_contours, Contour, Contour3d, Polygon};
+use crate::geo::{polygons_from_contours, ContorTrait, Contour, Contour3d, Enclosed, FromUnChecked, Polygon, Polygon3d};
 use crate::stl_op;
+use crate::skeleton::SkeletonBuilder;
+
+mod projection;
+use projection::edge_edge_intersection3d;
 
 
 
@@ -132,32 +137,202 @@ pub fn main(blender:&mut crate::Blender) {
     let file = File::open(file_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
     let mesh = stl_io::read_stl(& mut reader).expect("Failed to parse STL file");
+    blender.save_mesh(&mesh.faces,&mesh.vertices,String::from("asøldkfj"));
 
     let (indexed_contours,indexed_edges) = stl_op::extract_perimeters_and_edges(&mesh.faces);
+
     for contour in &indexed_contours{
         blender.edge_loop(contour, &mesh);
     }
+    let vertices = mesh.vertices.into_iter().map(|v|Point3::new( v[0],v[1],v[2]) ).collect();
+
+    let mesh_collider = MeshCollider{
+        faces:mesh.faces,
+        edges:indexed_edges,
+        vertices,
+    };
+
     let contours:Vec<Contour> = indexed_contours.into_iter()
         .map(|indexed_contour|{
             Contour::from(
                 indexed_contour.into_iter()
                     .map(|vertex_ndx|{
-                        let v = mesh.vertices[vertex_ndx];
+                        let v = mesh_collider.vertices[vertex_ndx];
                         Point2::new(v[0],v[1])
                     })
                     .collect::<Vec<Point2<f32>>>()
                 )
-        }).collect();
+        })
+        .collect();
+
     let polygons = polygons_from_contours(contours);
+    polygons.iter().for_each(|polygon|blender.polygon(polygon, 10.0));
 
-    let perimeter1:Vec<Polygon> = polygons.clone().into_iter()
-        .flat_map(|polygon:Polygon| polygon.offset(settings.layer_thickness*0.5).into_iter())
-        .collect();
-    let perimeter2:Vec<Polygon> = polygons.into_iter()
-        .flat_map(|polygon| polygon.offset(settings.layer_thickness*1.5).into_iter())
-        .collect();
+    polygons.into_iter()
+        .map(|polygon| SkeletonBuilder::from_polygon(polygon).unwrap())
+        .flat_map(|skeleton| skeleton.offset_polygon(0.5).unwrap())
+        // .map(|offset_polygon|offset_polygon.project_onto(&mesh_collider))
+        // .for_each(|polygon3d| blender.polygon3d(&polygon3d) )
+        .for_each(|polygon3d| blender.polygon(&polygon3d, 0.0) )
 
+    // let offset_polygon = skeleton.offset_polygon(0.5).unwrap().into_iter().next().unwrap();
+    // let offset_contour = offset_polygon.0[0].clone();
+    // blender.contour(&offset_contour, 10.0);
+    //
+    // // blender.polygon(&offset_polygon,0.0);
+    //
+    //
+    // let x = offset_contour.project_onto(&mesh_collider);
+    // blender.contour3d(&x);
+
+    // for ([start,end],normal) in x.0{
+    //     let e:Point3<f32> = start + (0.5*(end - start)) ;
+    //     // let e = Point3::new(10.,10.,10.);
+    //     let n = e + normal;
+    //     let points = vec![
+    //         [e.x,e.y,e.z],
+    //         [n.x,n.y,n.z]
+    //     ];
+    //     let edges = vec![[0,1]];
+    //     blender.line_body3d(points, edges);
+    // }
+
+    // let perimeter1:Vec<Polygon> = polygons.clone().into_iter()
+    //     .flat_map(|polygon:Polygon| polygon.offset(settings.layer_thickness*0.5).into_iter())
+    //     .collect();
+    // let perimeter2:Vec<Polygon> = polygons.into_iter()
+    //     .flat_map(|polygon| polygon.offset(settings.layer_thickness*1.5).into_iter())
+    //     .collect();
 }
+pub struct MeshCollider{
+    pub faces:Vec<IndexedTriangle>,
+    pub edges:Vec<stl_op::IndexedEdge>,
+    pub vertices:Vec<Point3<f32>>,
+}
+impl Polygon{
+    pub fn project_onto(&self,mesh:&MeshCollider) -> Polygon3d {
+        let contours:Vec<Contour3d> = self.contours()
+            .map(|contour| contour.project_onto(mesh))
+            .collect();
+        Polygon3d::from_unchecked(contours)
+    }
+}
+impl Contour{
+    pub fn project_onto(&self,mesh:&MeshCollider) -> Contour3d {
+        project_contour_onto(self, mesh)
+    }
+}
+
+pub fn project_point_onto(point:&Point2<f32>,mesh:&MeshCollider) -> Point3<f32> {
+    mesh.faces.iter()
+        .map(|face|(face.vertices,face.normal))
+        .map(|(v,norm)|([mesh.vertices[v[0]],mesh.vertices[v[1]],mesh.vertices[v[2]]],norm))
+        .filter(|(tri,norm)| tri.point_is_inside(&point))
+        .filter_map(|(tri,norm)|{
+            project_point_down(&point, &tri[0], norm)
+        })
+        .next()
+        .unwrap()
+}
+pub fn project_contour_onto(contour:&Contour,mesh:&MeshCollider) -> Contour3d {
+
+    Contour3d::from_unchecked( 
+        contour.edges()
+        .flat_map(|(e_start,e_end)|{
+            let ed_vec = e_end-e_start;
+
+            let mut intersections:Vec<(f32,f32)> = mesh.edges.iter()
+                .filter_map(move |edge|{
+                    let target_edge:[Point3<f32>;2] = [mesh.vertices[edge.0],mesh.vertices[edge.1]];
+
+                    edge_edge_intersection3d([e_start,e_end],target_edge)
+                })
+                .collect();
+
+            intersections.sort_unstable_by(|(t1,_),(t2,_)| t1.partial_cmp(t2).unwrap());
+
+            let intersection_points:Vec<Point3<f32>> = intersections.into_iter()
+                .map(move |(t,z)|{
+                    let point2d = e_start + t*ed_vec;
+                    Point3::new(point2d.x,point2d.y,z)
+                }).collect();
+
+            let first_point = project_point_onto(e_start, mesh);
+            // intersection_points.into_iter()
+            std::iter::once(first_point).chain(intersection_points.into_iter())
+        })
+    .collect()
+    )
+}
+impl Enclosed for &[Point3<f32>;3]{
+    fn area(&self) -> f32 {
+        todo!()
+    }
+    fn point_is_inside(&self,point:&Point2<f32>) -> bool {
+        let a = self[0].xy();
+        let b = self[1].xy();
+        let c = self[2].xy();
+
+        let v0 = c - a;
+        let v1 = b - a;
+        let v2 = point - a;
+
+        let dot00 = v0.dot(&v0);
+        let dot01 = v0.dot(&v1);
+        let dot02 = v0.dot(&v2);
+        let dot11 = v1.dot(&v1);
+        let dot12 = v1.dot(&v2);
+
+        let denom = dot00 * dot11 - dot01 * dot01;
+        if denom == 0.0 { return false } // Degenerate triangle
+
+        let inv_denom = 1.0 / denom;
+        let u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
+        let v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
+
+        return (u >= 0.0) && (v >= 0.0) && (u + v <= 1.0)
+    }
+}
+
+fn project_point_down(point:&Point2<f32>, tri_pnt:&Point3<f32>, norm:stl_io::Vector<f32>) -> Option<Point3<f32>>{
+    let normal = Vector3::new(norm[0],norm[1],norm[2]);
+    if normal.z > 1e-5 {return None}
+    // debug_assert!(normal.z > 1e-5); // <- face should not be parallell to the z-axis
+    let a_point = Vector3::new(tri_pnt.x,tri_pnt.y,tri_pnt.z);
+
+    // Solve for Z using plane equation:
+    // normal · (P - v0) = 0 → normal_x * (x - x0) + normal_y * (y - y0) + normal_z * (z - z0) = 0
+    let d = -normal.dot(&a_point);
+    let z = -(normal[0] * point.x + normal[1] * point.y + d) / normal[2];
+    Some(Point3::new(point.x, point.y, z))
+}
+fn vertical_ray_triangle_intersection(point:&Point2<f32>, [v0, v1, v2]:[Point3<f32>;3]) -> Option<Point3<f32>>{
+    // Intersects a vertical ray pointing in the -Z direction with a triangle.
+    //
+    // Parameters:
+    //     ray_origin (np.array): Starting point of the ray [x, y, z]
+    //     v0, v1, v2 (np.array): Triangle vertices [x, y, z]
+    //
+    // Returns:
+    //     hit (bool): True if the ray hits the triangle
+    //     intersection (np.array): The intersection point [x, y, z] if hit, else None
+    //     t (float): Distance along -Z from ray_origin to the triangle if hit, else None
+    // Triangle edges and normal
+    let edge1 = v1 - v0;
+    let edge2 = v2 - v0;
+    let normal:Vector3<f32> = edge1.cross(&edge2);
+
+    debug_assert!(normal.z > 1e-5); // <- face should not be parallell to the z-axis
+
+    // Solve for Z using plane equation:
+    // normal · (P - v0) = 0 → normal_x * (x - x0) + normal_y * (y - y0) + normal_z * (z - z0) = 0
+    // Solve for z:
+    let v0v:Vector3<f32> = Vector3::new(v0.x,v0.y,v0.z);
+    let d = -normal.dot(&v0v);
+    let z = -(normal[0] * point.x + normal[1] * point.y + d) / normal[2];
+    Some(Point3::new(point.x, point.y, z))
+}
+
 pub fn gcode(layers:Vec<Vec<ToolPathLine>>)-> Result<(),io::Error>{
     let file = File::open("gcode.gcode")?;
     let mut buf_writer = BufWriter::new(file);
