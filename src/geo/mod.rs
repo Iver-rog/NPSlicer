@@ -40,7 +40,8 @@ pub trait ContorTrait {
     fn x_distance_to_contour(&self,point:&Point2<f32>) -> Option<f32>;
     /// Method used to iterate over the points of the contour.
     fn points<'a>(&'a self) -> core::slice::Iter<'a,Self::PointType>;
-        // where T: ;
+    /// Reverses the order of the contour Eg reverses the vector of points
+    fn reverse_order(&mut self) -> ();
 }
 
 /// Used To Create Polygon/Polygon3d from vectors without checking hierarchy of input Contours
@@ -50,7 +51,7 @@ pub trait FromUnChecked<T> {
 
 pub fn polygons_from_contours<C,T>(mut contours:Vec<C>) -> Vec<T> 
 where
-    C: ContorTrait + Clone,
+    C: ContorTrait + Clone + Enclosed,
     T: FromUnChecked<Vec<C>>
 {
     let mut contour_inside_ref = vec![None;contours.len()];
@@ -94,7 +95,9 @@ where
             Some(outer_loop) => Some((outer_loop,holes)),
             None => None,
         })
-        .map(|(outer_loop, mut holes)|{
+        .map(|(mut outer_loop, mut holes)|{
+            if outer_loop.area() < 0.0 {outer_loop.reverse_order()}
+            holes.iter_mut().for_each(|hole|if hole.area() > 0.0 {outer_loop.reverse_order()});
             holes.insert(0,outer_loop);
             T::from_unchecked(holes)
         })

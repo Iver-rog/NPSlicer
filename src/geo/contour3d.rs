@@ -1,4 +1,5 @@
 use nalgebra::{Point2,Point3};
+use super::ContorTrait;
 
 #[derive(Debug,Clone)]
 pub struct Contour3d(pub Vec<Point3<f32>>);
@@ -8,13 +9,23 @@ impl From<Vec<Point3<f32>>> for Contour3d{
         Self(points)
     }
 }
-
-impl Contour3d{
+impl Contour3d {
     pub fn from_unchecked(raw_parts:Vec<Point3<f32>>) -> Self{
         Self(raw_parts)
     }
+    pub fn points<'a>(&'a self) -> core::slice::Iter<'a,Point3<f32>>{
+        self.0.iter()
+    }
+}
+// impl ContorTrait for Contour3d{
+impl Contour3d{
+    // type PointType = Point3<f32>;
+
+    // fn points<'a>(&'a self) -> core::slice::Iter<'a,Point3<f32>>{
+    //     self.0.iter().skip(1)
+    // }
     /// returns true if the point is on or inside the projection of the contour onto the xy-plane
-    pub fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
+    fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
 
         let points_offset_by_one = self.0.iter()
             .skip(1)

@@ -110,6 +110,7 @@ impl ContorTrait for Contour {
     fn points<'a>(&'a self) -> core::slice::Iter<'a,Point2<f32>>{
         self.points.iter()
     }
+
     fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
         // returns true if a point is on or inside the contour
         if !self.aabb.point_is_inside(&point) { return None }
@@ -142,6 +143,11 @@ impl ContorTrait for Contour {
         }
         else { return None }
     }
+
+    fn reverse_order(&mut self) {
+        self.points.reverse();
+        self.area = self.area * -1.0;
+    }
 }
 impl IntoIterator for Contour {
     type Item = Point2<f32>;
@@ -153,6 +159,16 @@ impl IntoIterator for Contour {
 }
 
 impl Contour {
+    pub fn edges(&self)
+        -> std::iter::Zip<
+        std::slice::Iter<Point2<f32>>,
+        std::iter::Skip<std::iter::Cycle<std::slice::Iter<Point2<f32>>>>
+        >
+    {
+        let points = self.points.iter();
+        let points_offset_by_one = points.clone().cycle().skip(1);
+        points.zip(points_offset_by_one)
+    }
     // returns a iterator over pairs of edges (pairs of points)
     pub fn into_edges(self) -> std::iter::Zip<
         std::vec::IntoIter<Point2<f32>>,
@@ -180,10 +196,6 @@ impl Contour {
             if area_x2.abs() < min_a*2. {self.points.remove(i);}
         }
         if self.points.len() < 3 {self.points.clear(); self.area = 0.0;}
-    }
-    pub fn reverse_order(&mut self) {
-        self.points.reverse();
-        self.area = self.area * -1.0;
     }
     pub fn from_points(points:Vec<Point2<f32>>) -> Self {
         Self::from(points)
