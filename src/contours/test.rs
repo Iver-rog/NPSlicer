@@ -1,5 +1,5 @@
 use nalgebra::Point2;
-use crate::geo::{Enclosed,Contour,Polygon,polygons_from_contours};
+use crate::geo::{Enclosed,Contour,Polygon,polygons_from_contours,ContorTrait};
 use crate::stl_op::area_contour2d;
 use crate::data;
 #[test]

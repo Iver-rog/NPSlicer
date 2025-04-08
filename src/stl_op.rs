@@ -270,17 +270,12 @@ impl Into<[usize;2]> for Edge {
         [self.0,self.1]
     }
 }
+#[derive(Debug)]
 pub struct IndexedEdge(pub usize,pub usize);
 impl From<Edge> for IndexedEdge{
     fn from(edge:Edge) -> Self {
         Self(edge.0,edge.1)
     }
-}
-
-pub struct ColiderMesh{
-    edges:[usize;2],
-    normals:Vec<Vector3<f32>>,
-    // edges:([Vector3<f32>;2],usize),
 }
 
 pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Vec<usize>>,Vec<IndexedEdge>) {

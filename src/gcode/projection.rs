@@ -39,7 +39,7 @@ pub fn do_intersect([p1,q1]:&[Point2<f32>;2], [p2,q2]:&[Point2<f32>;2]) -> bool 
     return false
 }
 
-pub fn edge_edge_intersection3d(edge1:[&Point2<f32>;2],edge2:[Point3<f32>;2]) -> Option<(f32,f32)> {
+pub fn edge_edge_intersection3d(edge1:[&Point2<f32>;2],edge2:&[Point3<f32>;2]) -> Option<(f32,f32)> {
 
     let (p1, q1, p2, q2) = (edge1[0],edge1[1], edge2[0],edge2[1]);
     // Returns the scalar 't' such that:
@@ -71,25 +71,23 @@ pub fn edge_edge_intersection3d(edge1:[&Point2<f32>;2],edge2:[Point3<f32>;2]) ->
 
 #[test]
 fn edge_edge_intersection_test(){
-    let edge1 = [
-        Point2::new(0., 0.),
-        Point2::new(2., 2.),
-    ];
+    let start = Point2::new(0., 0.);
+    let end = Point2::new(2., 2.);
+    let edge1 = [&start,&end];
     let edge2 = [
-        Point2::new(0., 2.),
-        Point2::new(2., 0.),
+        Point3::new(0., 2., 0.),
+        Point3::new(2., 0., 0.),
     ];
     let edge3 = [
-        Point2::new(2., 4.),
-        Point2::new(4., 2.),
+        Point3::new(2., 4., 0.),
+        Point3::new(4., 2., 0.),
     ];
     let edge4 = [
-        Point2::new(1.5, 1.5),
-        Point2::new(0.5, 0.5),
+        Point3::new(1.5, 1.5, 0.),
+        Point3::new(0.5, 0.5, 0.),
     ];
 
-    assert_eq!(edge_edge_intersection2(&edge1, &edge2),Some(0.5));
-    assert_eq!(edge_edge_intersection2(&edge1, &edge3),None);
-    assert_eq!(edge_edge_intersection2(&edge1, &edge4),None);// <-edges are parallel
-    assert_eq!(edge_edge_intersection2(&edge1, &edge1),None);
+    assert_eq!(edge_edge_intersection3d(edge1, &edge2),Some((0.5,0.0)));
+    assert_eq!(edge_edge_intersection3d(edge1, &edge3),None);
+    assert_eq!(edge_edge_intersection3d(edge1, &edge4),None);// <-edges are parallel
 }

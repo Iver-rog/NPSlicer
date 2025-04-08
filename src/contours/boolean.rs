@@ -81,7 +81,6 @@ impl Polygon{
             .collect();
         //dbg!(&shape);
         if shape.len() == 0 {panic!("BBBBB Bad input shape no polygons")}
-        dbg!(&shape);
         let style = OutlineStyle::new(distance).line_join(LineJoin::Round(0.5));
         let shapes = shape.outline(style);
 
