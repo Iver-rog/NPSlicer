@@ -4,7 +4,7 @@ use crate::geo::{Contour,Polygon,polygons_from_contours};
 use std::iter::{IntoIterator, Iterator};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
-use nalgebra::{Point2, Point3};
+use nalgebra::{Point2, Point3, Vector3};
 use nalgebra_glm::cross2d;
 
 
@@ -265,13 +265,29 @@ impl Edge {
         }
     }
 }
+impl Into<[usize;2]> for Edge {
+    fn into(self) -> [usize;2]{
+        [self.0,self.1]
+    }
+}
+pub struct IndexedEdge(pub usize,pub usize);
+impl From<Edge> for IndexedEdge{
+    fn from(edge:Edge) -> Self {
+        Self(edge.0,edge.1)
+    }
+}
 
+pub struct ColiderMesh{
+    edges:[usize;2],
+    normals:Vec<Vector3<f32>>,
+    // edges:([Vector3<f32>;2],usize),
+}
 
-pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Vec<usize>>,Vec<Edge>) {
+pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Vec<usize>>,Vec<IndexedEdge>) {
     // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
-    let mut edge_count: HashMap<Edge, bool> = HashMap::new(); 
+    let mut edge_count: HashMap<Edge,(usize,Option<usize>)> = HashMap::new(); 
 
-    for tri in triangles{
+    for (i,tri) in triangles.iter().enumerate(){
         let [v1, v2, v3] = tri.vertices;
         let edges = [
             Edge::new(v1,v2),
@@ -280,33 +296,38 @@ pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Ve
         ];
         for edge in edges { 
             edge_count.entry(edge)
-                .and_modify(|only_1_ref| *only_1_ref = false)
-                .or_insert(true);
+                .and_modify(|data| data.1 = Some(i) )
+                .or_insert((i,None));
         }
     }
 
-    let mut other_edges:Vec<Edge> = Vec::new();
-    let mut vertex_connections: HashMap<usize,(usize,Option<usize>)> = HashMap::new();
+    let mut internal_edges:Vec<IndexedEdge> = Vec::new();
+    // key:vertex index. value: vertex index of connected vertices.
+    let mut perimeter_vertices: HashMap<usize,(usize,Option<usize>)> = HashMap::new();
 
-    for (edge,only_1_ref) in edge_count.into_iter() {
-        if !only_1_ref {other_edges.push(edge); continue }
-
-        vertex_connections.entry(edge.0)
+    for (edge,face_refs) in edge_count.into_iter() {
+        // edge has more than two face_refrences -> not part of contour -> add it to internal edges
+        if let Some(face2) = face_refs.1 {
+            internal_edges.push(edge.into()); 
+            continue 
+        }
+        // edge is part of contour -> map its connections and add it to vertex connections
+        perimeter_vertices.entry(edge.0)
             .and_modify(|connections|{
                 assert!(connections.1.is_none(),"vertex is part of multiple edge loops");
                 connections.1 = Some(edge.1)
             }).or_insert((edge.1,None));
 
-        vertex_connections.entry(edge.1)
+        perimeter_vertices.entry(edge.1)
             .and_modify(|connections|{
                 assert!(connections.1.is_none(),"vertex is part of multiple edge loops");
                 connections.1 = Some(edge.0)
             }).or_insert((edge.0,None));
     }
-    let mut vertex_connections: HashMap<usize,(usize,usize)> = vertex_connections.into_iter()
+    let mut vertex_connections: HashMap<usize,(usize,usize)> = perimeter_vertices.into_iter()
         .map(|(key,connections)|(key,(connections.0,connections.1.unwrap())) )
         .collect();
-    println!("{}",vertex_connections.len());
+
     let mut contours = Vec::new();
     while vertex_connections.len() != 0 {
         // find a vertex to start the loop
@@ -328,8 +349,7 @@ pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Ve
             contours.push(contour);
         }
     }
-    dbg!(&contours);
-    return (contours,other_edges)
+    return (contours,internal_edges)
 }
 fn extract_perimeter(triangles: Vec<IndexedTriangle>) -> Vec<usize> {
     // note: default hashmap is not optimized for integers, a different hashmap will likley preforme better
