@@ -2,8 +2,10 @@ use nalgebra::{Matrix3, Point2, Point3, Vector2, Vector3};
 use nalgebra_glm::{cross2d,cross};
 use stl_io::{IndexedMesh, IndexedTriangle};
 
+use core::f32::EPSILON;
+use core::iter::Iterator;
 use std::io::{self,prelude,Write,BufWriter,BufReader};
-use std::fs::File;
+use std::fs::{self,File,DirEntry};
 
 use crate::geo::{polygons_from_contours, ContorTrait, Contour, Contour3d, Enclosed, FromUnChecked, Polygon, Polygon3d};
 use crate::stl_op;
@@ -11,7 +13,6 @@ use crate::skeleton::SkeletonBuilder;
 
 mod projection;
 use projection::edge_edge_intersection3d;
-
 
 
 pub struct Settings{
@@ -130,20 +131,21 @@ pub fn main(blender:&mut crate::Blender) {
     // let file = args.next().expect("missing argument: stl-layers directory");
     // println!("path:{path}");
     // println!("file:{file}");
+
     let settings = Settings::default();
 
-    let file_path = "../mesh/bunny-overhang-regions.stl";
+    let mesh_layers = import_layers("curving_overhang/p0.2");
 
-    let file = File::open(file_path).expect("Failed to open STL file");
-    let mut reader = BufReader::new(file);
-    let mesh = stl_io::read_stl(& mut reader).expect("Failed to parse STL file");
-    blender.save_mesh(&mesh.faces,&mesh.vertices,String::from("asøldkfj"));
+    for (layer_nr,mesh) in mesh_layers.enumerate(){//.take(72) {
+    println!("layer: {layer_nr}");
+    blender.save_mesh(&mesh.faces,&mesh.vertices,format!("mesh_layer: {layer_nr}"));
 
     let (indexed_contours,indexed_edges) = stl_op::extract_perimeters_and_edges(&mesh.faces);
 
-    for contour in &indexed_contours{
-        blender.edge_loop(contour, &mesh);
-    }
+    // for contour in &indexed_contours{
+    //     blender.edge_loop(contour, &mesh);
+    // }
+
     let vertices = mesh.vertices.into_iter().map(|v|Point3::new( v[0],v[1],v[2]) ).collect();
 
     let mesh_collider = MeshCollider{
@@ -152,7 +154,7 @@ pub fn main(blender:&mut crate::Blender) {
         vertices,
     };
 
-    let contours:Vec<Contour> = indexed_contours.into_iter()
+    let mut contours:Vec<Contour> = indexed_contours.into_iter()
         .map(|indexed_contour|{
             Contour::from(
                 indexed_contour.into_iter()
@@ -164,46 +166,38 @@ pub fn main(blender:&mut crate::Blender) {
                 )
         })
         .collect();
+    contours.iter_mut().for_each(|contour|contour.simplify(0.05));
 
-    let polygons = polygons_from_contours(contours);
-    polygons.iter().for_each(|polygon|blender.polygon(polygon, 10.0));
+    let polygons:Vec<Polygon> = polygons_from_contours(contours);
+
+    // polygons.iter().for_each(|polygon|blender.polygon(polygon, 10.0));
 
     polygons.into_iter()
-        .map(|polygon| SkeletonBuilder::from_polygon(polygon).unwrap())
-        .flat_map(|skeleton| skeleton.offset_polygon(0.5).unwrap())
-        // .map(|offset_polygon|offset_polygon.project_onto(&mesh_collider))
-        // .for_each(|polygon3d| blender.polygon3d(&polygon3d) )
-        .for_each(|polygon3d| blender.polygon(&polygon3d, 0.0) )
+        .flat_map(|polygon| polygon.offset(-0.6).into_iter() )
+        .map(|polygon| polygon.project_onto(&mesh_collider) )
+        .for_each(|polygon3d| blender.polygon3d(&polygon3d) );
 
-    // let offset_polygon = skeleton.offset_polygon(0.5).unwrap().into_iter().next().unwrap();
-    // let offset_contour = offset_polygon.0[0].clone();
-    // blender.contour(&offset_contour, 10.0);
-    //
-    // // blender.polygon(&offset_polygon,0.0);
-    //
-    //
-    // let x = offset_contour.project_onto(&mesh_collider);
-    // blender.contour3d(&x);
-
-    // for ([start,end],normal) in x.0{
-    //     let e:Point3<f32> = start + (0.5*(end - start)) ;
-    //     // let e = Point3::new(10.,10.,10.);
-    //     let n = e + normal;
-    //     let points = vec![
-    //         [e.x,e.y,e.z],
-    //         [n.x,n.y,n.z]
-    //     ];
-    //     let edges = vec![[0,1]];
-    //     blender.line_body3d(points, edges);
-    // }
-
-    // let perimeter1:Vec<Polygon> = polygons.clone().into_iter()
-    //     .flat_map(|polygon:Polygon| polygon.offset(settings.layer_thickness*0.5).into_iter())
-    //     .collect();
-    // let perimeter2:Vec<Polygon> = polygons.into_iter()
-    //     .flat_map(|polygon| polygon.offset(settings.layer_thickness*1.5).into_iter())
-    //     .collect();
+        }
 }
+
+pub fn import_layers(layer_dir:&str) -> impl Iterator<Item = IndexedMesh> {
+    let paths = fs::read_dir(format!("../{}",layer_dir)).expect("could not find directory");
+
+    let mut stl_files:Vec<_> = paths.filter_map(|path|path.ok())
+        // .map(|entry| entry.path() )
+        .filter(|path| path.file_type().unwrap().is_file() )
+        .filter(|path| path.path().extension().unwrap() == "stl" )
+        .collect();
+
+    stl_files.sort_by_key(|dir|dir.file_name());
+
+    stl_files.into_iter()
+        .map(|file| File::open(file.path()).unwrap() )
+        .map(|file| BufReader::new(file) )
+        .map(|mut reader| stl_io::read_stl(& mut reader).expect("Failed to parse STL file") )
+}
+
+#[derive(Debug)]
 pub struct MeshCollider{
     pub faces:Vec<IndexedTriangle>,
     pub edges:Vec<stl_op::IndexedEdge>,
@@ -224,15 +218,28 @@ impl Contour{
 }
 
 pub fn project_point_onto(point:&Point2<f32>,mesh:&MeshCollider) -> Point3<f32> {
-    mesh.faces.iter()
+    let x = mesh.faces.iter()
         .map(|face|(face.vertices,face.normal))
         .map(|(v,norm)|([mesh.vertices[v[0]],mesh.vertices[v[1]],mesh.vertices[v[2]]],norm))
         .filter(|(tri,norm)| tri.point_is_inside(&point))
-        .filter_map(|(tri,norm)|{
+        // .inspect(|x|{println!("x [{},{},{}] norm:{:?}",x.0[0],x.0[1],x.0[2],x.1)})
+        // .inspect(|x|{println!("x filtered {:?}",x);})
+        .map(|(tri,norm)|{
+            let x = ((tri[1]-tri[0]).normalize().cross(&(tri[2]-tri[1]).normalize())).normalize();
+            assert!((x.x-norm[0]).abs() < 0.00001);
+            assert!((x.y-norm[1]).abs() < 0.00001);
+            assert!((x.z-norm[2]).abs() < 0.00001);
             project_point_down(&point, &tri[0], norm)
         })
-        .next()
-        .unwrap()
+        .next();
+        // .unwrap_or(Point3::new(point.x,point.y,-1.0))
+        // .expect("could not project point onto mesh_collider");
+    if let Some(point) = x { return point } else {
+        // dbg!(mesh);
+        println!("found no triangles intersection point: {point}");
+        Point3::new(point.x,point.y,-1.0)
+        // panic!("found no triangles intersection point: {point}")
+    }
 }
 pub fn project_contour_onto(contour:&Contour,mesh:&MeshCollider) -> Contour3d {
 
@@ -245,7 +252,7 @@ pub fn project_contour_onto(contour:&Contour,mesh:&MeshCollider) -> Contour3d {
                 .filter_map(move |edge|{
                     let target_edge:[Point3<f32>;2] = [mesh.vertices[edge.0],mesh.vertices[edge.1]];
 
-                    edge_edge_intersection3d([e_start,e_end],target_edge)
+                    edge_edge_intersection3d([e_start,e_end],&target_edge)
                 })
                 .collect();
 
@@ -263,6 +270,26 @@ pub fn project_contour_onto(contour:&Contour,mesh:&MeshCollider) -> Contour3d {
         })
     .collect()
     )
+}
+#[test]
+fn point_is_inside_slice_test(){
+    let slice = [
+        Point3::new(1.0,0.0,0.0),
+        Point3::new(0.0,0.0,0.0),
+        Point3::new(0.0,1.0,0.0),
+    ];
+
+    assert!((&slice).point_is_inside(&Point2::new(0.2,0.2)));
+
+    assert!((&slice).point_is_inside(&Point2::new(0.0,0.0)));
+    assert!((&slice).point_is_inside(&Point2::new(1.0,0.0)));
+    assert!((&slice).point_is_inside(&Point2::new(0.0,1.0)));
+
+    assert!((&slice).point_is_inside(&Point2::new(0.5,0.5)));
+    assert!((&slice).point_is_inside(&Point2::new(0.5,0.0)));
+    assert!((&slice).point_is_inside(&Point2::new(0.0,0.5)));
+
+    assert!(!(&slice).point_is_inside(&Point2::new(1.0,1.0)));
 }
 impl Enclosed for &[Point3<f32>;3]{
     fn area(&self) -> f32 {
@@ -290,13 +317,24 @@ impl Enclosed for &[Point3<f32>;3]{
         let u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
         let v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
 
-        return (u >= 0.0) && (v >= 0.0) && (u + v <= 1.0)
+        return (u >= -EPSILON) && (v >= -EPSILON) && (u + v <= (1.0+EPSILON))
     }
 }
+#[test]
+fn project_point_down_test(){
+    let tri_pnt = Point3::new(12.468662, -11.523754, 0.20000005);
+    let point = Point2::new( 11.968662,-11.023754 );
+    let norm = stl_io::Vector::new([-0.0, 0.0, 1.0]);
 
-fn project_point_down(point:&Point2<f32>, tri_pnt:&Point3<f32>, norm:stl_io::Vector<f32>) -> Option<Point3<f32>>{
+    let s = project_point_down(&point, &tri_pnt, norm);
+    assert!(s.is_some());
+
+        // ,{-2.4686618, 5.6404305, 0.20000005},{-2.4686618, -11.523754, 0.20000005}] norm:Vector([-0.0, 0.0, 1.0]
+}
+
+fn project_point_down(point:&Point2<f32>, tri_pnt:&Point3<f32>, norm:stl_io::Vector<f32>) -> Point3<f32>{
     let normal = Vector3::new(norm[0],norm[1],norm[2]);
-    if normal.z > 1e-5 {return None}
+    if normal.z == 0.0 {return Point3::new(point.x, point.y, tri_pnt.z)}
     // debug_assert!(normal.z > 1e-5); // <- face should not be parallell to the z-axis
     let a_point = Vector3::new(tri_pnt.x,tri_pnt.y,tri_pnt.z);
 
@@ -304,7 +342,7 @@ fn project_point_down(point:&Point2<f32>, tri_pnt:&Point3<f32>, norm:stl_io::Vec
     // normal · (P - v0) = 0 → normal_x * (x - x0) + normal_y * (y - y0) + normal_z * (z - z0) = 0
     let d = -normal.dot(&a_point);
     let z = -(normal[0] * point.x + normal[1] * point.y + d) / normal[2];
-    Some(Point3::new(point.x, point.y, z))
+    Point3::new(point.x, point.y, z)
 }
 fn vertical_ray_triangle_intersection(point:&Point2<f32>, [v0, v1, v2]:[Point3<f32>;3]) -> Option<Point3<f32>>{
     // Intersects a vertical ray pointing in the -Z direction with a triangle.
