@@ -8,7 +8,7 @@ use super::Contour3d;
 #[derive(Debug,Clone,PartialEq)]
 pub struct Contour{
     pub area:f32,
-    aabb:AABB,
+    pub aabb:AABB,
     pub points: Vec<Point2<f32>>
 }
 impl From<Contour3d> for Contour{

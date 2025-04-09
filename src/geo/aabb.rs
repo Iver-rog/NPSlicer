@@ -4,11 +4,11 @@ use super::Enclosed;
 
 /// Axis Aligned Bounding Box
 #[derive(Debug,Clone,PartialEq)]
-pub (super) struct AABB{
-    pub (super) x_max:f32,
-    pub (super) x_min:f32,
-    pub (super) y_max:f32,
-    pub (super) y_min:f32,
+pub struct AABB{
+    pub x_max:f32,
+    pub x_min:f32,
+    pub y_max:f32,
+    pub y_min:f32,
 }
 impl Enclosed for AABB {
     fn area(&self) -> f32 {
