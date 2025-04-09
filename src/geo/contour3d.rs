@@ -1,6 +1,7 @@
+use std::f32::EPSILON;
 use nalgebra::{Point2,Point3};
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,PartialEq)]
 pub struct Contour3d(pub Vec<Point3<f32>>);
 
 impl From<Vec<Point3<f32>>> for Contour3d{
@@ -16,13 +17,44 @@ impl Contour3d {
         self.0.iter()
     }
 }
-// impl ContorTrait for Contour3d{
-impl Contour3d{
-    // type PointType = Point3<f32>;
 
-    // fn points<'a>(&'a self) -> core::slice::Iter<'a,Point3<f32>>{
-    //     self.0.iter().skip(1)
-    // }
+impl Contour3d{
+    pub fn edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point3<f32>,&'a Point3<f32>)>{
+        self.points().zip(self.points().cycle().skip(1))
+    }
+    /// Merges vertices together if they are closer together than the spesified distance value.
+    /// NOTE: weight value when merging the first and last vertex is not accurate.
+    fn merge_by_distance(&mut self, distance:f32) -> usize {
+        let mut old_points = self.0.iter();
+        let mut new_points = vec![*old_points.next().unwrap()];
+        let mut prev_merged = 0;
+        let mut removed_vertices = 0;
+
+        for point in old_points.into_iter() {
+            let last_ndx = new_points.len()-1;
+            if (point - new_points[last_ndx]).magnitude() < distance {
+                let weight = 1./((2+prev_merged) as f32);
+                new_points[last_ndx] = new_points[last_ndx].lerp(&point, weight );
+                prev_merged += 1;
+                removed_vertices +=1;
+            } else {
+                new_points.push(*point);
+                prev_merged = 0;
+            }
+        }
+
+        if (new_points.last().unwrap() - new_points.first().unwrap()).magnitude() < distance {
+            let last_ndx = new_points.len()-1;
+            let weight = 1./((2+prev_merged) as f32);
+            new_points[0] = new_points[last_ndx].lerp(&new_points[0], weight );
+            new_points.pop();
+            removed_vertices +=1;
+        }
+
+        self.0 = new_points;
+        return removed_vertices
+    }
+
     /// returns true if the point is on or inside the projection of the contour onto the xy-plane
     fn x_distance_to_contour(&self,point:&Point2<f32>)->Option<f32>{
 
@@ -54,4 +86,27 @@ impl Contour3d{
         }
         else { return None }
     }
+}
+#[test]
+fn merge_by_distance_test(){
+    let mut contour3d = Contour3d::from(vec![
+        Point3::new(0.0,0.0,0.0), // 1
+        Point3::new(0.0,0.0,0.0), // 1
+        Point3::new(1.0,0.0,0.0), // 2
+        Point3::new(1.1,0.0,0.0), // 2
+        Point3::new(1.2,0.0,0.0), // 2
+        Point3::new(4.0,0.0,0.0), // 3
+        Point3::new(4.2,0.0,0.0), // 3
+        Point3::new(0.2,0.0,0.0), // 1
+    ]);
+    let removed_vertices = contour3d.merge_by_distance(0.3);
+    assert_eq!(contour3d,
+    Contour3d::from(vec![
+        Point3::new(0.1,        0.0,  0.0), // 1
+        //                 v-- due to rounding error
+        Point3::new(1.1-EPSILON,0.0,  0.0), // 2
+        Point3::new(4.1,        0.0,  0.0), // 3
+        ])
+    );
+    assert_eq!(removed_vertices,5);
 }
