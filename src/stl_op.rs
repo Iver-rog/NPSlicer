@@ -278,7 +278,7 @@ impl From<Edge> for IndexedEdge{
 
 pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Vec<usize>>,Vec<IndexedEdge>) {
     // NOTE: default hashmap is not optimized for integers, a different hashmap will likley preforme better
-    let mut edge_count: HashMap<Edge,(usize,Option<usize>)> = HashMap::new(); 
+    let mut edge_count: HashMap<Edge,bool> = HashMap::new(); 
 
     for (i,tri) in triangles.iter().enumerate(){
         let [v1, v2, v3] = tri.vertices;
@@ -289,8 +289,8 @@ pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Ve
         ];
         for edge in edges { 
             edge_count.entry(edge)
-                .and_modify(|data| data.1 = Some(i) )
-                .or_insert((i,None));
+                .and_modify(|data| *data = false )
+                .or_insert(true);
         }
     }
 
@@ -298,9 +298,9 @@ pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Ve
     // key:vertex index. value: vertex index of connected vertices.
     let mut perimeter_vertices: HashMap<usize,(usize,Option<usize>)> = HashMap::new();
 
-    for (edge,face_refs) in edge_count.into_iter() {
+    for (edge,only_one_face_ref) in edge_count.into_iter() {
         // edge has more than two face_refrences -> not part of contour -> add it to internal edges
-        if let Some(face2) = face_refs.1 {
+        if !only_one_face_ref {
             internal_edges.push(edge.into()); 
             continue 
         }
