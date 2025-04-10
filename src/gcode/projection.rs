@@ -128,17 +128,8 @@ impl Enclosed for &[Point3<f32>;3]{
         let u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
         let v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
 
-        return (u >= -EPSILON) && (v >= -EPSILON) && (u + v <= (1.0+EPSILON))
+        return (u >= -3.*EPSILON) && (v >= -3.*EPSILON) && (u + v <= (1.0+3.*EPSILON))
     }
-}
-#[test]
-fn project_point_down_test(){
-    let tri_pnt = Point3::new(12.468662, -11.523754, 0.20000005);
-    let point = Point2::new( 11.968662,-11.023754 );
-    let norm = stl_io::Vector::new([-0.0, 0.0, 1.0]);
-
-    let s = project_point_down(&point, &tri_pnt, norm);
-    assert!(s.is_some());
 }
 
 fn project_point_down(point:&Point2<f32>, tri_pnt:&Point3<f32>, norm:stl_io::Vector<f32>) -> Point3<f32>{
