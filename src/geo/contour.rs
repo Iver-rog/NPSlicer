@@ -198,3 +198,28 @@ impl Contour {
         Self::from(points)
     }
 }
+
+use crate::contour;
+
+#[macro_export]
+macro_rules! contour {
+    ( $( [$x:expr, $y:expr] ),* ) => {
+        Contour::from(vec![
+            $(
+                Point2::new($x,$y),
+            )*
+        ])
+    };
+}
+
+#[test]
+fn contour_macro_test(){
+    assert_eq!(
+        contour!([2.+3.,4.],[3.,4.],[3.,4.]),
+        Contour::from(vec![
+            Point2::new(2.+3.,4.),
+            Point2::new(3.,4.),
+            Point2::new(3.,4.),
+        ])
+    )
+}

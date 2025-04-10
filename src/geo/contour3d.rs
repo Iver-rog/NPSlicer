@@ -89,24 +89,49 @@ impl Contour3d{
 }
 #[test]
 fn merge_by_distance_test(){
-    let mut contour3d = Contour3d::from(vec![
-        Point3::new(0.0,0.0,0.0), // 1
-        Point3::new(0.0,0.0,0.0), // 1
-        Point3::new(1.0,0.0,0.0), // 2
-        Point3::new(1.1,0.0,0.0), // 2
-        Point3::new(1.2,0.0,0.0), // 2
-        Point3::new(4.0,0.0,0.0), // 3
-        Point3::new(4.2,0.0,0.0), // 3
-        Point3::new(0.2,0.0,0.0), // 1
-    ]);
+    let mut contour3d = contour3d!(
+        [0.0,0.0,0.0], // 1
+        [0.0,0.0,0.0], // 1
+        [1.0,0.0,0.0], // 2
+        [1.1,0.0,0.0], // 2
+        [1.2,0.0,0.0], // 2
+        [4.0,0.0,0.0], // 3
+        [4.2,0.0,0.0], // 3
+        [0.2,0.0,0.0]  // 1
+    );
     let removed_vertices = contour3d.merge_by_distance(0.3);
-    assert_eq!(contour3d,
-    Contour3d::from(vec![
-        Point3::new(0.1,        0.0,  0.0), // 1
-        //                 v-- due to rounding error
-        Point3::new(1.1-EPSILON,0.0,  0.0), // 2
-        Point3::new(4.1,        0.0,  0.0), // 3
-        ])
+    assert_eq!(
+        contour3d,
+        contour3d!(
+            [0.1,        0.0,  0.0], // 1
+            [1.1-EPSILON,0.0,  0.0], // 2
+            [4.1,        0.0,  0.0]  // 3
+        )
     );
     assert_eq!(removed_vertices,5);
+}
+
+use crate::contour3d;
+
+#[macro_export]
+macro_rules! contour3d {
+    ( $( [$x:expr, $y:expr, $z:expr] ),* ) => {
+        Contour3d::from(vec![
+            $(
+                Point3::new($x,$y,$z),
+            )*
+        ])
+    };
+}
+
+#[test]
+fn contour3d_macro_test(){
+    assert_eq!(
+        contour3d!([1.+2.,3.,4.],[1.,2.,3.],[1.,2.,3.]),
+        Contour3d::from(vec![
+            Point3::new(1.+2.,3.,4.),
+            Point3::new(1.,2.,3.),
+            Point3::new(1.,2.,3.),
+        ])
+    )
 }
