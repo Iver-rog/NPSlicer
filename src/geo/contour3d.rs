@@ -24,7 +24,7 @@ impl Contour3d{
     }
     /// Merges vertices together if they are closer together than the spesified distance value.
     /// NOTE: weight value when merging the first and last vertex is not accurate.
-    fn merge_by_distance(&mut self, distance:f32) -> usize {
+    pub fn merge_by_distance(&mut self, distance:f32) -> usize {
         let mut old_points = self.0.iter();
         let mut new_points = vec![*old_points.next().unwrap()];
         let mut prev_merged = 0;
