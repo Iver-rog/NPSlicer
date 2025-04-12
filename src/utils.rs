@@ -9,6 +9,7 @@ use std::fmt::Display;
 use nalgebra::Point2;
 use stl_io::{IndexedTriangle, Triangle, Vector};
 use crate::geo::{self, Contour, Polygon, Contour3d, Polygon3d};
+use crate::gcode;
 
 #[derive(Debug)]
 pub struct Blender<'a> {
@@ -118,8 +119,16 @@ impl <'a> Blender<'a> {
         return Ok(())
     }
     pub fn n_gon(&mut self,points:Vec<[f32;3]>, edges:Vec<[usize;2]>,face:Vec<Vec<usize>> ){
-        let face = 
-        self.line_objects.push( (points, edges, face) );
+        let face = self.line_objects.push( (points, edges, face) );
+    }
+
+    pub fn path(&mut self, path:&gcode::Path){
+        let len = path.points.len();
+        let edges:Vec<[usize;2]> = if len != 0 {
+            (0..(len-1)).map(|i|[i,i+1]).collect()
+        }else{ vec![] };
+        let points = path.points.iter().map(|p|[p.x,p.y,p.z]).collect();
+        self.line_objects.push((points,edges.clone(),vec![]));
     }
 
     pub fn polygon3d(&mut self, polygon:&Polygon3d) {
