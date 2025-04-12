@@ -1,5 +1,8 @@
+#[cfg(test)]
 use std::f32::EPSILON;
+
 use nalgebra::{Point2,Point3};
+use super::Contour;
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct Contour3d(pub Vec<Point3<f32>>);
@@ -18,9 +21,12 @@ impl Contour3d {
     }
 }
 
-impl Contour3d{
+impl Contour3d {
+    pub fn from_contour(contour:Contour,height:f32) -> Self {
+        Self(contour.into_iter().map(|p| Point3::new(p.x,p.y,height) ).collect())
+    }
     pub fn edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point3<f32>,&'a Point3<f32>)>{
-        self.points().zip(self.points().cycle().skip(1))
+        self.points().zip( self.points().cycle().skip(1) )
     }
     /// Merges vertices together if they are closer together than the spesified distance value.
     /// NOTE: weight value when merging the first and last vertex is not accurate.

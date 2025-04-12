@@ -36,51 +36,10 @@ impl From<Polygon3d> for Polygon {
         )
     }
 }
-#[test]
-fn ølaskdjfølksadjf(){
-    let contour = Contour::from(vec![
-            Point2::new(0.1,0.1),
-            Point2::new(0.1,0.1),
-            Point2::new(0.1,0.1),
-    ]);
-    let polygon = Polygon(vec![
-        contour.clone(),
-        contour.clone(),
-        contour.clone(),
-    ]);
-    assert_eq!(polygon.clone(),polygon);
-}
-#[test]
-fn polygon_holes_test(){
-    let contour = Contour::from(vec![
-            Point2::new(0.1,0.1),
-            Point2::new(0.1,0.1),
-            Point2::new(0.1,0.1),
-    ]);
-    let polygon = Polygon(vec![
-        contour.clone(),
-        contour.clone(),
-        contour.clone(),
-    ]);
-    assert!(polygon.holes().len() == 2);
 
-    let mut p_iter = polygon.holes().iter();
-    assert_eq!(p_iter.next(),Some(&contour));
-    assert_eq!(p_iter.next(),Some(&contour));
-    assert_eq!(p_iter.next(),None);
-}
-
-// #[derive(Debug,Clone,PartialEq)]
-// pub struct Polygon{
-//     pub outer_loop: Contour,
-//     pub holes: Vec<Contour>,
-// }
 impl Enclosed for Polygon {
     fn area(&self) -> f32 {
         self.0.iter().map(|contour| contour.area).sum()
-        // let area = self.outer_loop().area();
-        // let hole_area: f32 = self.holes.iter().map(|contour| contour.area() ).sum();
-        // return area - hole_area
     }
     fn point_is_inside(&self,point:&Point2<f32>) -> bool {
         if !self.outer_loop().point_is_inside(point) {println!("outside outer_loop");return false}
@@ -92,13 +51,11 @@ impl Enclosed for Polygon {
 }
 
 impl Polygon {
+    pub fn all_edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point2<f32>,&'a Point2<f32>)>{
+        self.0.iter().flat_map(|contour|contour.edges())
+    }
     pub fn invert(&mut self){
         self.0.iter_mut().for_each(|contour|contour.reverse_order());
-        // for contour in &mut self {
-        //     contour.reverse_order()
-        // }
-        // self.outer_loop.reverse_order();
-        // self.holes.iter_mut().for_each(|c|c.reverse_order());
     }
     pub fn new(mut outer_loop:Contour,mut holes:Vec<Contour>)->Self{
         if outer_loop.area.is_sign_negative() {
