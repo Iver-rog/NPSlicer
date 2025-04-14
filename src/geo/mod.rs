@@ -33,7 +33,7 @@ pub trait Enclosed {
 /// The ContourTrait defines that the struct is made up of a sirular loop of points
 pub trait ContorTrait {
     type PointType: Into<Point2<f32>> + Clone;
-    /// Method used for ray casting that returns Oprion(distance).
+    /// Method used for ray casting that returns Option(distance).
     /// A some value means the point is inside the contour and 
     /// the distance value is the distance allong the x axis
     /// to the closest intersection with the contur.
