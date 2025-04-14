@@ -1,6 +1,7 @@
-use nalgebra::{Point2, Point3};
+use nalgebra::{wrap, Point2, Point3};
 use stl_io::IndexedMesh;
 
+use core::option::Option;
 use std::iter::Iterator;
 use std::io::BufReader;
 use std::fs::{self,File};
@@ -8,6 +9,7 @@ use std::iter;
 
 use crate::geo::*;
 use crate::stl_op::{self, IndexedEdge};
+use crate::Blender;
 
 mod projection;
 use projection::MeshCollider;
@@ -204,15 +206,21 @@ pub fn main(blender:&mut crate::Blender) {
 }
 #[test]
 fn infill_test(){
+    let mut blender = Blender::new();
+
     let vertices = vec![
         Point3::new( 0.0,  0.0,  0.0),
         Point3::new(-2.5, -2.5, -2.5),
-        Point3::new( 1.5,  1.5,  1.5),
+        Point3::new( 15.0,  9.0,  2.5),
     ];
     let edges = vec![
-        // IndexedEdge(0,1),
+        IndexedEdge(0,1),
         IndexedEdge(1,2),
     ];
+    blender.line_body3d(
+        vertices.iter().map(|p|[p.x,p.y,p.z]).collect(),
+        edges.iter().map(|e|[e.0,e.1]).collect()
+        );
 
     let mesh = MeshCollider { faces:vec![], edges, vertices, };
 
@@ -222,9 +230,11 @@ fn infill_test(){
         Point2::new(10.0, 10.0),
         Point2::new(0.0, 10.0),
     ])]);
+    blender.polygon(&bounds, 0.0);
 
     generate_infill(bounds, mesh, true);
-
+    // blender.show();
+    assert!(false);
 }
 
 fn generate_infill(bounds:Polygon,mesh:MeshCollider,allong_x:bool)->(){
@@ -294,17 +304,53 @@ fn generate_infill(bounds:Polygon,mesh:MeshCollider,allong_x:bool)->(){
                 // .filter(|(x_ndx,y)| *x_ndx < range)
                 .for_each(|(x_ndx,y)| yz_vals[x_ndx].push((y,None)) )
         }
-    for collumn in yz_vals {
-        println!("");
+    for (i,collumn) in yz_vals.iter().enumerate() {
+        print!("x{i}|");
         for (y,z) in collumn{
             match z {
                 Some(z) => print!(" y:{y:.1} z:{z:.1} |"),
                 None => print!(" y:{y:.1} z:None|"),
             }
         }
+        println!("");
     }
-    // dbg!(yz_vals);
-    todo!()
+
+
+    // sort the table:
+    for collumn in yz_vals.iter_mut(){
+        collumn.sort_unstable_by(|(t1,_),(t2,_)| t1.partial_cmp(t2).unwrap());
+    }
+
+    println!("sorted table");
+    for (i,collumn) in yz_vals.iter().enumerate() {
+        print!("x{i}|");
+        for (y,z) in collumn{
+            match z {
+                Some(z) => print!(" y:{y:.1} z:{z:.1} |"),
+                None => print!(" y:{y:.1} z:None|"),
+            }
+        }
+        println!("");
+    }
+    for (x,yz) in yz_vals.into_iter()
+        .enumerate()
+        .map(|(x,yz)| (x as isize * min,yz))
+        // .inspect(|(x,(y,z)):(isize,(isize,Option<isize>))|{()})
+        {
+            yz.into_iter()
+                .scan(false,|within_bounds,(y,z)|{
+                    match z {
+                        Some(z) => if *within_bounds {
+                            None
+                        } else { Some((y,z)) },
+                        None => {
+                            *within_bounds = !*within_bounds;
+                            Some((y,0.0))
+                        },
+                    }
+                });
+
+    }
 }
 
 impl Polygon {
