@@ -1,5 +1,5 @@
-use nalgebra::{wrap, Point2, Point3};
-use stl_io::IndexedMesh;
+use nalgebra::{wrap, Matrix2, Point2, Point3};
+use stl_io::{IndexedMesh, IndexedTriangle, Normal, Vector};
 
 use core::option::Option;
 use std::iter::Iterator;
@@ -12,7 +12,7 @@ use crate::stl_op::{self, IndexedEdge};
 use crate::Blender;
 
 mod projection;
-use projection::MeshCollider;
+use projection::{MeshCollider,project_point_onto};
 
 mod gcodefile;
 use gcodefile::{GcodeFile,Settings};
@@ -62,6 +62,7 @@ pub fn generate_perimeter_offsets(polygon:Polygon,nr_of_perimeters:usize,layer_w
         // .flat_map(|(i,polygons)| polygons.into_iter().map(move |polygon|(i,polygon)))
         .flat_map(move |(i,polygon)| polygon.offset(-((i as f32 + 0.5)*layer_w)).into_iter() )
 }
+#[derive(Debug)]
 pub struct Path{
     pub points:Vec<Point3<f32>>
 }
@@ -131,7 +132,8 @@ pub fn main(blender:&mut crate::Blender) {
     let nr_of_perimeters = 2;
     let brim = 25;
 
-    let mesh_layer_dir = "../curving_overhang/p0.2";
+    // let mesh_layer_dir = "../curving_overhang/p0.2";
+    let mesh_layer_dir = "../simple_overhang";
     let mut mesh_layers = import_layers(&mesh_layer_dir)
         .map(|layer_mesh| contour_and_mesh_colider_from_mesh(layer_mesh));
 
@@ -160,10 +162,40 @@ pub fn main(blender:&mut crate::Blender) {
 
     gcodefile.layer(first_layer_paths);
 
-    mesh_layers.enumerate()
-        .inspect(|(layer_nr,_)|{println!("layer: {}",layer_nr+1);})
-        .map(|(layer_nr,(mut polygons, mesh_collider))|{
-            polygons.into_iter()
+    // mesh_layers.enumerate() .inspect(|(layer_nr,_)|{println!("layer: {}",layer_nr+1);})
+    //     .map(|(layer_nr,(mut polygons, mesh_collider))|{
+    //         polygons.into_iter()
+    //             .flat_map(|polygon|{
+    //                 iter::repeat(polygon.clone())
+    //                     .take(nr_of_perimeters)
+    //                     .enumerate()
+    //             })
+    //             .flat_map(|(i,polygon)| polygon.offset(-((i as f32 + 0.5)*layer_w)).into_iter() )
+    //             .map(move |polygon| polygon.project_onto(&mesh_collider) )
+    //             .flat_map(|polygon| polygon.0.into_iter() )
+    //             .map(|contour3d| Path::from(contour3d) )
+    //             .map(|mut path|{
+    //                 path.shorten_ends(settings.perimeter_line_width/2.);
+    //                 return path
+    //             })
+    //             // .inspect(move |path| blender.path(&path) )
+    //     })                
+    //     .for_each(|layer_paths|{ gcodefile.layer(layer_paths); });
+   
+    for (layer_nr,(mut polygons, mesh_collider)) in mesh_layers.enumerate()
+        .inspect(|(layer_nr,_)|{println!("layer: {}",layer_nr+1);}){
+
+            // let bounds = polygons[0].clone().offset(-((nr_of_perimeters+1) as f32) *layer_w);
+            //
+            // let infill = generate_infill(bounds[0].clone(), &mesh_collider, true);
+            let mesh_collider_copy = mesh_collider.clone();
+
+            let infill:Vec<Path> = polygons.iter().cloned()
+                .flat_map(|polygon| polygon.offset(-((nr_of_perimeters as f32) + 0.5) *layer_w).into_iter() )
+                .flat_map(|offset_polygon| generate_infill(offset_polygon, &mesh_collider_copy, true) )
+                .collect();
+
+            let layer_paths = polygons.into_iter()
                 .flat_map(|polygon|{
                     iter::repeat(polygon.clone())
                         .take(nr_of_perimeters)
@@ -176,10 +208,13 @@ pub fn main(blender:&mut crate::Blender) {
                 .map(|mut path|{
                     path.shorten_ends(settings.perimeter_line_width/2.);
                     return path
-                })
-                // .inspect(move |path| blender.path(&path) )
-        })                
-        .for_each(|layer_paths|{ gcodefile.layer(layer_paths); });
+                    })
+                .chain(infill.into_iter())
+                .inspect(|path|blender.path(&path));
+
+            gcodefile.layer(layer_paths);
+
+        }
 
 
 
@@ -221,104 +256,123 @@ fn infill_test(){
         vertices.iter().map(|p|[p.x,p.y,p.z]).collect(),
         edges.iter().map(|e|[e.0,e.1]).collect()
         );
+    let face = IndexedTriangle{
+        normal: Vector::new([0.4244,-0.8163,0.3918]),
+        vertices: [0,1,2],
+    };
 
-    let mesh = MeshCollider { faces:vec![], edges, vertices, };
+    let mesh = MeshCollider { faces:vec![face], edges, vertices, };
 
     let bounds = Polygon::from_unchecked(vec![Contour::from(vec![
-        Point2::new(0.0, 0.0),
-        Point2::new(10.0, 0.0),
-        Point2::new(10.0, 10.0),
-        Point2::new(0.0, 10.0),
+        Point2::new(1.0, 0.0),
+        Point2::new(11.0, 0.0),
+        Point2::new(11.0, 10.0),
+        Point2::new(1.0, 11.0),
     ])]);
     blender.polygon(&bounds, 0.0);
 
-    generate_infill(bounds, mesh, true);
+    let paths = generate_infill(bounds, mesh, true);
+    for path in paths {
+        blender.path(&path);
+    }
     // blender.show();
     assert!(false);
 }
 
-fn generate_infill(bounds:Polygon,mesh:MeshCollider,allong_x:bool)->(){
+// Generates infill paths inside the bounds.
+// Spacing is the distance in mm between infill lines.
+// Rotation is the angle in radians between the x-axis and the direction of the infill.
+// fn generate_infill2(bounds:Polygon,mesh:MeshCollider,spacing:f32,rotation:f32) -> () {
+//     let aabb = bounds.outer_loop().aabb.clone();
+//     let bounds3d = bounds.project_onto(&mesh);
+// }
+
+fn generate_infill(bounds:Polygon,mesh:&MeshCollider,allong_x:bool) -> Vec<Path> {
     let aabb = &bounds.outer_loop().aabb;
     let (min,max) = ( aabb.x_min.floor() as isize, aabb.x_max.ceil() as isize);
+    // let (min,max) = ( aabb.x_min.ceil() as isize, aabb.x_max.floor() as isize);
+
+    let offset = -aabb.x_min.floor();
     let range = (max-min) as usize;
-    let mut yz_vals:Vec<Vec<(f32,Option<f32>)>> = vec![Vec::new();range];
+    println!("blobal min:{min}, max:{max}");
+    println!("blobal range{range}");
+    let mut yz_vals:Vec<Vec<(f32,Option<f32>)>> = vec![Vec::new();range+1];
 
     for (e1,e2) in mesh.edges.iter()
         .map(|edge|(mesh.vertices[edge.0],mesh.vertices[edge.1]))
         .map(|(e1,e2)| if e1.x < e2.x { (e1,e2) }else{ (e2,e1) }){
+
+            let residual = e1.x.ceil()-e1.x;
+
+            // f(x) = a*x + b
             let ay = (e2.y-e1.y)/(e2.x-e1.x);
+            let by = (e1.y) + ay*residual;
             let az = (e2.z-e1.z)/(e2.x-e1.x);
+            let bz = (e1.z) + az*residual;
 
-            let residual = e1.x%e1.x.ceil();
-            let x_range = ((e2.x.floor() as isize) - (e1.x.ceil() as isize)) as usize;
+            let (x_min,x_max) = ((e1.x.ceil() as isize) , (e2.x.floor() as isize));
 
-            let y = if ay == 0.0 { vec![e1.y; x_range] }else{
-                (0..=x_range).into_iter().map(|x|x as f32)
-                    .map(|x|ay*(x-residual)+e1.y).collect()
+            let x_vals = (0..(1+x_max - x_min)).map(|x| x as f32);
+
+            let y = match ay == 0.0 {
+                true => vec![e1.y; x_vals.len()],
+                false => x_vals.clone().map(|x| ay * x + by ).collect(),
             };
-            let z = if az == 0.0 { vec![e1.z; x_range] }else{
-                (0..=x_range).into_iter().map(|x|x as f32)
-                    .map(|x|az*(x-residual)+e1.z).collect()
+
+            let z = match az == 0.0 {
+                true => vec![e1.z; x_vals.len()],
+                false => x_vals.clone().map(|x| az * x + bz ).collect(),
             };
-            y.into_iter().zip(z.into_iter()).enumerate()
-                .map(|(x,(y,z))|{ 
-                    let x_ndx = (x as isize) + (e1.x.ceil() as isize + min);
-                    println!("{x_ndx}");
+
+            y.into_iter().zip(z.into_iter())
+                .enumerate()
+                .map(|(i,(y,z))|{ 
+                    let x_ndx = (i as isize + x_min - min);
                     (x_ndx,y,z)
                 })
-                // .filter(|(x_ndx,y,z)| x_ndx.is_negative())
-                .filter_map(|(x_ndx,y,z)| 
-                    if let Ok(x_ndx) = usize::try_from(x_ndx){ Some((x_ndx,y,z)) }else{None}
-                )
-                .filter(|(x_ndx,y,z)| *x_ndx < range)
+                .filter_map(|(x_ndx,y,z)| usize::try_from(x_ndx).ok().map(|x_ndx|(x_ndx,y,z)) )
+                .filter(|(x_ndx,y,z)| *x_ndx < range+1)
+                .filter(|(x_ndx,y,z)| (aabb.y_min <= *y) && (*y <= aabb.y_max) )
                 .for_each(|(x_ndx,y,z)| yz_vals[x_ndx].push((y,Some(z))) )
-
-            // for x in (0..=x_range).into_iter().map(|x| (x as f32)  ){//+e1.x.ceil()) {
-            //     let y = ay*(x-residual)+e1.y;
-            //     let z = az*(x-residual)+e1.z;
-            //     println!("n:{x} x:{:.2} y:{y:.2} z:{z:.2}",(x as f32)+e1.x.ceil());
-            // }
     }
 
     // Add contour intersections
     for (e1,e2) in bounds.all_edges()
         .map(|(e1,e2)| if e1.x < e2.x { (e1,e2) }else{ (e2,e1) }){
+
+            let residual = e1.x.ceil()-e1.x;
+
             let ay = (e2.y-e1.y)/(e2.x-e1.x);
+            let by = (e1.y) + ay*residual;
 
-            let residual = e1.x%e1.x.ceil();
-            let x_range = ((e2.x.floor() as isize) - (e1.x.ceil() as isize)) as usize;
+            let (x_min,x_max) = ((e1.x.ceil() as isize) , (e2.x.ceil() as isize));
 
-            let y = if ay == 0.0 { vec![e1.y; x_range] }else{
-                (0..x_range).into_iter().map(|x|x as f32)
-                    .map(|x|ay*(x-residual)+e1.y).collect()
+            let x_vals = (0..(x_max - x_min)).map(|x| x as f32);
+
+            let y = match ay == 0.0 {
+                true => vec![e1.y; x_vals.len()],
+                false => x_vals.clone().map(|x| ay * x + by ).collect(),
             };
 
-            y.into_iter().enumerate()
-                .map(|(x,y)|{ 
-                    let x_ndx = (x as isize) + (e1.x.ceil() as isize + min);
+            y.into_iter()
+                .enumerate()
+                .map(|(i,y)|{ 
+                    let x_ndx = (i as isize + x_min - min);
                     (x_ndx,y)
                 })
-                .filter_map(|(x_ndx,y)| 
-                    if let Ok(x_ndx) = usize::try_from(x_ndx){ Some((x_ndx,y)) }else{None}
-                )
-                // .filter(|(x_ndx,y)| *x_ndx < range)
+                .filter_map(|(x_ndx,y)| usize::try_from(x_ndx).ok().map(|x_ndx|(x_ndx,y)) )
+                .filter(|(x_ndx,y)| *x_ndx < range+1)
+                .filter(|(x_ndx,y)| (aabb.y_min <= *y) && (*y <= aabb.y_max) )
                 .for_each(|(x_ndx,y)| yz_vals[x_ndx].push((y,None)) )
         }
-    for (i,collumn) in yz_vals.iter().enumerate() {
-        print!("x{i}|");
-        for (y,z) in collumn{
-            match z {
-                Some(z) => print!(" y:{y:.1} z:{z:.1} |"),
-                None => print!(" y:{y:.1} z:None|"),
-            }
-        }
-        println!("");
-    }
-
 
     // sort the table:
-    for collumn in yz_vals.iter_mut(){
-        collumn.sort_unstable_by(|(t1,_),(t2,_)| t1.partial_cmp(t2).unwrap());
+    for (i,collumn) in yz_vals.iter_mut().enumerate(){
+        if i%2 == 0 {
+            collumn.sort_unstable_by(|(t1,_),(t2,_)| t1.partial_cmp(t2).unwrap());
+        } else {
+            collumn.sort_unstable_by(|(t1,_),(t2,_)| t2.partial_cmp(t1).unwrap());
+        }
     }
 
     println!("sorted table");
@@ -332,25 +386,40 @@ fn generate_infill(bounds:Polygon,mesh:MeshCollider,allong_x:bool)->(){
         }
         println!("");
     }
+
+    let mut collums = Vec::new();
     for (x,yz) in yz_vals.into_iter()
         .enumerate()
-        .map(|(x,yz)| (x as isize * min,yz))
-        // .inspect(|(x,(y,z)):(isize,(isize,Option<isize>))|{()})
-        {
-            yz.into_iter()
-                .scan(false,|within_bounds,(y,z)|{
-                    match z {
-                        Some(z) => if *within_bounds {
-                            None
-                        } else { Some((y,z)) },
-                        None => {
-                            *within_bounds = !*within_bounds;
-                            Some((y,0.0))
-                        },
-                    }
-                });
+        .map(|(x,yz)| ((x as isize + min) as f32 ,yz)){
 
+        let mut segment = Vec::new();
+        let mut within_bounds = false;
+
+        for (y,z) in yz {
+            match z {
+                // found a mesh point keep it if it is inside the contur
+                Some(z) => if within_bounds {
+                    segment.push(Point3::new(x,y,z));
+                },
+                // point on the bounding contour which implies crossing 
+                // the boundary between inside and outside the bounds
+                None => {
+                    // let point3d = Point3::new(x,y,0.0); // <- only for testing
+                    let point3d = project_point_onto(&Point2::new(x,y),&mesh);
+                    if within_bounds { // completed the line segment
+                        segment.push( point3d );
+                        collums.push( Path{points:segment} );
+                        segment = Vec::new();
+                    } else {
+                        segment.push(point3d)
+                    }
+                    within_bounds = !within_bounds;
+                    (y,0.0);
+                },
+            };
+        }
     }
+    return collums
 }
 
 impl Polygon {

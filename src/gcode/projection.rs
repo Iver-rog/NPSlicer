@@ -20,7 +20,7 @@ impl Contour{
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct MeshCollider{
     pub faces:Vec<IndexedTriangle>,
     pub edges:Vec<stl_op::IndexedEdge>,
@@ -33,8 +33,6 @@ pub fn project_point_onto(point:&Point2<f32>,mesh:&MeshCollider) -> Point3<f32> 
         .map(|face|(face.vertices,face.normal))
         .map(|(v,norm)|([mesh.vertices[v[0]],mesh.vertices[v[1]],mesh.vertices[v[2]]],norm))
         .filter(|(tri,norm)| tri.point_is_inside(&point))
-        // .inspect(|x|{println!("x [{},{},{}] norm:{:?}",x.0[0],x.0[1],x.0[2],x.1)})
-        // .inspect(|x|{println!("x filtered {:?}",x);})
         .map(|(tri,norm)|{
             let x = ((tri[1]-tri[0]).normalize().cross(&(tri[2]-tri[1]).normalize())).normalize();
             assert!((x.x-norm[0]).abs() < 0.00001);
@@ -43,13 +41,11 @@ pub fn project_point_onto(point:&Point2<f32>,mesh:&MeshCollider) -> Point3<f32> 
             project_point_down(&point, &tri[0], norm)
         })
         .next();
-        // .unwrap_or(Point3::new(point.x,point.y,-1.0))
-        // .expect("could not project point onto mesh_collider");
+
     if let Some(point) = x { return point } else {
-        // dbg!(mesh);
-        println!("found no triangles intersection point: {point}");
-        Point3::new(point.x,point.y,-1.0)
-        // panic!("found no triangles intersection point: {point}")
+        // println!("found no triangles intersection point: {point}");
+        // Point3::new(point.x,point.y,-1.0)
+        panic!("found no triangles intersection point: {point}")
     }
 }
 pub fn project_contour_onto(contour:&Contour,mesh:&MeshCollider) -> Contour3d {

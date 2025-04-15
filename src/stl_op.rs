@@ -268,7 +268,7 @@ impl Into<[usize;2]> for Edge {
         [self.0,self.1]
     }
 }
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct IndexedEdge(pub usize,pub usize);
 impl From<Edge> for IndexedEdge{
     fn from(edge:Edge) -> Self {
