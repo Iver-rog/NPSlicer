@@ -5,10 +5,18 @@ use super::Enclosed;
 /// Axis Aligned Bounding Box
 #[derive(Debug,Clone,PartialEq)]
 pub struct AABB{
-    pub x_max:f32,
     pub x_min:f32,
-    pub y_max:f32,
+    pub x_max:f32,
     pub y_min:f32,
+    pub y_max:f32,
+}
+impl AABB{
+    pub fn scale(&mut self,scale:f32) {
+        self.x_min *= scale;
+        self.x_max *= scale;
+        self.y_min *= scale;
+        self.y_max *= scale;
+    }
 }
 impl Enclosed for AABB {
     fn area(&self) -> f32 {
