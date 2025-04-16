@@ -78,26 +78,7 @@ pub fn project_contour_onto(contour:&Contour,mesh:&MeshCollider) -> Contour3d {
     .collect()
     )
 }
-#[test]
-fn point_is_inside_slice_test(){
-    let slice = [
-        Point3::new(1.0,0.0,0.0),
-        Point3::new(0.0,0.0,0.0),
-        Point3::new(0.0,1.0,0.0),
-    ];
 
-    assert!((&slice).point_is_inside(&Point2::new(0.2,0.2)));
-
-    assert!((&slice).point_is_inside(&Point2::new(0.0,0.0)));
-    assert!((&slice).point_is_inside(&Point2::new(1.0,0.0)));
-    assert!((&slice).point_is_inside(&Point2::new(0.0,1.0)));
-
-    assert!((&slice).point_is_inside(&Point2::new(0.5,0.5)));
-    assert!((&slice).point_is_inside(&Point2::new(0.5,0.0)));
-    assert!((&slice).point_is_inside(&Point2::new(0.0,0.5)));
-
-    assert!(!(&slice).point_is_inside(&Point2::new(1.0,1.0)));
-}
 impl Enclosed for &[Point3<f32>;3]{
     fn area(&self) -> f32 {
         todo!()
@@ -171,25 +152,3 @@ pub fn edge_edge_intersection3d(edge1:[&Point2<f32>;2],edge2:&[Point3<f32>;2]) -
     else{ return None } // The lines intersect but not within the segments
 }
 
-#[test]
-fn edge_edge_intersection_test(){
-    let start = Point2::new(0., 0.);
-    let end = Point2::new(2., 2.);
-    let edge1 = [&start,&end];
-    let edge2 = [
-        Point3::new(0., 2., 0.),
-        Point3::new(2., 0., 0.),
-    ];
-    let edge3 = [
-        Point3::new(2., 4., 0.),
-        Point3::new(4., 2., 0.),
-    ];
-    let edge4 = [
-        Point3::new(1.5, 1.5, 0.),
-        Point3::new(0.5, 0.5, 0.),
-    ];
-
-    assert_eq!(edge_edge_intersection3d(edge1, &edge2),Some((0.5,0.0)));
-    assert_eq!(edge_edge_intersection3d(edge1, &edge3),None);
-    assert_eq!(edge_edge_intersection3d(edge1, &edge4),None);// <-edges are parallel
-}

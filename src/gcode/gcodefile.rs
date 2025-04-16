@@ -205,6 +205,7 @@ fn writeheader<W: Write>(f:&mut BufWriter<W>,settings:&Settings) -> Result<(),io
 }
 
 // NOTE: Might not be a good idea to do it this way
+#[allow(unused)]
 impl Drop for GcodeFile<'_> {
     fn drop(&mut self){
         let f = &mut self.file;
