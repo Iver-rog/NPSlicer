@@ -123,6 +123,7 @@ impl GcodeFile<'_> {
                 writeln!(f,"G92 E0.0 ; Reset extruder distance")?;    // Reset extruder distance
             } else {
                 writeln!(f,"G1 X{:.3} Y{:.3} F{:.3}",start.x+x_offset,start.y+y_offset,s.travel_feedrate)?;
+                writeln!(f,"G1 Z{:.3} F{:.3}",start.z,s.travel_feedrate)?;
             }
 
             let extrusion_area = PI*(s.filament_diameter/2.).powi(2); 
@@ -137,7 +138,7 @@ impl GcodeFile<'_> {
 
                 let (x,y,z) = (point.x+x_offset, point.y+y_offset, point.z);
 
-                writeln!(f,"G1 X{x:.3} Y{y:.3} Z{z:.3} E{extrusion_length:.5} F{}",s.extrusion_feedrate/2)?;
+                writeln!(f,"G1 X{x:.3} Y{y:.3} Z{z:.3} E{extrusion_length:.5} F{}",s.extrusion_feedrate)?;
 
                 prev_point = point;
             }
