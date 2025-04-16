@@ -12,6 +12,9 @@ impl FromUnChecked<Vec<Contour3d>> for Polygon3d {
 }
 
 impl Polygon3d{
+    pub fn all_edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point3<f32>,&'a Point3<f32>)>{
+        self.0.iter().flat_map(|contour|contour.edges())
+    }
     pub fn merge_by_distance(&mut self, distance:f32) -> usize {
         self.0.iter_mut()
             .map(|contour| contour.merge_by_distance(distance))

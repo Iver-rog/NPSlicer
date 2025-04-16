@@ -28,8 +28,6 @@ impl Contour3d {
     pub fn edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point3<f32>,&'a Point3<f32>)>{
         self.points().zip( self.points().cycle().skip(1) )
     }
-    /// Merges vertices together if they are closer together than the spesified distance value.
-    /// NOTE: weight value when merging the first and last vertex is not accurate.
     pub fn merge_by_distance(&mut self, distance:f32) -> usize {
         let (new_points,points_removed) = super::merge_by_distance(&self.0[..], distance);
         self.0 = new_points;
