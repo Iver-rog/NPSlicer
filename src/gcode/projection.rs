@@ -83,29 +83,29 @@ impl Enclosed for &[Point3<f32>;3]{
     fn area(&self) -> f32 {
         todo!()
     }
-    fn point_is_inside(&self,point:&Point2<f32>) -> bool {
-        let a = self[0].xy();
-        let b = self[1].xy();
-        let c = self[2].xy();
+    fn point_is_inside(&self, point: &Point2<f32>) -> bool {
+    let a = self[0].xy();
+    let b = self[1].xy();
+    let c = self[2].xy();
 
-        let v0 = c - a;
-        let v1 = b - a;
-        let v2 = point - a;
+    // 2D cross product (returns scalar)
+    fn edge_fn(p1: Point2<f32>, p2: Point2<f32>, p: Point2<f32>) -> f32 {
+        let d1 = p2 - p1;
+        let d2 = p - p1;
+        d1.x * d2.y - d1.y * d2.x
+    }
 
-        let dot00 = v0.dot(&v0);
-        let dot01 = v0.dot(&v1);
-        let dot02 = v0.dot(&v2);
-        let dot11 = v1.dot(&v1);
-        let dot12 = v1.dot(&v2);
+    let eps = 1e-6; // tolerance to account for floating point error
 
-        let denom = dot00 * dot11 - dot01 * dot01;
-        if denom == 0.0 { return false } // Degenerate triangle
+    let w0 = edge_fn(b, c, *point);
+    let w1 = edge_fn(c, a, *point);
+    let w2 = edge_fn(a, b, *point);
 
-        let inv_denom = 1.0 / denom;
-        let u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
-        let v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
+    // Check if all edge functions are the same sign or zero
+    let has_neg = (w0 < -eps) || (w1 < -eps) || (w2 < -eps);
+    let has_pos = (w0 > eps) || (w1 > eps) || (w2 > eps);
 
-        return (u >= -3.*EPSILON) && (v >= -3.*EPSILON) && (u + v <= (1.0+3.*EPSILON))
+    !(has_neg && has_pos) // true if all non-negative or all non-positive
     }
 }
 
