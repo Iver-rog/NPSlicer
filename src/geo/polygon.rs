@@ -51,6 +51,11 @@ impl Enclosed for Polygon {
 }
 
 impl Polygon {
+    pub fn merge_by_distance(&mut self, distance:f32) -> usize {
+        self.0.iter_mut()
+            .map(|contour| contour.merge_by_distance(distance) )
+            .sum()
+    }
     // Rotates the polygon around the origin by the angle (in radians)
     pub fn scale(&mut self, scale:f32) {
         for contour in self.0.iter_mut() {

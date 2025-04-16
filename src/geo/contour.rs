@@ -170,6 +170,11 @@ fn contour_rotate_test(){
 }
 
 impl Contour {
+    pub fn merge_by_distance(&mut self, distance:f32) -> usize {
+        let (new_points, points_removed) = super::merge_by_distance(&self.points[..], distance);
+        self.points = new_points;
+        return points_removed
+    }
     pub fn scale(&mut self, scale:f32){
         for point in self.points.iter_mut(){ *point *= scale; };
         self.area *= scale;

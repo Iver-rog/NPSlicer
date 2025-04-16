@@ -1,4 +1,4 @@
-use nalgebra::Point2;
+use nalgebra::{Point2,Point};
 
 mod aabb;
 pub use aabb::*;
@@ -102,4 +102,36 @@ where
             T::from_unchecked(holes)
         })
         .collect()
+}
+
+/// Merges vertices together if they are closer together than the spesified distance value.
+/// NOTE: weight value when merging the first and last vertex is not accurate.
+pub(self) fn merge_by_distance<const D:usize>(contour:&[Point<f32,D>], distance:f32) -> (Vec<Point<f32,D>>,usize) {
+    let mut old_points = contour.iter();
+    let mut new_points = vec![*old_points.next().unwrap()];
+    let mut prev_merged = 0;
+    let mut removed_vertices = 0;
+
+    for point in old_points.into_iter() {
+        let last_ndx = new_points.len()-1;
+        if (point - new_points[last_ndx]).magnitude() < distance {
+            let weight = 1./((2+prev_merged) as f32);
+            new_points[last_ndx] = new_points[last_ndx].lerp(&point, weight );
+            prev_merged += 1;
+            removed_vertices +=1;
+        } else {
+            new_points.push(*point);
+            prev_merged = 0;
+        }
+    }
+
+    if (new_points.last().unwrap() - new_points.first().unwrap()).magnitude() < distance {
+        let last_ndx = new_points.len()-1;
+        let weight = 1./((2+prev_merged) as f32);
+        new_points[0] = new_points[last_ndx].lerp(&new_points[0], weight );
+        new_points.pop();
+        removed_vertices +=1;
+    }
+
+    return (new_points, removed_vertices)
 }
