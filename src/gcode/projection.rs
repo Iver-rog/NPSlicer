@@ -95,7 +95,7 @@ impl Enclosed for &[Point3<f32>;3]{
         d1.x * d2.y - d1.y * d2.x
     }
 
-    let eps = 1e-6; // tolerance to account for floating point error
+    let eps = 1e-4; // tolerance to account for floating point error
 
     let w0 = edge_fn(b, c, *point);
     let w1 = edge_fn(c, a, *point);
