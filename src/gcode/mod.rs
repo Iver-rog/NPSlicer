@@ -1,7 +1,8 @@
-use nalgebra::{Point, Point2, Point3, Matrix2};
+use nalgebra::{Point, Point2, Point3, Rotation3, Similarity3, Vector3};
 use priority_queue::core_iterators::Iter;
 use stl_io::IndexedMesh;
 
+use std::f32::consts::PI;
 use std::iter::Iterator;
 use std::io::BufReader;
 use std::fs::{self, File};
@@ -72,11 +73,13 @@ pub fn main(blender:&mut Blender) {
     let layer_w = settings.perimeter_line_width;
     let nr_of_perimeters = 2;
     let brim = 25;
+    // let infill_scale = (settings.infill_percentage as f32/100.0)*settings.perimeter_line_width;
+    let infill_scale = 1.0;
 
     // let mesh_layer_dir = "../curving_overhang/p0.2";
-    // let mesh_layer_dir = "../simple_overhang";
+    let mesh_layer_dir = "../simple_overhang";
     // let mesh_layer_dir = "../wine_glass";
-    let mesh_layer_dir = "../flat_wine_glass";
+    // let mesh_layer_dir = "../flat_wine_glass";
 
     let mut mesh_layers = import_layers(&mesh_layer_dir)
         .map(|layer_mesh| contour_and_mesh_colider_from_mesh(layer_mesh));
@@ -87,7 +90,7 @@ pub fn main(blender:&mut Blender) {
 
     let first_layer_infill = first_layer_perimeters.clone().into_iter()
         .flat_map(|polygon| polygon.offset(-(nr_of_perimeters as f32)*layer_w))
-        .flat_map(|polygon| generate_infill_allong_x_2d(polygon, layer_h ,0.45) );
+        .flat_map(|polygon| generate_infill_allong_x_2d(polygon, layer_h , 1./settings.perimeter_line_width) );
 
     let first_layer_paths = first_layer_perimeters.into_iter()
             .flat_map(|polygon|{
@@ -119,10 +122,10 @@ pub fn main(blender:&mut Blender) {
 
             let infill:Vec<Path> = polygons.iter().cloned()
                 .flat_map(|polygon| polygon.offset(-((nr_of_perimeters as f32) + 0.5) *layer_w).into_iter() )
-                .flat_map(|offset_polygon| match layer_nr%2 ==0 {
-                    true => generate_infill_allong_y(offset_polygon, &mesh_collider_copy),
-                    false => generate_infill_allong_x(offset_polygon, &mesh_collider_copy),
-                })
+                .flat_map(|offset_polygon|{
+                    let angle = if layer_nr%2 == 0 {PI*0.5}else{0.0}; 
+                    generate_3d_infill(offset_polygon, &mesh_collider_copy,angle,infill_scale)
+                    })
                 .collect();
 
             let layer_paths = polygons.into_iter()
@@ -170,128 +173,6 @@ pub fn main(blender:&mut Blender) {
     // }
 }
 
-// Generates infill paths inside the bounds.
-// Spacing is the distance in mm between infill lines.
-// Rotation is the angle in radians between the x-axis and the direction of the infill.
-fn generate_infill_allong_y(bounds:Polygon,mesh:&MeshCollider) -> Vec<Path> {
-    let aabb = &bounds.outer_loop().aabb;
-    let (min,max) = ( aabb.y_min.floor() as isize, aabb.y_max.ceil() as isize);
-    // let (min,max) = ( aabb.x_min.ceil() as isize, aabb.x_max.floor() as isize);
-
-    let offset = -aabb.y_min.floor();
-    let range = (max-min) as usize;
-    let mut xz_vals:Vec<Vec<(f32,Option<f32>)>> = vec![Vec::new();range+1];
-
-    for (e1,e2) in mesh.edges.iter()
-        .map(|edge|(mesh.vertices[edge.0],mesh.vertices[edge.1]))
-        .map(|(e1,e2)| if e1.y < e2.y { (e1,e2) }else{ (e2,e1) }){
-
-            let residual = e1.y.ceil()-e1.y;
-
-            // f(y) = a*y + b
-            let ax = (e2.x-e1.x)/(e2.y-e1.y);
-            let bx = (e1.x) + ax*residual;
-            let az = (e2.z-e1.z)/(e2.y-e1.y);
-            let bz = (e1.z) + az*residual;
-
-            let (y_min,y_max) = ((e1.y.ceil() as isize) , (e2.y.floor() as isize));
-
-            let y_vals = (0..(1+y_max - y_min)).map(|y| y as f32);
-
-            let x = match ax == 0.0 {
-                true => vec![e1.x; y_vals.len()],
-                false => y_vals.clone().map(|y| ax * y + bx ).collect(),
-            };
-
-            let z = match az == 0.0 {
-                true => vec![e1.z; y_vals.len()],
-                false => y_vals.clone().map(|y| az * y + bz ).collect(),
-            };
-
-            x.into_iter().zip(z.into_iter())
-                .enumerate()
-                .map(|(i,(x,z))|{ 
-                    let y_ndx = i as isize + y_min - min;
-                    (y_ndx,x,z)
-                })
-                .filter_map(|(y_ndx,x,z)| usize::try_from(y_ndx).ok().map(|y_ndx|(y_ndx,x,z)) )
-                .filter(|(y_ndx,x,z)| *y_ndx < range+1)
-                .filter(|(y_ndx,x,z)| (aabb.x_min <= *x) && (*x <= aabb.y_max) )
-                .for_each(|(y_ndx,x,z)| xz_vals[y_ndx].push((x,Some(z))) )
-    }
-
-    // Add contour intersections
-    for (e1,e2) in bounds.all_edges()
-        .map(|(e1,e2)| if e1.y < e2.y { (e1,e2) }else{ (e2,e1) }){
-
-            let residual = e1.y.ceil()-e1.y;
-
-            let ax = (e2.x-e1.x)/(e2.y-e1.y);
-            let bx = (e1.x) + ax*residual;
-
-            let (y_min,y_max) = ((e1.y.ceil() as isize) , (e2.y.ceil() as isize));
-
-            let y_vals = (0..(y_max - y_min)).map(|y| y as f32);
-
-            let x = match ax == 0.0 {
-                true => vec![e1.x; y_vals.len()],
-                false => y_vals.clone().map(|y| ax * y + bx ).collect(),
-            };
-
-            x.into_iter()
-                .enumerate()
-                .map(|(i,x)|{ 
-                    let y_ndx = i as isize + y_min - min;
-                    (y_ndx,x)
-                })
-                .filter_map(|(y_ndx,x)| usize::try_from(y_ndx).ok().map(|y_ndx|(y_ndx,x)) )
-                .filter(|(y_ndx,x)| *y_ndx < range+1)
-                .filter(|(y_ndx,x)| (aabb.x_min <= *x) && (*x <= aabb.x_max) )
-                .for_each(|(y_ndx,x)| xz_vals[y_ndx].push((x,None)) )
-        }
-
-    // sort the table:
-    for (i,collumn) in xz_vals.iter_mut().enumerate(){
-        if i%2 == 0 {
-            collumn.sort_unstable_by(|(t1,_),(t2,_)| t1.partial_cmp(t2).unwrap());
-        } else {
-            collumn.sort_unstable_by(|(t1,_),(t2,_)| t2.partial_cmp(t1).unwrap());
-        }
-    }
-
-    let mut collums = Vec::new();
-    for (y,xz) in xz_vals.into_iter()
-        .enumerate()
-        .map(|(y,xz)| ((y as isize + min) as f32 ,xz)){
-
-        let mut segment = Vec::new();
-        let mut within_bounds = false;
-
-        for (x,z) in xz {
-            match z {
-                // found a mesh point keep it if it is inside the contur
-                Some(z) => if within_bounds {
-                    segment.push(Point3::new(x,y,z));
-                },
-                // point on the bounding contour which implies crossing 
-                // the boundary between inside and outside the bounds
-                None => {
-                    let point3d = project_point_onto(&Point2::new(x,y),&mesh);
-                    if within_bounds { // completed the line segment
-                        segment.push( point3d );
-                        collums.push( Path{points:segment} );
-                        segment = Vec::new();
-                    } else {
-                        segment.push(point3d)
-                    }
-                    within_bounds = !within_bounds;
-                    (x,0.0);
-                },
-            };
-        }
-    }
-    return collums
-}
 
 #[derive(Copy,Clone,Debug)]
 enum PntType {
@@ -348,9 +229,23 @@ where
     }
 }
 
-fn generate_infill_allong_x(bounds:Polygon,mesh:&MeshCollider) -> Vec<Path> {
+// Generates infill paths inside the bounds.
+// scale = 1/line_spacing
+// Rotation is the angle in radians between the x-axis and the direction of the infill.
+fn generate_3d_infill(bounds:Polygon,mesh:&MeshCollider,angle:f32 ,scale:f32) -> Vec<Path> {
 
-    let aabb = &bounds.outer_loop().aabb;
+    let mut bounds3d = bounds.project_onto(mesh);
+    bounds3d.rotate_scale(angle,scale);
+
+    let rot = Rotation3::from_axis_angle(&Vector3::z_axis(),angle);
+    // Similarity3::f
+    // let transform = scale * rot;
+    let translation = Vector3::zeros();
+    let axisangle = Vector3::z();
+    let transform = Similarity3::new(translation,axisangle,scale);
+    let reverse_transform = Similarity3::new(translation,-axisangle,1./scale);
+
+    let aabb = &bounds3d.outer_loop().aabb();
     let (min,max) = ( aabb.x_min.floor() as isize, aabb.x_max.ceil() as isize);
 
     let offset = -aabb.x_min.floor();
@@ -358,13 +253,13 @@ fn generate_infill_allong_x(bounds:Polygon,mesh:&MeshCollider) -> Vec<Path> {
     let mut yz_vals:Vec<Vec<(f32,f32,PntType)>> = vec![Vec::new();range+1];
 
     let edges = mesh.edges.iter()
-        .map(|edge|(mesh.vertices[edge.0],mesh.vertices[edge.1]));
+        .map(|edge|(&mesh.vertices[edge.0],&mesh.vertices[edge.1]))
+        .map(|(e1,e2)| (transform.transform_point(e1),transform.transform_point(e2)) );
 
     let tag = PntType::Inside;
 
     sample_points(edges, aabb, range, min, &mut yz_vals, tag);
 
-    let bounds3d = bounds.project_onto(mesh);
     let edges = bounds3d.all_edges()
         .map(|(e1,e2)|(e1*1.,e2*1.));
     let tag = PntType::Perimeter;
@@ -389,15 +284,16 @@ fn generate_infill_allong_x(bounds:Polygon,mesh:&MeshCollider) -> Vec<Path> {
         let mut within_bounds = false;
 
         for (y,z,tag) in yz {
+            let point = rot.inverse_transform_point(&(Point3::new(x,y,z)*1./scale));
             match tag {
                 // found a mesh point keep it if it is inside the contur
                 PntType::Inside => if within_bounds {
-                    segment.push(Point3::new(x,y,z));
+                    segment.push(point);
                 },
                 // point on the bounding contour which implies crossing 
                 // the boundary between inside and outside the bounds
                 PntType::Perimeter => {
-                    let point = Point3::new(x,y,z);
+                    // let point = Point3::new(x,y,z);
                     if within_bounds { // completed the line segment
                         segment.push( point );
                         collums.push( Path{points:segment} );
@@ -412,10 +308,10 @@ fn generate_infill_allong_x(bounds:Polygon,mesh:&MeshCollider) -> Vec<Path> {
         }
     }
     return collums
+
 }
 
-fn generate_infill_allong_x_2d(bounds:Polygon, height:f32, spacing:f32) -> Vec<Path> {
-    let scale = 1.0/spacing;
+fn generate_infill_allong_x_2d(bounds:Polygon, height:f32, scale:f32) -> Vec<Path> {
     let aabb = &bounds.outer_loop().aabb;
     let (min,max) = ( (aabb.x_min*scale).floor() as isize, (aabb.x_max*scale).ceil() as isize);
 
