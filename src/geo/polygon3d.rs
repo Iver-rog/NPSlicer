@@ -1,8 +1,10 @@
 use super::{Contour3d,FromUnChecked};
 use nalgebra::Point3;
-use std::f32::EPSILON;
+use core::{assert_eq, assert_ne};
+use std::f32::{ EPSILON, consts::PI };
+use super::AABB;
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq,Clone)]
 pub struct Polygon3d(pub Vec<Contour3d>);
 
 impl FromUnChecked<Vec<Contour3d>> for Polygon3d {
@@ -11,7 +13,58 @@ impl FromUnChecked<Vec<Contour3d>> for Polygon3d {
     }
 }
 
+use crate::contour3d;
+#[test]
+fn polygon3d_rotation(){
+    let mut polygon = Polygon3d::from_unchecked(vec![
+        contour3d!(
+            [0.0,0.0,0.0],
+            [1.0,2.0,0.0],
+            [3.0,1.0,0.0]
+            ),
+    ]);
+    let mut rot = polygon.clone();
+    let mut scale = polygon.clone();
+
+    // rot.rotate_scale(PI, 1.);
+    // assert_eq!(
+    //     rot,
+    //     Polygon3d::from_unchecked(vec![
+    //     contour3d!(
+    //         [ 0.0, 0.0, 0.0],
+    //         [-2.0,-4.0, 0.0],
+    //         [-6.0,-2.0, 0.0]
+    //         ),
+    //     ]),
+    //     "pure rotation"
+    // );
+
+    scale.rotate_scale(0.,2.);
+    assert_eq!(
+        scale,
+        Polygon3d::from_unchecked(vec![
+        contour3d!(
+            [0.0, 0.0, 0.0],
+            [2.0, 4.0, 0.0],
+            [6.0, 2.0, 0.0]
+            ),
+        ]),
+        "pure scaleing"
+    );
+    assert_ne!(polygon.aabb(),scale.aabb())
+
+}
+
 impl Polygon3d{
+    pub fn aabb(&self) -> AABB{
+        self.outer_loop().aabb()
+    }
+    pub fn outer_loop(&self) -> &Contour3d{
+        &self.0[0]
+    }
+    pub fn rotate_scale(&mut self, angle:f32, scale:f32) {
+        self.0.iter_mut().for_each(|contour|contour.rotate_scale(angle,scale))
+    }
     pub fn all_edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point3<f32>,&'a Point3<f32>)>{
         self.0.iter().flat_map(|contour|contour.edges())
     }

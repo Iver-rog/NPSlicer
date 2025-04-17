@@ -1,8 +1,8 @@
 #[cfg(test)]
 use std::f32::EPSILON;
 
-use nalgebra::{Point2,Point3};
-use super::Contour;
+use nalgebra::{Matrix3, Point2, Point3, Rotation3, Similarity3, Vector3};
+use super::{Contour,AABB};
 
 #[derive(Debug,Clone,PartialEq)]
 pub struct Contour3d(pub Vec<Point3<f32>>);
@@ -22,6 +22,22 @@ impl Contour3d {
 }
 
 impl Contour3d {
+    pub fn aabb(&self) -> AABB {
+        let first_p = self.0[0];
+        let mut aabb = AABB{
+            x_min: first_p.x,
+            x_max: first_p.x,
+            y_min: first_p.y,
+            y_max: first_p.y,
+        };
+        for point in self.points().skip(1){
+            aabb.x_max = aabb.x_max.max(point.x);
+            aabb.x_min = aabb.x_min.min(point.x);
+            aabb.y_max = aabb.y_max.max(point.y);
+            aabb.y_min = aabb.y_min.min(point.y);
+        }
+        return aabb
+    }
     pub fn from_contour(contour:Contour,height:f32) -> Self {
         Self(contour.into_iter().map(|p| Point3::new(p.x,p.y,height) ).collect())
     }
@@ -32,6 +48,20 @@ impl Contour3d {
         let (new_points,points_removed) = super::merge_by_distance(&self.0[..], distance);
         self.0 = new_points;
         return points_removed
+    }
+    pub fn rotate_scale(&mut self, angle:f32, scale:f32){
+        let translation = Vector3::zeros();
+        let axisangle = Vector3::z() * angle;
+        let transform = Similarity3::new(translation,axisangle,scale);
+        // let transform = Similarity3::from_parts(translation,axisangle,scale);
+        let rot = Rotation3::from_axis_angle(&Vector3::z_axis(), angle);
+
+        let tanformed_points:Vec<_> = self.0.iter()
+            // .map(|p| transform.transform_point(&p) )
+            // .map(|p| transform * p )
+            .map(|p| rot * p * scale )
+            .collect();
+        *self = Contour3d::from(tanformed_points);
     }
 
     /// returns true if the point is on or inside the projection of the contour onto the xy-plane
