@@ -1,4 +1,5 @@
 use nalgebra::{Point2, Point3, Rotation3, Similarity3, Vector3};
+use path::PathType;
 use stl_io::IndexedMesh;
 
 use std::f32::consts::PI;
@@ -72,7 +73,6 @@ pub fn main(blender:&mut Blender) {
     let nr_of_perimeters = 2;
     let brim = 25;
     let infill_scale = (settings.infill_percentage as f32/100.0)*(1.0/settings.perimeter_line_width);
-    // let infill_scale = 1.0;
 
     // let mesh_layer_dir = "../curving_overhang/p0.2";
     let mesh_layer_dir = "../simple_overhang";
@@ -114,14 +114,17 @@ pub fn main(blender:&mut Blender) {
 
    
     for (layer_nr,(mut polygons, mesh_collider)) in mesh_layers.enumerate()
-        .inspect(|(layer_nr,_)|{println!("layer: {}",layer_nr+1);}){
+        .inspect(|(layer_nr,_)|{ println!("layer: {}",layer_nr+1);} ){
 
             let mesh_collider_copy = mesh_collider.clone();
 
+            let infill_offset = -layer_w * ((nr_of_perimeters as f32) 
+                + 0.5 -(settings.infill_overlap_percentage as f32)/100.);
+
             let infill:Vec<Path> = polygons.iter().cloned()
-                .flat_map(|polygon| polygon.offset(-((nr_of_perimeters as f32) + 0.5) *layer_w).into_iter() )
+                .flat_map(|polygon| polygon.offset(infill_offset).into_iter() )
                 .flat_map(|offset_polygon|{
-                    let direction = if layer_nr%2 == 0 {InfillDirection::Y}else{InfillDirection::X};
+                    let direction = if layer_nr%2 == 0 { InfillDirection::Y }else{ InfillDirection::X };
                     generate_3d_infill(offset_polygon, &mesh_collider_copy,infill_scale,direction)
                     })
                 .collect();
@@ -316,7 +319,7 @@ fn generate_3d_infill(
                 PntType::Perimeter => {
                     segment.push( point );
                     if within_bounds { // completed the line segment
-                        collums.push( Path{points:segment} );
+                        collums.push( Path{points:segment, path_type:PathType::Infill } );
                         segment = Vec::new();
                     }
                     within_bounds = !within_bounds;
@@ -384,7 +387,7 @@ fn generate_infill_allong_x_2d(bounds:Polygon, height:f32, scale:f32) -> Vec<Pat
             if let Some(end) = collumn.next() {
                 let start_p = Point3::new(x,start,height);
                 let end_p = Point3::new(x,end,height);
-                paths.push(Path{ points:vec![start_p,end_p] })
+                paths.push(Path{ points:vec![start_p,end_p], path_type:PathType::Infill })
             }
         }
 

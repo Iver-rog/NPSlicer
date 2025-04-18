@@ -2,65 +2,104 @@ use std::io::{self,BufWriter,Write};
 use std::fs::File;
 use std::f32::consts::PI;
 
-use nalgebra::Point3;
+use nalgebra::{partial_max, Point3};
 
+use super::path::PathType;
 use super::Path;
 
 pub struct Settings{
-    pub layer_height: f32,
-    pub infill_percentage: usize,// %
-    pub nozzle_diameter: f32, // mm
-    pub perimeter_line_width: f32,
-    pub infill_line_width: f32,
-    pub n_perimeters: usize,
+    pub layer_height: f32,          // mm
+    pub infill_percentage: usize,   // %
+    pub nozzle_diameter: f32,       // mm
+    pub perimeter_line_width: f32,  // mm
+    pub infill_line_width: f32,     // mm
+    pub n_perimeters: usize,        // int
+    
+    /// [%] The overlap between the infill lines and inner most contour
     pub infill_overlap_percentage: usize,
-    pub z_hop: f32,
 
+    /// [mm] The maximum lenght a travel move can have without requiering a 
+    /// retract opperation. Used to allow the hotend to travel to the 
+    /// start of the next path without moving up to the safe z-height.
     pub max_staydown_distance: f32,
-    pub min_edge_length: f32,   // mm
-    pub filament_diameter: f32, // mm
-    pub layer_fan_start: usize,
-    pub perimeter_start_xy: [isize;2],
+
+    /// [mm] Diameter of the fillament (usually 1.75mm)
+    pub filament_diameter: f32,
+
+    /// [(x,y) mm] A displacement applied to the model during gcode parsing.
+    /// Used to center the model on the build plate.
     pub translate_xy: [f32;2],
 
-    // my fields
-    pub max_nonplanar_thicness:f32, // mm  the largest z-distance a non planar layer can have
-    pub travel_feedrate:usize, // mm/s?
-    pub retract_feedrate:usize,// mm/s?
-    pub extrusion_feedrate:usize,
-    pub non_planar_travel_feedrate:usize,
-    pub fan_start:usize, // at which layer the fan should turn on
-    pub retract_distance: usize,// nm (10⁻³ mm)  retract distance(movement of extruder) during travel moves
+    /// [int] The layer number at which the fan should turn on (first layer is 0)
+    pub fan_start:usize,
+
+    /// [nm (10⁻³ mm)] The length of fillament to retract before travel moves
+    pub retract_distance: usize,
+
+    pub feedrates:Feedrates,
 }
+
+pub struct Feedrates {
+    /// [mm/min] The feedrate of the axis during first layer perimeter
+    pub initial_layer:usize,
+
+    /// [mm/min] The feedrate of the axis during first layer perimeter
+    pub initial_layer_infill:usize,
+
+    /// [mm/min] The feedrate for the outer wall during normal printing
+    pub outer_wall:usize,
+
+    /// [mm/min] The feedrate for the inner walls during normal printing
+    pub inner_wall:usize,
+
+    /// [mm/min] The feedrate for infill during normal printing
+    pub infill:usize,
+
+    /// [mm/min] The feedrate of the axis during travel moves
+    pub travel:usize,
+
+    /// [mm/min] The feedrate of the extruder during retraction
+    pub retract:usize,
+
+    /// [mm/min] The feddrate of the z-axis during strictly vertical movement
+    pub z_max:usize,
+}
+
 impl Default for Settings {
     fn default() -> Self {
-        let layer_thickness = 0.2;
         let nozzle_diameter = 0.6;
         let infill_percentage = 10;
         Self {
-            layer_height: layer_thickness,
+            layer_height: 0.2,
             infill_percentage,
             nozzle_diameter,
             perimeter_line_width: 0.45,
             infill_line_width: 0.6,
             n_perimeters: 2,
             infill_overlap_percentage: 0,
-            z_hop: layer_thickness,
                
             max_staydown_distance: 1.5 * nozzle_diameter/((infill_percentage as f32)/100.),
-            min_edge_length: 0.5,//mm
             filament_diameter: 1.75,//mm
-            layer_fan_start: 3,
-            perimeter_start_xy: [-30, -15],
             translate_xy: [100., 100.],
 
-            max_nonplanar_thicness: 50., //mm
-            travel_feedrate: 10800,//mm/s?
-            retract_feedrate: 2500,//mm/s?
-            extrusion_feedrate: 1500,//mm/s?
-            non_planar_travel_feedrate: 5040,//mm/s?
             fan_start:3,
-            retract_distance: 800 // nm (10⁻³ mm)
+            retract_distance: 800, // nm (10⁻³ mm)
+            feedrates:Feedrates::default(),
+        }
+    }
+}
+
+impl Default for Feedrates {
+    fn default() -> Self {
+        Self {
+            initial_layer:1200,
+            initial_layer_infill:2400,
+            outer_wall:1500, //orca 45mm/s = 2700mm/min
+            inner_wall:1500, //orca 60mm/s = 3600mm/min
+            infill:2500, //orca 70mm/s = 4200mm/min
+            travel: 10800,
+            retract: 2500,
+            z_max: 720,
         }
     }
 }
@@ -69,6 +108,7 @@ pub struct GcodeFile<'a>{
     file: BufWriter<File>,
     settings: &'a Settings,
     n_layer: usize,
+    safe_z: f32,
 }
 
 impl GcodeFile<'_> {
@@ -83,25 +123,34 @@ impl GcodeFile<'_> {
         let mut buffer = BufWriter::new(file);
 
         writeheader(&mut buffer, settings).unwrap();
+        let safe_z = settings.layer_height;
 
-        return GcodeFile { file:buffer, n_layer:0, settings }
+        return GcodeFile{ file:buffer, settings, n_layer:0, safe_z }
     }
 
     pub fn layer(&mut self,mut paths: impl Iterator<Item = Path>) -> Result<(),io::Error> {
         let f = &mut self.file;
         let s = self.settings;
 
+        let (outer_wall_feedrate, inner_wall_feedrate) = match self.n_layer == 0 {
+            true  => (s.feedrates.initial_layer, s.feedrates.initial_layer),
+            false => (s.feedrates.outer_wall,    s.feedrates.inner_wall   ),
+        };
+        let infill_feedrate = match self.n_layer == 0 {
+            true => s.feedrates.initial_layer_infill,
+            false => s.feedrates.infill,
+        };
+
         writeln!(f,"\n;Start layer {}",self.n_layer)?;
         writeln!(f,"M117 Layer {}",self.n_layer)?;
         if s.fan_start == self.n_layer { writeln!(f,"M106 ; Fan on")?; }
-
         self.n_layer += 1;
-        let safe_z = self.n_layer as f32 * s.layer_height;
+
         let [x_offset,y_offset] = s.translate_xy;
 
         writeln!(f,"G92 E0.0 ; Reset extruder distance")?;
-        writeln!(f,"G1 Z{:.3} F{:.3}",safe_z,s.travel_feedrate)?;
-        writeln!(f,"G1 E{} F{} ; De-retract",(s.retract_distance as f32)/1000.,s.retract_feedrate)?;  // De-Retraction
+        writeln!(f,"G1 Z{:.3} F{:.3}",self.safe_z,s.feedrates.z_max)?;
+        writeln!(f,"G1 E{} F{} ; De-retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // De-Retraction
         let mut end_of_previous_layer:Option<Point3<f32>> = None; 
 
         for path in paths {
@@ -114,39 +163,48 @@ impl GcodeFile<'_> {
                 None => false, // <- first path in new layer no need for retraction
             };
 
+            let (start_x, start_y, start_z) = (start.x+x_offset, start.y+y_offset ,start.z);
+            self.safe_z = self.safe_z.max( start_z );
+
             if should_retract {
-                writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.retract_feedrate)?;  // Retraction
-                writeln!(f,"G1 Z{:.3} F{:.3}",safe_z,s.travel_feedrate)?;
-                writeln!(f,"G1 X{:.3} Y{:.3} F{:.3}",start.x+x_offset,start.y+y_offset,s.travel_feedrate)?;
-                writeln!(f,"G1 Z{:.3} F{:.3}",start.z,s.travel_feedrate)?;
-                writeln!(f,"G1 E{} F{} ; De-retract",(s.retract_distance as f32)/1000.,s.retract_feedrate)?;  // De-Retraction
-                writeln!(f,"G92 E0.0 ; Reset extruder distance")?;    // Reset extruder distance
+                writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // Retraction
+                writeln!(f,"G1 Z{:.3} F{:.3}",self.safe_z,s.feedrates.z_max)?;
+                writeln!(f,"G1 X{start_x:.3} Y{start_y:.3} F{:.3}", s.feedrates.travel)?;
+                writeln!(f,"G1 Z{start_z:.3} F{:.3}",s.feedrates.z_max)?;
+                writeln!(f,"G1 E{} F{} ; De-retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // De-Retraction
+                writeln!(f,"G92 E0.0 ; Reset extruder distance")?;
             } else {
-                writeln!(f,"G1 X{:.3} Y{:.3} F{:.3}",start.x+x_offset,start.y+y_offset,s.travel_feedrate)?;
-                writeln!(f,"G1 Z{:.3} F{:.3}",start.z,s.travel_feedrate)?;
+                writeln!(f,"G1 X{start_x:.3} Y{start_y:.3} Z{start_z:.3} F{:.3}", s.feedrates.travel)?;
             }
 
             let extrusion_area = PI*(s.filament_diameter/2.).powi(2); 
             let line_area = s.layer_height*s.perimeter_line_width;
             let extrusion_multiplier = line_area/extrusion_area;
 
+            let feedrate = match path.path_type {
+                PathType::OuterWall => outer_wall_feedrate,
+                PathType::InnerWall => inner_wall_feedrate,
+                PathType::Infill    => infill_feedrate,
+            };
+
             let mut prev_point = start;
             for point in points{
+                self.safe_z = self.safe_z.max( point.z );
                 // let line_length = (point.xy() - prev_point.xy()).magnitude();
                 let line_length = (point - prev_point).magnitude();
                 let extrusion_length = line_length*extrusion_multiplier;
 
                 let (x,y,z) = (point.x+x_offset, point.y+y_offset, point.z);
 
-                writeln!(f,"G1 X{x:.3} Y{y:.3} Z{z:.3} E{extrusion_length:.5} F{}",s.extrusion_feedrate)?;
+                writeln!(f,"G1 X{x:.3} Y{y:.3} Z{z:.3} E{extrusion_length:.5} F{feedrate}")?;
 
                 prev_point = point;
             }
             end_of_previous_layer = Some(*prev_point);
         }
 
-        writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.retract_feedrate)?;  // Retraction
-        writeln!(f,"G1 Z{:.3} F{}",safe_z, s.travel_feedrate)?;
+        writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // Retraction
+        writeln!(f,"G1 Z{:.3} F{}",self.safe_z, s.feedrates.z_max)?;
         writeln!(f,";End of layer {}",self.n_layer)?;
         Ok(())
     }
@@ -161,7 +219,7 @@ fn writeheader<W: Write>(f:&mut BufWriter<W>,settings:&Settings) -> Result<(),io
     writeln!(f,"; Infill line width: {}",settings.infill_line_width)?;
     // writeln!(f,"; Infill angle: {}",settings.infill_angle)?;
     // writeln!(f,"; Infill line spacing: {}",settings.infill_line_spacing)?;
-    writeln!(f,"; Layer fan start: {}",settings.layer_fan_start)?;
+    writeln!(f,"; fan start: {}",settings.fan_start)?;
     writeln!(f,"; Max staydown distance: {}",settings.max_staydown_distance)?;
     // writeln!(f,"; Seam position: {}",settings.seam_position)?;
     // writeln!(f,"; Translate XY: {translate_xy}")?;
@@ -214,8 +272,8 @@ impl Drop for GcodeFile<'_> {
 
         // Wipe (set relative mode, move to X2.0, Y2.0)
         writeln!(f,"G91 ; relative mode");
-        writeln!(f,"G1 X2.0 Y2.0 E-0.4 F{} ; wipe and retract",s.travel_feedrate);
-        writeln!(f,"G01 E-0.1 F{} ; retract some more",s.travel_feedrate);
+        writeln!(f,"G1 X2.0 Y2.0 E-0.4 F{} ; wipe and retract",s.feedrates.travel);
+        writeln!(f,"G01 E-0.1 F{} ; retract some more",s.feedrates.travel);
         writeln!(f,"G90 ; absolute mode");
 
         // Turn off heaters and fan
@@ -224,10 +282,10 @@ impl Drop for GcodeFile<'_> {
         writeln!(f,"M107 ; fan off");
 
         // Move up
-        writeln!(f,"G1 Z{} F{} ; move up",s.max_nonplanar_thicness,s.travel_feedrate);
+        writeln!(f,"G1 Z{} F{} ; move up",self.safe_z + 10.,s.feedrates.travel);
 
         // Present print
-        writeln!(f,"G1 Y200 F{} ; present print",(s.travel_feedrate/2));
+        writeln!(f,"G1 Y200 F{} ; present print",(s.feedrates.travel/2));
 
         // Home x
         writeln!(f,"G28 X ; home x");
