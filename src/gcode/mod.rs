@@ -71,8 +71,8 @@ pub fn main(blender:&mut Blender) {
     let layer_w = settings.perimeter_line_width;
     let nr_of_perimeters = 2;
     let brim = 25;
-    // let infill_scale = (settings.infill_percentage as f32/100.0)*settings.perimeter_line_width;
-    let infill_scale = 1.0;
+    let infill_scale = (settings.infill_percentage as f32/100.0)*(1.0/settings.perimeter_line_width);
+    // let infill_scale = 1.0;
 
     // let mesh_layer_dir = "../curving_overhang/p0.2";
     let mesh_layer_dir = "../simple_overhang";
@@ -121,8 +121,8 @@ pub fn main(blender:&mut Blender) {
             let infill:Vec<Path> = polygons.iter().cloned()
                 .flat_map(|polygon| polygon.offset(-((nr_of_perimeters as f32) + 0.5) *layer_w).into_iter() )
                 .flat_map(|offset_polygon|{
-                    let angle = if layer_nr%2 == 0 {PI*0.5}else{0.0}; 
-                    generate_3d_infill(offset_polygon, &mesh_collider_copy,angle,infill_scale)
+                    let direction = if layer_nr%2 == 0 {InfillDirection::Y}else{InfillDirection::X};
+                    generate_3d_infill(offset_polygon, &mesh_collider_copy,infill_scale,direction)
                     })
                 .collect();
 
@@ -230,39 +230,59 @@ where
 // Generates infill paths inside the bounds.
 // scale = 1/line_spacing
 // Rotation is the angle in radians between the x-axis and the direction of the infill.
-fn generate_3d_infill(bounds:Polygon,mesh:&MeshCollider,angle:f32 ,scale:f32) -> Vec<Path> {
+#[derive(PartialEq)]
+pub enum InfillDirection{
+    X,
+    Y,
+}
+fn generate_3d_infill(
+    bounds:Polygon,
+    mesh:&MeshCollider, 
+    scale:f32, 
+    infill_direction:InfillDirection
+    ) -> Vec<Path> {
 
     let mut bounds3d = bounds.project_onto(mesh);
-    bounds3d.rotate_scale(angle,scale);
 
-    let rot = Rotation3::from_axis_angle(&Vector3::z_axis(),angle);
-    // Similarity3::f
-    // let transform = scale * rot;
-    let translation = Vector3::zeros();
-    let axisangle = Vector3::z();
-    let transform = Similarity3::new(translation,axisangle,scale);
-    let reverse_transform = Similarity3::new(translation,-axisangle,1./scale);
-
-    let aabb = &bounds3d.outer_loop().aabb();
+    let mut aabb = bounds3d.outer_loop().aabb().clone();
+    if infill_direction == InfillDirection::Y{
+        aabb = AABB{
+            x_min: aabb.y_min * scale,
+            x_max: aabb.y_max * scale,
+            y_min: aabb.x_min * scale,
+            y_max: aabb.x_max * scale,
+        };
+    }
     let (min,max) = ( aabb.x_min.floor() as isize, aabb.x_max.ceil() as isize);
 
     let offset = -aabb.x_min.floor();
     let range = (max-min) as usize;
     let mut yz_vals:Vec<Vec<(f32,f32,PntType)>> = vec![Vec::new();range+1];
 
-    let edges = mesh.edges.iter()
+    let mut edges = mesh.edges.iter()
         .map(|edge|(&mesh.vertices[edge.0],&mesh.vertices[edge.1]))
-        .map(|(e1,e2)| (transform.transform_point(e1),transform.transform_point(e2)) );
+        .map(|(e1,e2)|(e1*scale,e2*scale))
+        .map(|(e1,e2)|{
+            if infill_direction == InfillDirection::Y{
+                (Point3::new(e1.y,e1.x,e1.z),Point3::new(e2.y,e2.x,e2.z))
+            } else {(e1,e2)}
+        });
 
     let tag = PntType::Inside;
 
-    sample_points(edges, aabb, range, min, &mut yz_vals, tag);
+    sample_points(edges, &aabb, range, min, &mut yz_vals, tag);
 
-    let edges = bounds3d.all_edges()
-        .map(|(e1,e2)|(e1*1.,e2*1.));
+    let mut edges = bounds3d.all_edges()
+        .map(|(e1,e2)|(e1*scale,e2*scale))
+        .map(|(e1,e2)|{
+            if infill_direction == InfillDirection::Y{
+                (Point3::new(e1.y,e1.x,e1.z),Point3::new(e2.y,e2.x,e2.z))
+            } else {(e1,e2)}
+        });
+
     let tag = PntType::Perimeter;
 
-    sample_points(edges, aabb, range, min, &mut yz_vals, tag);
+    sample_points(edges, &aabb, range, min, &mut yz_vals, tag);
 
     // sort the tables by y value in alternating increasing/decrasing order:
     for (i,collumn) in yz_vals.iter_mut().enumerate(){
@@ -282,7 +302,10 @@ fn generate_3d_infill(bounds:Polygon,mesh:&MeshCollider,angle:f32 ,scale:f32) ->
         let mut within_bounds = false;
 
         for (y,z,tag) in yz {
-            let point = rot.inverse_transform_point(&(Point3::new(x,y,z)*1./scale));
+            let point = match infill_direction {
+                InfillDirection::Y => Point3::new(y,x,z)*1./scale,
+                InfillDirection::X => Point3::new(x,y,z)*1./scale,
+            };
             match tag {
                 // found a mesh point keep it if it is inside the contur
                 PntType::Inside => if within_bounds {
@@ -300,6 +323,7 @@ fn generate_3d_infill(bounds:Polygon,mesh:&MeshCollider,angle:f32 ,scale:f32) ->
                 },
             };
         }
+        assert!(!within_bounds);
     }
     return collums
 

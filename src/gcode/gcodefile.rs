@@ -36,10 +36,10 @@ impl Default for Settings {
     fn default() -> Self {
         let layer_thickness = 0.2;
         let nozzle_diameter = 0.6;
-        let infill_percentage = 20;
+        let infill_percentage = 10;
         Self {
             layer_height: layer_thickness,
-            infill_percentage: 20,
+            infill_percentage,
             nozzle_diameter,
             perimeter_line_width: 0.45,
             infill_line_width: 0.6,
