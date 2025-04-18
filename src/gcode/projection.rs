@@ -3,7 +3,6 @@ use nalgebra::{Point2,Point3,Vector3};
 use stl_io::IndexedTriangle;
 use crate::stl_op;
 use crate::geo::{Contour,Contour3d,Enclosed,Polygon,Polygon3d,FromUnChecked};
-use core::f32::EPSILON;
 
 impl Polygon{
     pub fn project_onto(&self,mesh:&MeshCollider) -> Polygon3d {

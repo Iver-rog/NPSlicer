@@ -1,12 +1,5 @@
-use core::todo;
-
-use nalgebra::{Point, Point3};
+use nalgebra::Point3;
 use crate::geo::Contour3d;
-
-pub enum PathType{
-    Perimeter,
-    Infill,
-}
 
 #[derive(Debug)]
 pub struct Path{

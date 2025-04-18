@@ -120,8 +120,7 @@ impl ContorTrait for Contour {
             .skip(1)
             .chain( self.points.iter() );
 
-        let intersections: Vec<f32> = self.points.iter()
-            .zip(points_offset_by_one)
+        let intersections: Vec<f32> = self.edges()
             // cast a ray from the test point towards the right direction allong 
             // the x-axis and check if the ray intersects the edge
             .filter_map(|(p1,p2)|{

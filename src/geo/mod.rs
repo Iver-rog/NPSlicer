@@ -104,7 +104,7 @@ where
         .collect()
 }
 
-/// Merges vertices together if they are closer together than the spesified distance value.
+/// Merges vertices together if they are closer than the spesified distance value.
 /// NOTE: weight value when merging the first and last vertex is not accurate.
 pub(self) fn merge_by_distance<const D:usize>(contour:&[Point<f32,D>], distance:f32) -> (Vec<Point<f32,D>>,usize) {
     let mut old_points = contour.iter();

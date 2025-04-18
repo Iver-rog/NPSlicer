@@ -1,4 +1,4 @@
-use nalgebra::{Point2,Matrix2};
+use nalgebra::Point2;
 use super::{ContorTrait, Contour, FromUnChecked, Polygon3d};
 pub use super::Enclosed;
 

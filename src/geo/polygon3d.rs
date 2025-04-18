@@ -1,8 +1,9 @@
 use super::{Contour3d,FromUnChecked};
 use nalgebra::Point3;
-use core::{assert_eq, assert_ne};
-use std::f32::{ EPSILON, consts::PI };
 use super::AABB;
+
+#[cfg(test)]
+use std::f32::{ EPSILON, consts::PI };
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct Polygon3d(pub Vec<Contour3d>);

@@ -1,5 +1,4 @@
-use nalgebra::{Point, Point2, Point3, Rotation3, Similarity3, Vector3};
-use priority_queue::core_iterators::Iter;
+use nalgebra::{Point2, Point3, Rotation3, Similarity3, Vector3};
 use stl_io::IndexedMesh;
 
 use std::f32::consts::PI;
@@ -7,14 +6,13 @@ use std::iter::Iterator;
 use std::io::BufReader;
 use std::fs::{self, File};
 use std::iter;
-use std::iter::zip;
 
 use crate::geo::*;
 use crate::stl_op;
 use crate::Blender;
 
 mod projection;
-use projection::{MeshCollider,project_point_onto};
+use projection::MeshCollider;
 
 mod gcodefile;
 use gcodefile::{GcodeFile,Settings};

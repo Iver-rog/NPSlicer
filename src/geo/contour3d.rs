@@ -1,7 +1,7 @@
 #[cfg(test)]
 use std::f32::EPSILON;
 
-use nalgebra::{Matrix3, Point2, Point3, Rotation3, Similarity3, Vector3};
+use nalgebra::{Point2, Point3, Rotation3, Similarity3, Vector3};
 use super::{Contour,AABB};
 
 #[derive(Debug,Clone,PartialEq)]
