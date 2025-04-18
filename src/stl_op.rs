@@ -280,7 +280,7 @@ pub fn extract_perimeters_and_edges(triangles: &Vec<IndexedTriangle>) -> (Vec<Ve
     // NOTE: default hashmap is not optimized for integers, a different hashmap will likley preforme better
     let mut edge_count: HashMap<Edge,bool> = HashMap::new(); 
 
-    for tri in triangles{
+    for tri in triangles {
         let [v1, v2, v3] = tri.vertices;
         let edges = [
             Edge::new(v1,v2),

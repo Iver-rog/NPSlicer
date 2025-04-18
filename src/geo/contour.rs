@@ -116,10 +116,6 @@ impl ContorTrait for Contour {
         // returns true if a point is on or inside the contour
         if !self.aabb.point_is_inside(&point) { return None }
 
-        let points_offset_by_one = self.points.iter()
-            .skip(1)
-            .chain( self.points.iter() );
-
         let intersections: Vec<f32> = self.edges()
             // cast a ray from the test point towards the right direction allong 
             // the x-axis and check if the ray intersects the edge

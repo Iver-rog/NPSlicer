@@ -286,21 +286,17 @@ fn generate_3d_infill(bounds:Polygon,mesh:&MeshCollider,angle:f32 ,scale:f32) ->
             match tag {
                 // found a mesh point keep it if it is inside the contur
                 PntType::Inside => if within_bounds {
-                    segment.push(point);
+                    segment.push( point );
                 },
                 // point on the bounding contour which implies crossing 
                 // the boundary between inside and outside the bounds
                 PntType::Perimeter => {
-                    // let point = Point3::new(x,y,z);
+                    segment.push( point );
                     if within_bounds { // completed the line segment
-                        segment.push( point );
                         collums.push( Path{points:segment} );
                         segment = Vec::new();
-                    } else {
-                        segment.push(point)
                     }
                     within_bounds = !within_bounds;
-                    (y,0.0);
                 },
             };
         }
