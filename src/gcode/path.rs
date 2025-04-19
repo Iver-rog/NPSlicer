@@ -1,13 +1,13 @@
 use nalgebra::Point3;
 use crate::geo::Contour3d;
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum PathType{
     InnerWall,
     OuterWall,
     Infill,
 }
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub struct Path{
     pub points:Vec<Point3<f32>>,
     pub path_type:PathType,

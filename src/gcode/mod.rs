@@ -70,7 +70,7 @@ pub fn main(blender:&mut Blender) {
     let layer_h = 0.2;
     // let layer_w = 0.21;
     let layer_w = settings.perimeter_line_width;
-    let nr_of_perimeters = 2;
+    let nr_of_perimeters = 3;
     let brim = 25;
     let infill_scale = (settings.infill_percentage as f32/100.0)*(1.0/settings.perimeter_line_width);
 

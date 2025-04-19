@@ -94,8 +94,8 @@ impl Default for Feedrates {
         Self {
             initial_layer:1200,
             initial_layer_infill:2400,
-            outer_wall:1500, //orca 45mm/s = 2700mm/min
-            inner_wall:1500, //orca 60mm/s = 3600mm/min
+            outer_wall:1600, //orca 45mm/s = 2700mm/min
+            inner_wall:1800, //orca 60mm/s = 3600mm/min
             infill:2500, //orca 70mm/s = 4200mm/min
             travel: 10800,
             retract: 2500,
@@ -113,12 +113,7 @@ pub struct GcodeFile<'a>{
 
 impl GcodeFile<'_> {
     pub fn new<'a>(path:&'_ str, settings:&'a Settings) -> GcodeFile<'a> {
-        // let mut file = File::options()
-        //     .read(true)
-        //     .open(format!("{path}.gcode"))
-        //     .unwrap();
-        //
-        println!("{path}");
+
         let mut file = File::create(format!("{path}/gcode.gcode")).unwrap();
         let mut buffer = BufWriter::new(file);
 
