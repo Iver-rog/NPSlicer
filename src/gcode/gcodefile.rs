@@ -172,15 +172,25 @@ impl GcodeFile<'_> {
                 writeln!(f,"G1 X{start_x:.3} Y{start_y:.3} Z{start_z:.3} F{:.3}", s.feedrates.travel)?;
             }
 
-            let extrusion_area = PI*(s.filament_diameter/2.).powi(2); 
-            let line_area = s.layer_height*s.perimeter_line_width;
-            let extrusion_multiplier = line_area/extrusion_area;
-
             let feedrate = match path.path_type {
                 PathType::OuterWall => outer_wall_feedrate,
                 PathType::InnerWall => inner_wall_feedrate,
                 PathType::Infill    => infill_feedrate,
             };
+            let line_width = match path.path_type {
+                PathType::OuterWall => s.perimeter_line_width,
+                PathType::InnerWall => s.perimeter_line_width,
+                PathType::Infill    => s.infill_line_width,
+            };
+            match path.path_type {
+                PathType::OuterWall => writeln!(f,";OuterWall")?,
+                PathType::InnerWall => writeln!(f,";InnerWall")?,
+                PathType::Infill    => writeln!(f,";Infill")?,
+            };
+
+            let extrusion_area = PI*(s.filament_diameter/2.).powi(2); 
+            let line_area = s.layer_height * line_width;
+            let extrusion_multiplier = line_area/extrusion_area;
 
             let mut prev_point = start;
             for point in points{

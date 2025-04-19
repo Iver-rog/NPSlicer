@@ -12,12 +12,12 @@ pub struct Path{
     pub points:Vec<Point3<f32>>,
     pub path_type:PathType,
 }
-impl From<Contour3d> for Path {
-    fn from(mut contour3d:Contour3d) -> Self{
+impl Path {
+    pub fn from_contour3d(mut contour3d:Contour3d, path_type:PathType) -> Self{
         contour3d.set_start();
         let mut points = contour3d.0;
         points.push(points[0].clone());
-        Self{ points, path_type: PathType::OuterWall }
+        Self{ points, path_type, }
     }
 }
 impl Path{

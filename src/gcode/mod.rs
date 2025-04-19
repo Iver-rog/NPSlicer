@@ -72,7 +72,7 @@ pub fn main(blender:&mut Blender) {
     let layer_w = settings.perimeter_line_width;
     let nr_of_perimeters = 3;
     let brim = 25;
-    let infill_scale = (settings.infill_percentage as f32/100.0)*(1.0/settings.perimeter_line_width);
+    let infill_scale = (settings.infill_percentage as f32/100.0)*(1.0/settings.infill_line_width);
 
     // let mesh_layer_dir = "../curving_overhang/p0.2";
     let mesh_layer_dir = "../simple_overhang";
@@ -102,7 +102,7 @@ pub fn main(blender:&mut Blender) {
             })
             .flat_map(|polygon| polygon.0.into_iter() )
             .map(|contour| Contour3d::from_contour(contour,layer_h) )
-            .map(|contour3d| Path::from(contour3d) )
+            .map(|contour3d| Path::from_contour3d(contour3d,PathType::OuterWall) )
             .map(|mut path|{
                 path.shorten_ends(settings.perimeter_line_width/2.);
                 return path
@@ -135,10 +135,16 @@ pub fn main(blender:&mut Blender) {
                         .take(nr_of_perimeters)
                         .enumerate()
                 })
-                .flat_map(|(i,polygon)| polygon.offset(-((i as f32 + 0.5)*layer_w)).into_iter() )
-                .map(move |polygon| polygon.project_onto(&mesh_collider) )
-                .flat_map(|polygon| polygon.0.into_iter() )
-                .map(|contour3d| Path::from(contour3d) )
+                .flat_map(|(i,polygon)| polygon.offset(-((i as f32 + 0.5)*layer_w))
+                    .into_iter()
+                    .map(move |p| (i,p) )
+                    )
+                .map(|(i,polygon)| (i,polygon.project_onto(&mesh_collider)) )
+                .flat_map(|(i,polygon)| polygon.0.into_iter().map(move |p|(i,p)) )
+                .map(|(i,contour3d)|{ 
+                    let path_type = if i == 0 { PathType::OuterWall }else{ PathType::InnerWall };
+                    Path::from_contour3d(contour3d, path_type)
+                    })
                 .map(|mut path|{
                     path.shorten_ends(settings.perimeter_line_width/2.);
                     return path
