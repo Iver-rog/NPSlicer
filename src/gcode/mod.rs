@@ -65,15 +65,10 @@ pub fn main(blender:&mut Blender) {
     // let mut args = env::args();
     // let path = args.next().expect("first arg should be the path");
     // let mesh_layer_dir = args.next().expect("missing argument: stl-layers directory");
-    let mut settings = Settings::default();
+    let mut s = Settings::default();
 
-    let layer_h = 0.2;
-    // let layer_w = 0.21;
-    let layer_w = settings.perimeter_line_width;
-    let nr_of_perimeters = 3;
-    let brim = 25;
-    let infill_scale = (settings.infill_percentage as f32/100.0)*(1.0/settings.infill_line_width);
-    let outer_wall_first = false;
+    let layer_w = s.perimeter_line_width;
+    let infill_scale = (s.infill_percentage as f32/100.0)*(1.0/s.infill_line_width);
 
     // let mesh_layer_dir = "../curving_overhang/p0.2";
     let mesh_layer_dir = "../simple_overhang";
@@ -85,31 +80,31 @@ pub fn main(blender:&mut Blender) {
 
     println!("layer: 0");
     let (first_layer_perimeters,_) = mesh_layers.next().expect("missing first layer");
-    let mut gcodefile = GcodeFile::new(&mesh_layer_dir,&settings);
+    let mut gcodefile = GcodeFile::new(&mesh_layer_dir,&s);
 
     let first_layer_infill = first_layer_perimeters.clone().into_iter()
-        .flat_map(|polygon| polygon.offset(-(nr_of_perimeters as f32)*layer_w))
-        .flat_map(|polygon| generate_infill_allong_x_2d(polygon, layer_h , 1./settings.perimeter_line_width) );
+        .flat_map(|polygon| polygon.offset(-(s.nr_of_perimeters as f32)*layer_w))
+        .flat_map(|polygon| generate_infill_allong_x_2d(polygon, s.layer_height , 1./s.perimeter_line_width) );
 
     let first_layer_paths = first_layer_perimeters.into_iter()
-            .flat_map(|polygon|{
-                iter::repeat(polygon.clone())
-                    .take(nr_of_perimeters + brim)
-                    .enumerate()
-            })
-            .flat_map(|(i,polygon)| {
-                let offset = (((brim as isize) - (i as isize)) as f32 - 0.5)*layer_w;
-                polygon.offset(offset).into_iter() 
-            })
-            .flat_map(|polygon| polygon.0.into_iter() )
-            .map(|contour| Contour3d::from_contour(contour,layer_h) )
-            .map(|contour3d| Path::from_contour3d(contour3d,PathType::OuterWall) )
-            .map(|mut path|{
-                path.shorten_ends(settings.perimeter_line_width/2.);
-                return path
-            })
-            .chain(first_layer_infill)
-            .inspect(|path| blender.path(&path) );
+        .flat_map(|polygon|{
+            iter::repeat(polygon.clone())
+                .take(s.nr_of_perimeters + s.brim)
+                .enumerate()
+        })
+        .flat_map(|(i,polygon)| {
+            let offset = (((s.brim as isize) - (i as isize)) as f32 - 0.5)*layer_w;
+            polygon.offset(offset).into_iter() 
+        })
+        .flat_map(|polygon| polygon.0.into_iter() )
+        .map(|contour| Contour3d::from_contour(contour,s.layer_height) )
+        .map(|contour3d| Path::from_contour3d(contour3d,PathType::OuterWall) )
+        .map(|mut path|{
+            path.shorten_ends(s.perimeter_line_width/2.);
+            return path
+        })
+        .chain(first_layer_infill)
+        .inspect(|path| blender.path(&path) );
 
     gcodefile.layer(first_layer_paths);
 
@@ -119,8 +114,8 @@ pub fn main(blender:&mut Blender) {
 
             let mesh_collider_copy = mesh_collider.clone();
 
-            let infill_offset = -layer_w * ((nr_of_perimeters as f32) 
-                + 0.5 -(settings.infill_overlap_percentage as f32)/100.);
+            let infill_offset = -layer_w * ((s.nr_of_perimeters as f32) 
+                + 0.5 -(s.infill_overlap_percentage as f32)/100.);
 
             let infill:Vec<Path> = polygons.iter().cloned()
                 .flat_map(|polygon| polygon.offset(infill_offset).into_iter() )
@@ -133,13 +128,13 @@ pub fn main(blender:&mut Blender) {
             let layer_paths = polygons.into_iter()
                 .flat_map(|polygon|{
                     iter::repeat(polygon.clone())
-                        .take(nr_of_perimeters)
+                        .take(s.nr_of_perimeters)
                         .enumerate()
                 })
                 .flat_map(|(i,polygon)|{
-                    let offset = match outer_wall_first {
+                    let offset = match s.outer_wall_first {
                         true  => -layer_w*(i as f32 + 0.5), 
-                        false => -layer_w*((nr_of_perimeters-i) as f32 - 0.5),
+                        false => -layer_w*((s.nr_of_perimeters-i) as f32 - 0.5),
                     };
                     polygon.offset(offset)
                     .into_iter()
@@ -148,14 +143,14 @@ pub fn main(blender:&mut Blender) {
                 .map(|(i,polygon)| (i,polygon.project_onto(&mesh_collider)) )
                 .flat_map(|(i,polygon)| polygon.0.into_iter().map(move |p|(i,p)) )
                 .map(|(i,contour3d)|{ 
-                    let path_type = match outer_wall_first { 
+                    let path_type = match s.outer_wall_first { 
                         true  => if     i == 0                {PathType::OuterWall}else{PathType::InnerWall},
-                        false => if (i+1) == nr_of_perimeters {PathType::OuterWall}else{PathType::InnerWall},
+                        false => if (i+1) == s.nr_of_perimeters {PathType::OuterWall}else{PathType::InnerWall},
                     };
                     Path::from_contour3d(contour3d, path_type)
                     })
                 .map(|mut path|{
-                    path.shorten_ends(settings.perimeter_line_width/2.);
+                    path.shorten_ends(s.perimeter_line_width/2.);
                     return path
                     })
                 .chain(infill.into_iter())
@@ -341,7 +336,6 @@ fn generate_3d_infill(
                 },
             };
         }
-        assert!(!within_bounds);
     }
     return collums
 

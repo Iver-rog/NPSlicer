@@ -8,12 +8,19 @@ use super::path::PathType;
 use super::Path;
 
 pub struct Settings{
+    pub nozzle_diameter: f32,       // mm
     pub layer_height: f32,          // mm
     pub infill_percentage: usize,   // %
-    pub nozzle_diameter: f32,       // mm
+    pub nr_of_perimeters: usize,    // int
     pub perimeter_line_width: f32,  // mm
     pub infill_line_width: f32,     // mm
-    pub n_perimeters: usize,        // int
+
+    /// Wether to print perimeters from the outside in (true)
+    /// or from the inside out (false)
+    pub outer_wall_first: bool,
+
+    /// [int] The number of brim contours. set to zero to dissable brims
+    pub brim: usize,
     
     /// [%] The overlap between the infill lines and inner most contour
     pub infill_overlap_percentage: usize,
@@ -75,8 +82,9 @@ impl Default for Settings {
             nozzle_diameter,
             perimeter_line_width: 0.45,
             infill_line_width: 0.6,
-            n_perimeters: 2,
+            nr_of_perimeters: 2,
             infill_overlap_percentage: 0,
+            outer_wall_first: true,
                
             max_staydown_distance: 1.5 * nozzle_diameter/((infill_percentage as f32)/100.),
             filament_diameter: 1.75,//mm
@@ -84,6 +92,7 @@ impl Default for Settings {
 
             fan_start:3,
             retract_distance: 800, // nm (10⁻³ mm)
+            brim: 20,
             feedrates:Feedrates::default(),
         }
     }
