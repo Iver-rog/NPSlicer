@@ -100,10 +100,6 @@ pub fn main(blender:&mut Blender) {
         .flat_map(|polygon| polygon.0.into_iter() )
         .map(|contour| Contour3d::from_contour(contour,s.layer_height) )
         .map(|contour3d| Path::from_contour3d(contour3d,PathType::OuterWall) )
-        .map(|mut path|{
-            path.shorten_ends(s.perimeter_line_width/2.);
-            return path
-        })
         .chain(first_layer_infill)
         .inspect(|path| blender.path(&path) );
 
@@ -149,10 +145,6 @@ pub fn main(blender:&mut Blender) {
                         false => if (i+1) == s.nr_of_perimeters {PathType::OuterWall}else{PathType::InnerWall},
                     };
                     Path::from_contour3d(contour3d, path_type)
-                    })
-                .map(|mut path|{
-                    path.shorten_ends(s.perimeter_line_width/2.);
-                    return path
                     })
                 .chain(infill.into_iter())
                 .inspect(|path|blender.path(&path));
