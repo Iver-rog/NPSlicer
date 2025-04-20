@@ -73,6 +73,7 @@ pub fn main(blender:&mut Blender) {
     let nr_of_perimeters = 3;
     let brim = 25;
     let infill_scale = (settings.infill_percentage as f32/100.0)*(1.0/settings.infill_line_width);
+    let outer_wall_first = false;
 
     // let mesh_layer_dir = "../curving_overhang/p0.2";
     let mesh_layer_dir = "../simple_overhang";
@@ -135,14 +136,22 @@ pub fn main(blender:&mut Blender) {
                         .take(nr_of_perimeters)
                         .enumerate()
                 })
-                .flat_map(|(i,polygon)| polygon.offset(-((i as f32 + 0.5)*layer_w))
+                .flat_map(|(i,polygon)|{
+                    let offset = match outer_wall_first {
+                        true  => -layer_w*(i as f32 + 0.5), 
+                        false => -layer_w*((nr_of_perimeters-i) as f32 - 0.5),
+                    };
+                    polygon.offset(offset)
                     .into_iter()
                     .map(move |p| (i,p) )
-                    )
+                })
                 .map(|(i,polygon)| (i,polygon.project_onto(&mesh_collider)) )
                 .flat_map(|(i,polygon)| polygon.0.into_iter().map(move |p|(i,p)) )
                 .map(|(i,contour3d)|{ 
-                    let path_type = if i == 0 { PathType::OuterWall }else{ PathType::InnerWall };
+                    let path_type = match outer_wall_first { 
+                        true  => if     i == 0                {PathType::OuterWall}else{PathType::InnerWall},
+                        false => if (i+1) == nr_of_perimeters {PathType::OuterWall}else{PathType::InnerWall},
+                    };
                     Path::from_contour3d(contour3d, path_type)
                     })
                 .map(|mut path|{
