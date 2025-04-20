@@ -87,11 +87,10 @@ impl GcodeFile<'_> {
                 PathType::InnerWall => s.perimeter_line_width,
                 PathType::Infill    => s.infill_line_width,
             };
-            match path.path_type {
-                PathType::OuterWall => writeln!(f,";OuterWall")?,
-                PathType::InnerWall => writeln!(f,";InnerWall")?,
-                PathType::Infill    => writeln!(f,";Infill")?,
-            };
+            writeln!(f,";TYPE:{}",path.path_type)?;
+            writeln!(f,";WIDTH:{line_width}")?;
+            writeln!(f,";HEIGHT:{}",s.layer_height)?;
+            writeln!(f,"G1 F{feedrate}")?;
 
             let extrusion_area = PI*(s.filament_diameter/2.).powi(2); 
             let line_area = s.layer_height * line_width;
@@ -106,7 +105,7 @@ impl GcodeFile<'_> {
 
                 let (x,y,z) = (point.x+x_offset, point.y+y_offset, point.z);
 
-                writeln!(f,"G1 X{x:.3} Y{y:.3} Z{z:.3} E{extrusion_length:.5} F{feedrate}")?;
+                writeln!(f,"G1 X{x:.3} Y{y:.3} Z{z:.3} E{extrusion_length:.5}")?;
 
                 prev_point = point;
             }
@@ -115,7 +114,7 @@ impl GcodeFile<'_> {
 
         writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // Retraction
         writeln!(f,"G1 Z{:.3} F{}",self.safe_z, s.feedrates.z_max)?;
-        writeln!(f,";End of layer {}",self.n_layer)?;
+        writeln!(f,";LAYER_CHANGE")?;
         Ok(())
     }
 }

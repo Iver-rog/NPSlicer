@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use nalgebra::Point3;
 use crate::geo::Contour3d;
 
@@ -12,6 +14,15 @@ pub struct Path{
     pub points:Vec<Point3<f32>>,
     pub path_type:PathType,
 }
+impl Display for PathType {
+    fn fmt(&self, f: &mut Formatter<'_>,) -> Result<(),std::fmt::Error> {
+        match self {
+            PathType::InnerWall => write!(f,"Inner wall"),
+            PathType::OuterWall => write!(f,"Outer wall"),
+            PathType::Infill => write!(f,"Sparse infill"),
+        }
+    }
+}
 impl Path {
     pub fn from_contour3d(mut contour3d:Contour3d, path_type:PathType) -> Self{
         contour3d.set_start();
@@ -19,8 +30,7 @@ impl Path {
         points.push(points[0].clone());
         Self{ points, path_type, }
     }
-}
-impl Path{
+
     pub fn edges(&self) -> impl Iterator<Item = (&Point3<f32>,&Point3<f32>)> {
         let points = self.points.iter();
         let points_offset_by_one = points.clone().skip(1);
