@@ -11,12 +11,13 @@ use std::iter;
 use crate::geo::*;
 use crate::stl_op;
 use crate::Blender;
+use crate::settings::Settings;
 
 mod projection;
 use projection::MeshCollider;
 
 mod gcodefile;
-use gcodefile::{GcodeFile,Settings};
+use gcodefile::GcodeFile;
 
 mod path;
 pub use path::Path;
