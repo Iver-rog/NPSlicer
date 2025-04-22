@@ -51,6 +51,17 @@ impl Enclosed for Polygon {
 }
 
 impl Polygon {
+    /// assert that the polygon has valid data
+    pub fn validate(&self) {
+        assert![self.0.len()!=0];
+        for contour in self.0.iter() {
+            assert!(contour.points.len()!=0);
+            for point in &contour.points{
+                assert!(!point.x.is_nan());
+                assert!(!point.y.is_nan());
+            }
+        }
+    }
     pub fn merge_by_distance(&mut self, distance:f32) -> usize {
         self.0.iter_mut()
             .map(|contour| contour.merge_by_distance(distance) )
