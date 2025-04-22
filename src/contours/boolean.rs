@@ -1,4 +1,5 @@
 use crate::geo::{Polygon,Contour,polygons_from_contours};
+use crate::skeleton::{self, SkeletonBuilder};
 use std::fmt::Display;
 use nalgebra::Point2;
 use i_overlay::i_float::float::compatible::FloatPointCompatible;
@@ -144,6 +145,20 @@ pub fn clip_poly(obj:Vec<Polygon>,mask:Vec<Polygon>)-> Vec<Vec<Point2<f32>>>{
         .flatten()
         .map(|c|c.into_iter().map(|p|p.into()).collect())
         .collect()
+}
+pub fn ss_offset(mut polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
+    let mut skeleton = SkeletonBuilder::new();
+    if distance.is_sign_negative() {
+        let err:Vec<_> = polygons.into_iter()
+            .map(|mut polygon|{polygon.invert();polygon})
+            .map(|p|{skeleton.add_polygon(p)})
+            .collect();
+    }else{
+        for polygon in polygons {
+            skeleton.add_polygon(polygon).unwrap();
+        }
+    }
+    skeleton.offset_polygon(distance.abs()).unwrap()
 }
 
 pub fn offset(polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
