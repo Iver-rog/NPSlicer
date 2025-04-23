@@ -130,13 +130,14 @@ fn straight_skeleton(blender:&mut Blender) {
 }
 #[allow(dead_code)]
 fn offset_polygon(blender:&mut Blender){
-    let polygon = data::test_poly6();
+    let mut polygon = data::test_poly6();
 
     blender.polygon(&polygon, 0.0);
-    let i_overlay_poly = polygon.clone().offset(-2.0);
+    let i_overlay_poly = polygon.clone().offset(2.0);
 
     i_overlay_poly.iter().for_each(|p|blender.polygon(p, 1.0));
 
+    polygon.invert();
     let skeleton = match skeleton::SkeletonBuilder::from_polygon(polygon.clone()){
         Ok(skeleton_builder) => skeleton_builder,
         Err(err) =>{ println!("\x1b[032m{err}\x1b[0m");
@@ -152,11 +153,11 @@ fn offset_polygon(blender:&mut Blender){
 
 fn mesh_gen(blender:&mut Blender){
     // let file_path = "../mesh/bunny2.stl";
-    // let file_path = "../mesh/stanford-armadillo.stl";
+    let file_path = "../mesh/stanford-armadillo.stl";
     // let file_path = "../mesh/curved overhang.stl";
     // let file_path = "../mesh/simple_overhang.stl";
     // let file_path = "../mesh/wine_glass3.stl";
-    let file_path = "../mesh/internal_external.stl";
+    // let file_path = "../mesh/internal_external.stl";
 
     let file = File::open(file_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
@@ -194,7 +195,7 @@ fn mesh_gen(blender:&mut Blender){
 
     for (i, layer) in layers.enumerate(){
         println!("layer {i}");
-        let mut offset_sup = ss_offset(support_regions.last().unwrap().clone(),d_x);
+        let mut offset_sup = ss_offset(support_regions.last().unwrap().clone(),-d_x);
 
 
         // let support:Vec<_> = offset_sup.into_iter()
@@ -258,6 +259,14 @@ fn mesh_gen(blender:&mut Blender){
          });
 }
 
+
+fn boolean_layers2(blender:&mut Blender){
+    let file_path = "../mesh/bunny2.stl";
+    // let file_path = "../mesh/stanford-armadillo.stl";
+    // let file_path = "../mesh/curved overhang.stl";
+    // let file_path = "../mesh/simple_overhang.stl";
+    // let file_path = "../mesh/wine_glass3.stl";
+    // let file_path = "../mesh/internal_external.stl";
     let file = File::open(file_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
 
@@ -266,40 +275,62 @@ fn mesh_gen(blender:&mut Blender){
 
     let min_a = 0.05;   // min area for contour simplification
     let layer_h = 0.2; // layer height in mm
-    let theta = PI/6.; // overhang angle
-    let d_x = layer_h/theta.tan();
+    // let theta = PI/6.; // overhang angle 30deg
+    let theta:f32 = 0.3490659; // overhang angle 20deg
+    let d_x = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
+    // let d_x = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
+    // dbg!(&d_x);
 
     let mut layers = stl_op::extract_planar_layers(&mesh, layer_h ,blender);
 
     layers.iter_mut().for_each(|layer| layer.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
     println!("model has {} layers",layers.iter().filter(|n|n.len()!=0).count());
-    layers.iter().enumerate()
-        .flat_map(|(i,layer)| layer.iter().map(move|l|(i,l) ) )
-        .for_each(|(i,l)|{ blender.polygon(&l,i as f32 * layer_h) });
+    // layers.iter().enumerate()
+    //     .flat_map(|(i,layer)|layer.into_iter().map(move |polygon|(i,polygon) ))
+    //     .for_each(|(i,polygon)| blender.polygon(polygon, i as f32 * layer_h));
+
 
     let mut layers = layers.into_iter();
     let mut prev_layer = layers.next().unwrap();
     let mut new_overhangs:Vec<Vec<Polygon>> = Vec::new();
+
     for (i, layer) in layers.enumerate(){
         println!("layer {i}");
-
         let offset_sup = offset(prev_layer.clone(),d_x);
-        let clip_lines = clip_poly(offset_sup.clone(), layer.clone());
-        let additional_sup:Vec<Polygon> = clip_lines.clone()
-            .into_iter()
-            .map(|line| offset_line(line,d_x*3.))
-            .flatten()
-            .collect();
+        let mut support = boolean(layer,offset_sup.clone(),OverlayRule::Union);
+        // support.iter_mut().for_each(|layer| layer.0.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
+        support.iter().for_each(|polygon|blender.polygon(polygon,(i as f32)*layer_h));
+        let new_support5 = support;
+        if i == 7 {break};
 
-        let new_support1 = boolean(additional_sup.clone(), prev_layer.clone(), OverlayRule::Union);
-        let new_support2 = boolean(new_support1.clone(), offset_sup.clone(), OverlayRule::Intersect);
-        let mut new_support3 = boolean(new_support2.clone(), layer.clone(), OverlayRule::Intersect);
-        //new_support3.iter_mut().for_each(|p|p.simplify(min_a/2.0));
-        let new_support4:Vec<Polygon> = new_support3.clone().into_iter().filter(|p|p.area().abs() > min_a).collect();
-        let new_support5 = i_simplify(new_support4.clone(), min_a);
+        // let offset_sup = offset(prev_layer.clone(),d_x);
+        // // assert!(offset_sup.len()>0);
+        // let clip_lines = clip_poly(offset_sup.clone(), layer.clone());
+        // let additional_sup:Vec<Polygon> = clip_lines.clone()
+        //     .into_iter()
+        //     .map(|line| offset_line(line,d_x*3.))
+        //     .flatten()
+        //     .collect();
+        //
+        // let new_support1 = boolean(additional_sup.clone(), prev_layer.clone(), OverlayRule::Union);
+        // // assert!(new_support1.len()>0);
+        // let new_support2 = boolean(new_support1.clone(), offset_sup.clone(), OverlayRule::Intersect);
+        // let mut new_support3 = boolean(new_support2.clone(), layer.clone(), OverlayRule::Intersect);
+        // // new_support3.iter_mut().for_each(|p|p.simplify(min_a*0.01));
+        // new_support3.iter_mut().for_each(|p|{p.merge_by_distance(0.1);});
+        // let new_support4:Vec<Polygon> = new_support3.clone().into_iter().filter(|p|p.area().abs() > min_a).collect();
+        // let new_support5 = i_simplify(new_support4.clone(), min_a);
 
         new_overhangs.push(new_support5.clone());
         prev_layer = new_support5;
+    }
+    blender.clone().show();
+    panic!();
+
+    for (i,support) in new_overhangs.iter().enumerate().flat_map(|(i,vec)|vec.into_iter().map(move |p|(i,p))) { 
+        if support.0.iter().map(|c|c.points.len()).sum::<usize>() == 0 {panic!()}
+        dbg!(&support);
+        // blender.polygon(support, i as f32 * layer_h );
     }
 
     println!("created {} layers",new_overhangs.len());

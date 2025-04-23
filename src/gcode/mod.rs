@@ -72,7 +72,8 @@ pub fn main(blender:&mut Blender) {
     let infill_scale = (s.infill_percentage as f32/100.0)*(1.0/s.infill_line_width);
 
     // let mesh_layer_dir = "../curving_overhang/p0.2";
-    let mesh_layer_dir = "../simple_overhang";
+    // let mesh_layer_dir = "../simple_overhang";
+    let mesh_layer_dir = "../simple_overhang_half_layers";
     // let mesh_layer_dir = "../wine_glass";
     // let mesh_layer_dir = "../flat_wine_glass";
 
