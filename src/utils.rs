@@ -11,7 +11,7 @@ use stl_io::{IndexedTriangle, Triangle, Vector};
 use crate::geo::{self, Contour, Polygon, Contour3d, Polygon3d};
 use crate::gcode;
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct Blender<'a> {
     tmp_path:Box<Path>,
     mesh_path:Box<Path>,
@@ -86,6 +86,7 @@ impl <'a> Blender<'a> {
         let mut f = BufWriter::new(file);
 
         // ============ Line bodies ==============
+        writeln!(f,"NaN = -100")?;
         writeln!(f,"def get_points():")?;
         writeln!(f,"    return [")?;
         for (i,line_object) in self.line_objects.iter().enumerate() {
