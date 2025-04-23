@@ -6,9 +6,9 @@ impl SkeletonBuilder{
         // Check if edge is a reflex angle
 
         let node_v = &self.vertices[node.vertex_ndx];
-        let next_node = self.shrining_polygon.next(*node);
+        let next_node = self.shrinking_polygon.next(*node);
         let next_node_v = &self.vertices[next_node.vertex_ndx];
-        let prev_node = self.shrining_polygon.prev(*node);
+        let prev_node = self.shrinking_polygon.prev(*node);
         let prev_node_v = &self.vertices[prev_node.vertex_ndx];
 
         if !is_reflex(node_v.coords,
@@ -23,9 +23,9 @@ impl SkeletonBuilder{
         // Looking for splitt candidates
         for edge_start in self.original_polygon.nodes.iter()
             .filter(|e| e.vertex_ndx != node.vertex_ndx && 
-                self.shrining_polygon.next(**e).vertex_ndx != node.vertex_ndx)
+                self.shrinking_polygon.next(**e).vertex_ndx != node.vertex_ndx)
             {
-                let edge_end = self.shrining_polygon.next(*edge_start);
+                let edge_end = self.shrinking_polygon.next(*edge_start);
 
                 // coordinates (Points)
                 let edge_start_p = self.vertices[edge_start.vertex_ndx].coords;
@@ -40,10 +40,10 @@ impl SkeletonBuilder{
 
                 // vector pointing form the splitting vertex to its next vertex
                 let edge_left = (node_p
-                    - self.vertices[self.shrining_polygon.next(*node).vertex_ndx].coords).normalize();
+                    - self.vertices[self.shrinking_polygon.next(*node).vertex_ndx].coords).normalize();
                 // vector pointing from the splitting vertex to its previous vertex
                 let edge_right = (node_p 
-                    - self.vertices[self.shrining_polygon.prev(*node).vertex_ndx].coords).normalize();
+                    - self.vertices[self.shrinking_polygon.prev(*node).vertex_ndx].coords).normalize();
 
                 // a potential b is at the intersection of between our own bisector and the 
 		            // bisector of the angle between the tested edge and any one of our own edges.
@@ -119,10 +119,10 @@ impl SkeletonBuilder{
             _ => panic!("wrong event type sendt to handle split event funcion")
         };
 
-        let node = self.shrining_polygon.nodes[event.node.ndx];
+        let node = self.shrinking_polygon.nodes[event.node.ndx];
         let time = event.time.0;
 
-        if !self.shrining_polygon.contains(&event.node.ndx) { 
+        if !self.shrinking_polygon.contains(&event.node.ndx) { 
             info!("t:{:.3} skipping Split Event node: {} split point: {} \x1b[031minactive node\x1b[0m",
                 event.time,node.ndx,b);
             return Ok(false) 
@@ -131,9 +131,9 @@ impl SkeletonBuilder{
         // find edge beeing split
         let mut edge = None;
         // TODO: this loop redundantly checks each edge twise
-        for [edge_start, edge_end] in self.shrining_polygon.nodes.iter()
-            .filter(|n| self.shrining_polygon.contains(&n.ndx))
-            .map(|n| [n, &self.shrining_polygon.nodes[n.next_ndx]] )
+        for [edge_start, edge_end] in self.shrinking_polygon.nodes.iter()
+            .filter(|n| self.shrinking_polygon.contains(&n.ndx))
+            .map(|n| [n, &self.shrinking_polygon.nodes[n.next_ndx]] )
             // split event has become a edge event since split event calculation, a edge event is expected to follow
             .filter(|[edge_start,edge_end]| edge_start.ndx != node.next_ndx && edge_end.ndx != node.prev_ndx )
             .filter(|[edge_start,edge_end]| edge_start.ndx != node.ndx && edge_end.ndx != node.ndx ){
@@ -175,7 +175,7 @@ impl SkeletonBuilder{
         let edge_start_possition = edge_start_v.coords + edge_start.bisector() * (time-edge_start_v.time);
 
         // splitting vertex's neighbour forming a close loop with edge_start vertex:
-        let s_vert_start = &self.shrining_polygon.nodes[node.next_ndx];
+        let s_vert_start = &self.shrinking_polygon.nodes[node.next_ndx];
         let s_vert_start_v = &self.vertices[s_vert_start.vertex_ndx];
         let s_vert_start_possition = s_vert_start_v.coords + s_vert_start.bisector() * (time-s_vert_start_v.time);
 
@@ -195,7 +195,7 @@ impl SkeletonBuilder{
 
         // ============= Secound edge loop ================
         // splitting vertex's neighbour forming a close loop with edge_start vertex:
-        let s_vert_end = &self.shrining_polygon.nodes[node.prev_ndx];
+        let s_vert_end = &self.shrinking_polygon.nodes[node.prev_ndx];
         let s_vert_end_v = &self.vertices[s_vert_end.vertex_ndx];
         let s_vert_end_possition = s_vert_end_v.coords + s_vert_end.bisector() * (time-s_vert_end_v.time);
 
@@ -211,7 +211,7 @@ impl SkeletonBuilder{
             .bisector( bisector)
             .vertex_ndx( self.vertices.len()-1);
 
-        let [left_node,right_node] = self.shrining_polygon.split(left_node, right_node);
+        let [left_node,right_node] = self.shrinking_polygon.split(left_node, right_node);
 
         // Find new events for the new verices
         self.find_events(events,left_node)?;

@@ -171,7 +171,7 @@ fn polygon_iterator_from_polygon(polygon:&Polygon, offset:usize) -> PolygonItera
 }
 #[derive(Debug,Default)]
 pub struct SkeletonBuilder {
-    shrining_polygon: Nodes,
+    shrinking_polygon: Nodes,
     original_polygon: Nodes,
     input_polygon_refs: Vec<PolygonIterator>,
     vertices: Vec<Vertex>,
@@ -198,7 +198,7 @@ impl SkeletonBuilder {
         if points.len() < 3 { return Err(SkeletonError::InvalidInput) }
         info!("\x1b[034m========================== Adding Contour ==========================\x1b[0m");
 
-        let offset = self.shrining_polygon.len();
+        let offset = self.shrinking_polygon.len();
         for i in 0..points.len() {
             let next_ndx = (i + 1) % points.len();
             let prev_ndx = if i == 0 {points.len()-1} else { i-1 };
@@ -212,7 +212,7 @@ impl SkeletonBuilder {
                 Err(error) => return Err(SkeletonError::InitializationError{node:i,error})
             };
 
-            self.shrining_polygon.insert(Node {
+            self.shrinking_polygon.insert(Node {
                 ndx: i + offset,
                 next_ndx: next_ndx + offset,
                 prev_ndx: prev_ndx + offset,
@@ -253,13 +253,13 @@ impl SkeletonBuilder {
     fn compute_untill(&mut self,stop_time:f32) -> Result<PriorityQueue<Event, OrderedFloat<f32>>, SkeletonError> {
         let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
         //initialize events 
-        for node in self.shrining_polygon.nodes.iter() {
+        for node in self.shrinking_polygon.nodes.iter() {
             self.find_events(&mut events,*node)?;
         }
         while let Some((event, priority)) = events.pop() {
             let time = -priority.0;
             if stop_time < time { break }
-            if self.shrining_polygon.len() == 0 { break }
+            if self.shrinking_polygon.len() == 0 { break }
             match self.handle_event(&mut events, event){
                 Ok(_valid_event) => (),
                 Err(error) => { 
@@ -278,7 +278,7 @@ impl SkeletonBuilder {
 
         let mut events: PriorityQueue<Event, OrderedFloat<f32>> = PriorityQueue::new();
         //initialize events 
-        for node in self.shrining_polygon.nodes.iter() {
+        for node in self.shrinking_polygon.nodes.iter() {
             self.find_events(&mut events,*node)?;
         }
         info!("\x1b[034m========================== Computing Skeleton ==========================\x1b[0m");
@@ -286,7 +286,7 @@ impl SkeletonBuilder {
         let mut handled_events = 0;
         while let Some((event, priority)) = events.pop() {
             let time = -priority.0;
-            if self.shrining_polygon.len() == 0 { break }
+            if self.shrinking_polygon.len() == 0 { break }
             let current_time = time;
             match self.handle_event(&mut events, event) {
                 Ok(valid_event) => {
@@ -333,11 +333,11 @@ impl SkeletonBuilder {
 
     pub fn add_offset_active_vertices(&mut self, time:f32) {
         let mut computed_vertecies:HashSet<usize> = HashSet::new();
-        for node_ndx in self.shrining_polygon.active_nodes_iter() {
+        for node_ndx in self.shrinking_polygon.active_nodes_iter() {
             if computed_vertecies.contains(&node_ndx){continue}
-            let start_node = self.shrining_polygon.nodes[node_ndx];
+            let start_node = self.shrinking_polygon.nodes[node_ndx];
             let index_of_first_new_point = self.vertices.len();
-            for node in self.shrining_polygon.iter_from(&start_node){
+            for node in self.shrinking_polygon.iter_from(&start_node){
                 let coords = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
                 self.edges.push(Edge{start:node.vertex_ndx, end:self.vertices.len()});
                 //self.edges.push(Edge{start:self.vertices.len(), end:self.vertices.len()+1});
@@ -354,11 +354,11 @@ impl SkeletonBuilder {
     pub fn offset_active_vertices(&self, time:f32) -> Vec<Polygon> {
         let mut computed_vertecies:HashSet<usize> = HashSet::new();
         let mut contours = Vec::new();
-        for node_ndx in self.shrining_polygon.active_nodes_iter() {
+        for node_ndx in self.shrinking_polygon.active_nodes_iter() {
                 if computed_vertecies.contains(&node_ndx){continue};
                 let mut contour = Vec::new();
-                let start_node = self.shrining_polygon.nodes[node_ndx];
-                for node in self.shrining_polygon.iter_from(&start_node){
+                let start_node = self.shrinking_polygon.nodes[node_ndx];
+                for node in self.shrinking_polygon.iter_from(&start_node){
                     let vertex = self.vertices[node.vertex_ndx].coords + node.bisector()*(time - self.vertices[node.vertex_ndx].time);
                     contour.push(vertex);
                     computed_vertecies.insert(node.ndx);
@@ -506,7 +506,7 @@ impl Display for EventType{
 
 impl Display for SkeletonBuilder{
     fn fmt(&self, b: &mut Formatter)->Result<(),fmt::Error> {
-        let nodes_display = format!("{}",self.shrining_polygon);
+        let nodes_display = format!("{}",self.shrinking_polygon);
         let mut nodes_lines = nodes_display.split('\n');
         writeln!(b,"{}  |     Vertices     |",
             nodes_lines.next()

@@ -9,9 +9,9 @@ pub struct VertexTree(Vec<Node>);
 
 impl SkeletonBuilder {
     pub fn offset_inside_bounds(&self,bounds:Polygon,time:f32) -> Vec<Contour> {
-        let vertex_positions:HashMap<usize,Option<Point2<f32>>> = self.shrining_polygon.active_nodes_iter()
+        let vertex_positions:HashMap<usize,Option<Point2<f32>>> = self.shrinking_polygon.active_nodes_iter()
             .map(|ndx|{
-                let node = self.shrining_polygon.nodes[ndx];
+                let node = self.shrinking_polygon.nodes[ndx];
                 let node_v = &self.vertices[node.vertex_ndx];
                 let current_pos = node_v.coords + node.bisector() * (time-node_v.time);
                 ( node.vertex_ndx, if bounds.point_is_inside(&current_pos){Some(current_pos)}else{None} )

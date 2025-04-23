@@ -2,12 +2,12 @@ use crate::skeleton::*;
 
 impl SkeletonBuilder{
     pub (super) fn handle_bound_event(&mut self,events:&mut PriorityQueue<Event,OrderedFloat<f32>>,event:Event)->Result<bool,SkeletonError>{
-        if !self.shrining_polygon.contains(&event.node.ndx) {return Ok(false);}
+        if !self.shrinking_polygon.contains(&event.node.ndx) {return Ok(false);}
         let (edge_ndx,intersect_p) = match event.event_type {
             EventType::Bound { edge_ndx, intersect_p } => (edge_ndx,intersect_p),
             _ => panic!("wrong event sendt to handle_bound_event"),
         };
-        self.shrining_polygon.deactivate(&event.node.ndx);
+        self.shrinking_polygon.deactivate(&event.node.ndx);
         self.edges.push(Edge{
             start: event.node.vertex_ndx,
             end: self.vertices.len()
