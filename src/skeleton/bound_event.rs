@@ -18,9 +18,7 @@ impl SkeletonBuilder{
         });
         Ok(true)
     }
-    pub (super) fn find_bound_event(&self, events:&mut PriorityQueue<Event, OrderedFloat<f32>>, node_ndx:usize){
 
-    }
     pub (super) fn compute_bounds_event(&self, node:&Node) -> Option<Event>{
         let node_v = &self.vertices[node.vertex_ndx];
         let node_p = node_v.coords;

@@ -2,7 +2,7 @@
 mod test;
 
 use crate::geo::{Polygon,Contour,polygons_from_contours};
-use crate::skeleton::{self, SkeletonBuilder};
+use crate::skeleton::SkeletonBuilder;
 use std::fmt::Display;
 use nalgebra::Point2;
 use i_overlay::i_float::float::compatible::FloatPointCompatible;

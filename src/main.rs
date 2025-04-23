@@ -50,12 +50,6 @@ fn polygon_boolean(blender:&mut Blender) {
 fn straight_skeleton_with_bounds(blender:&mut Blender) {
     let mut polygon = data::test_poly8();
     let bounds = Contour::from(vec![
-        Point2::new( 4.5, 11.0),
-        Point2::new( 4.5,-38.0),
-        Point2::new(54.0,-38.0),
-        Point2::new(54.0, 11.0),
-    ]);
-    let bounds = Contour::from(vec![
         Point2::new(54.0, 61.0),
         Point2::new( 4.5, 61.0),
         Point2::new( 4.5,-38.0),
@@ -66,13 +60,7 @@ fn straight_skeleton_with_bounds(blender:&mut Blender) {
         Point2::new(30.0,9.8),
         Point2::new(54.0,9.8),
     ]);
-    let p = Contour::from(vec![
-        Point2::new(30.0, -4.0),
-        Point2::new(20.0,-13.5),
-        Point2::new(30.0,-23.0),
-        Point2::new(38.0,-13.4),
-    ]);
-    //let mut polygon = Polygon::new(p,vec![]);
+
     polygon.invert();
     blender.polygon(&polygon, 0.0);
     blender.contour(&bounds, 0.0);

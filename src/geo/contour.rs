@@ -1,5 +1,4 @@
-use nalgebra::Vector2;
-use nalgebra::{Point2,Matrix2};
+use nalgebra::Point2;
 use nalgebra_glm::cross2d;
 use super::ContorTrait;
 use super::Enclosed;
@@ -157,7 +156,7 @@ impl Contour {
         let points_offset_by_one = points.clone().cycle().skip(1);
         points.zip(points_offset_by_one)
     }
-    // returns a iterator over pairs of edges (pairs of points)
+    // returns a iterator over edges/(pairs of points)
     pub fn into_edges(self) -> impl Iterator<Item = (Point2<f32>,Point2<f32>)> {
         let points = self.points.into_iter();
         let points_offset_by_one = points.clone().cycle().skip(1);
