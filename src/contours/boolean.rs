@@ -50,17 +50,49 @@ impl FloatPointCompatible<f32> for IOverlayCompatibleType {
      }
 }
 impl Polygon{
-    pub fn subtract(self, sub_shape:Self) -> Vec<Polygon>{
+    pub fn intersect(&self, sub_shape:Vec<Self>) -> Vec<Polygon>{
         // subtracts sub_shape from self
-        let subj:Vec<Vec<IOverlayCompatibleType>> = self.flatten()
-            .into_iter()
+        let subj:Vec<Vec<IOverlayCompatibleType>> = self.0
+            .iter()
+            .cloned()
             .map(|contour| contour.points.into_iter().map(|p|p.into()).collect() )
             .collect();
 
-        let clip:Vec<Vec<IOverlayCompatibleType>> = sub_shape.flatten()
-            .into_iter()
+        let clip:Vec<Vec<Vec<IOverlayCompatibleType>>> = sub_shape.into_iter()
+            .map(|polygon|{
+                let polygon2:Vec<Vec<_>> = polygon.flatten()
+                    .into_iter()
+                    .map(|contour| contour.points.into_iter().map(|p|p.into()).collect() )
+                    .collect();
+                polygon2
+            }).collect();
+
+        let result = subj.overlay(&clip, OverlayRule::Intersect, FillRule::EvenOdd);
+
+        return result.into_iter()
+            .map(|polygon|{
+                let contours = polygon.into_iter()
+                    .map(|contour| Contour::from_points(contour.into_iter().map(|p|p.into()).collect()) )
+                    .collect();
+                polygons_from_contours(contours).into_iter().next().unwrap()
+            }).collect()
+    }
+    pub fn subtract(&self, sub_shape:Vec<Self>) -> Vec<Polygon>{
+        // subtracts sub_shape from self
+        let subj:Vec<Vec<IOverlayCompatibleType>> = self.0
+            .iter()
+            .cloned()
             .map(|contour| contour.points.into_iter().map(|p|p.into()).collect() )
             .collect();
+
+        let clip:Vec<Vec<Vec<IOverlayCompatibleType>>> = sub_shape.into_iter()
+            .map(|polygon|{
+                let polygon2:Vec<Vec<_>> = polygon.flatten()
+                    .into_iter()
+                    .map(|contour| contour.points.into_iter().map(|p|p.into()).collect() )
+                    .collect();
+                polygon2
+            }).collect();
 
         let result = subj.overlay(&clip, OverlayRule::Difference, FillRule::EvenOdd);
 

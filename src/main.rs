@@ -43,7 +43,7 @@ fn polygon_boolean(blender:&mut Blender) {
     blender.polygon(&poly,0.0);
     blender.polygon(&clip,0.0);
 
-    let boolean = poly.subtract(clip).into_iter().next().unwrap();
+    let boolean = poly.subtract(vec![clip]).into_iter().next().unwrap();
     blender.polygon(&boolean,0.0);
 }
 fn straight_skeleton_with_bounds(blender:&mut Blender) {
