@@ -145,14 +145,7 @@ impl ContorTrait<2> for Contour {
         self.area = self.area * -1.0;
     }
 }
-impl IntoIterator for Contour {
-    type Item = Point2<f32>;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
 
-    fn into_iter(self) -> Self::IntoIter{
-        self.points.into_iter()
-    }
-}
 #[test]
 fn contour_rotate_test(){
     let mut contour = contour!([0.,0.],[1.,0.],[1.,1.],[0.,1.]);

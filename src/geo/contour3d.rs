@@ -79,7 +79,7 @@ impl Contour3d {
         return aabb
     }
     pub fn from_contour(contour:Contour,height:f32) -> Self {
-        Self(contour.into_iter().map(|p| Point3::new(p.x,p.y,height) ).collect())
+        Self(contour.points.into_iter().map(|p| Point3::new(p.x,p.y,height) ).collect())
     }
     pub fn edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point3<f32>,&'a Point3<f32>)>{
         self.points().zip( self.points().cycle().skip(1) )
