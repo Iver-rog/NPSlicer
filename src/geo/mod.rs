@@ -31,15 +31,14 @@ pub trait Enclosed {
 }
 
 /// The ContourTrait defines that the struct is made up of a sirular loop of points
-pub trait ContorTrait {
-    type PointType: Into<Point2<f32>> + Clone;
+pub trait ContorTrait<const D:usize> {
     /// Method used for ray casting that returns Option(distance).
     /// A some value means the point is inside the contour and 
     /// the distance value is the distance allong the x axis
     /// to the closest intersection with the contur.
-    fn x_distance_to_contour(&self,point:&Point2<f32>) -> Option<f32>;
+    fn x_distance_to_contour(&self,point:&Point<f32,D>) -> Option<f32>;
     /// Method used to iterate over the points of the contour.
-    fn points<'a>(&'a self) -> core::slice::Iter<'a,Self::PointType>;
+    fn points<'a>(&'a self) -> core::slice::Iter<'a,Point<f32,D>>;
     /// Reverses the order of the contour Eg reverses the vector of points
     fn reverse_order(&mut self) -> ();
 }
@@ -49,14 +48,14 @@ pub trait FromUnChecked<T> {
     fn from_unchecked(raw_parts:T) -> Self;
 }
 
-pub fn polygons_from_contours<C,T>(mut contours:Vec<C>) -> Vec<T> 
+pub fn polygons_from_contours<C,T,const D:usize>(mut contours:Vec<C>) -> Vec<T> 
 where
-    C: ContorTrait + Clone + Enclosed,
+    C: ContorTrait<D> + Clone + Enclosed,
     T: FromUnChecked<Vec<C>>
 {
     let mut contour_inside_ref = vec![None;contours.len()];
     for (i,contour) in contours.iter().enumerate() {
-        let test_point:Point2<f32> = contour.points().cloned().next().unwrap().into();
+        let test_point:Point<f32,D> = contour.points().cloned().next().unwrap();
 
         let contour_i_is_inside = contours.iter()
             .enumerate()

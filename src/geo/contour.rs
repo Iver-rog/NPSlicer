@@ -105,8 +105,7 @@ impl From<Vec<Point2<f32>>> for Contour {
         }
     }
 }
-impl ContorTrait for Contour {
-    type PointType = Point2<f32>;
+impl ContorTrait<2> for Contour {
 
     fn points<'a>(&'a self) -> core::slice::Iter<'a,Point2<f32>>{
         self.points.iter()
