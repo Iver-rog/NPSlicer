@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test
+
 use crate::geo::{Polygon,Contour,polygons_from_contours};
 use crate::skeleton::{self, SkeletonBuilder};
 use std::fmt::Display;

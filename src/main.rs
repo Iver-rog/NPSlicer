@@ -1,13 +1,13 @@
 #![allow(unused)]
 mod settings;
-mod contours;
+mod boolean;
 mod stl_op;
 mod skeleton;
 mod utils;
 mod gcode;
 mod geo;
 use geo::{Enclosed,Contour,Polygon};
-use contours::boolean::{boolean, clip_poly, i_simplify, offset, offset_line,ss_offset};
+use boolean::{boolean, clip_poly, i_simplify, offset, offset_line, ss_offset};
 use i_overlay::core::overlay_rule::OverlayRule;
 use utils::Blender;
 mod data;
