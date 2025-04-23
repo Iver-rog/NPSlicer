@@ -7,7 +7,7 @@ mod utils;
 mod gcode;
 mod geo;
 use geo::{Enclosed,Contour,Polygon};
-use contours::boolean::{boolean, clip_poly, i_simplify, offset, offset_line};
+use contours::boolean::{boolean, clip_poly, i_simplify, offset, offset_line,ss_offset};
 use i_overlay::core::overlay_rule::OverlayRule;
 use utils::Blender;
 mod data;
@@ -23,7 +23,7 @@ fn main(){
     init_logger();
 
     let mut blender = Blender::new();
-    gcode::main(&mut blender);
+    // gcode::main(&mut blender);
     // pipe_line(&mut blender);
 
     // straight_skeleton(&mut blender);
@@ -33,6 +33,7 @@ fn main(){
     // offset_layers(&mut blender);
     // skeleton_layers(&mut blender);
     // boolean_layers2(&mut blender);
+    mesh_gen(&mut blender);
 
     blender.show();
 }
@@ -146,12 +147,116 @@ fn offset_polygon(blender:&mut Blender){
         Err(err) => {println!("{err}"); return;},
         };
 
-    offset_poly.iter().for_each(|p|blender.polygon(p, 0.0));
+    offset_poly.iter().for_each(|p|blender.polygon(p, 4.0));
 }
-fn boolean_layers2(blender:&mut Blender){
+
+fn mesh_gen(blender:&mut Blender){
     // let file_path = "../mesh/bunny2.stl";
-    //let file_path = "../mesh/stanford-armadillo.stl";
-    let file_path = "../mesh/curved overhang.stl";
+    // let file_path = "../mesh/stanford-armadillo.stl";
+    // let file_path = "../mesh/curved overhang.stl";
+    // let file_path = "../mesh/simple_overhang.stl";
+    // let file_path = "../mesh/wine_glass3.stl";
+    let file_path = "../mesh/internal_external.stl";
+
+    let file = File::open(file_path).expect("Failed to open STL file");
+    let mut reader = BufReader::new(file);
+
+    let mut mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
+    blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
+
+    let min_a = 0.05;   // min area for contour simplification
+    let layer_h = 0.4; // layer height in mm
+    // let theta = PI/6.; // overhang angle 30deg
+    let theta:f32 = 0.3490659; // overhang angle 20deg
+    // let d_x = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
+    // let d_x = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
+    let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h; 
+
+    let mut layers = stl_op::extract_planar_layers(&mesh, layer_h ,blender);
+
+    // let layers:Vec<Vec<_>> = layers.into_iter()
+    //     .for_each(|layer|{
+    //         layer.into_iter()
+    //         .filter_map(|mut polygon|{
+    //             polygon.simplify(min_a);
+    //             if polygon.0.len() == 0 {None} else {Some(polygon)}
+    //         })
+    //         .collect()
+    //         })
+    //     .collect();
+
+    for polygon in &layers[0] {
+        polygon.validate();
+    }
+
+    let mut layers = layers.into_iter();
+    let mut support_regions:Vec<Vec<Polygon>> = vec![layers.next().unwrap()];
+
+    for (i, layer) in layers.enumerate(){
+        println!("layer {i}");
+        let mut offset_sup = ss_offset(support_regions.last().unwrap().clone(),d_x);
+
+
+        // let support:Vec<_> = offset_sup.into_iter()
+        //     .map(|polygon|{
+        //     let result = polygon.intersect(layer.clone());
+        //     if result.len() == 0 { vec![polygon] }else{result}
+        //     })
+        // .flatten()
+        // .collect();
+        let mut support = boolean(layer,offset_sup.clone(),OverlayRule::Intersect);
+        // support.iter_mut().for_each(|layer| layer.0.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
+        support.iter().for_each(|polygon|blender.polygon(polygon,(i as f32)*layer_h));
+
+        // for polygon in &support {
+        //     polygon.validate();
+        // }
+        support_regions.push(support.clone());
+        // if i == 80 {break}
+    }
+    // blender.clone().show();
+    // panic!();
+
+    println!("created {} layers",support_regions.len());
+
+    let skeletons = support_regions.iter()
+        .enumerate()
+        .map(|(i,layer)|{
+            let polygons:Vec<Polygon> = layer.into_iter()
+                // .map(|p|{let mut p = p.clone(); p.invert(); p})
+                .cloned()
+                .collect();
+            (i,polygons)
+        })
+        .filter_map(|(i,polygons)|{
+            print!("layer {i}: skeleton");
+            match skeleton::skeleton_from_polygons_with_limit(polygons.clone(),20.0){
+                Ok(skeleton) => Some((i,skeleton)),
+                Err(err) => {
+                    println!("\x1b[031m{err}\x1b[0m");
+                    dbg!(&polygons); 
+                    None
+                }
+            }
+        })
+        .for_each(|(i,skeleton)|{ 
+            print!(" => crating iterator");
+            let layer_height = (i+1) as f32 * layer_h;
+            let mut input_polygon_mesh = skeleton.input_polygons_mesh_outer_loop();
+
+            println!(" => meshing");
+            let mut mesh = skeleton.skeleton_mesh();
+            mesh.append(&mut input_polygon_mesh);
+            let edges = skeleton.edges;
+            let points = skeleton.vertices.into_iter()
+                .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
+                .collect();
+
+            blender.n_gon(points, edges, mesh);
+            // blender.n_gon(points, edges, input_polygon_mesh);
+            //blender.line_body3d( points, edges );
+         });
+}
 
     let file = File::open(file_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
