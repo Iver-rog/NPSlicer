@@ -146,47 +146,11 @@ impl ContorTrait<2> for Contour {
     }
 }
 
-#[test]
-fn contour_rotate_test(){
-    let mut contour = contour!([0.,0.],[1.,0.],[1.,1.],[0.,1.]);
-    contour.transform(PI/4.,Vector2::new(0.2,0.2));
-    dbg!(&contour);
-    assert_eq!(contour,
-        contour!([0.5,0.5],[0.5,0.5],[0.5,0.5],[0.5,0.5])
-        );
-
-}
-
 impl Contour {
     pub fn merge_by_distance(&mut self, distance:f32) -> usize {
         let (new_points, points_removed) = super::merge_by_distance(&self.points[..], distance);
         self.points = new_points;
         return points_removed
-    }
-    pub fn scale(&mut self, scale:f32){
-        for point in self.points.iter_mut(){ *point *= scale; };
-        self.area *= scale;
-        self.aabb.scale(scale);
-    }
-    pub fn transform(&mut self, angle:f32, displacement:Vector2<f32>){
-        let rotation_matrix = Matrix2::new(
-            angle.cos(),-angle.sin(),
-            angle.sin(), angle.cos(),
-            );
-        let tanformed_points:Vec<_> = self.points.iter()
-            .map(|p|{ (rotation_matrix*p) + displacement})
-            .collect();
-        *self = Contour::from(tanformed_points);
-    }
-    pub fn rotate(&mut self, angle:f32){
-        let rotation_matrix = Matrix2::new(
-            angle.cos(),-angle.sin(),
-            angle.sin(), angle.cos(),
-            );
-        let rotated_points:Vec<_> = self.points.iter()
-            .map(|p|{ rotation_matrix*p})
-            .collect();
-        *self = Contour::from(rotated_points);
     }
     pub fn edges(&self) -> impl Iterator<Item = (&Point2<f32>,&Point2<f32>)>{
         let points = self.points.iter();

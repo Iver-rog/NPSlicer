@@ -67,17 +67,6 @@ impl Polygon {
             .map(|contour| contour.merge_by_distance(distance) )
             .sum()
     }
-    // Rotates the polygon around the origin by the angle (in radians)
-    pub fn scale(&mut self, scale:f32) {
-        for contour in self.0.iter_mut() {
-            contour.scale(scale);
-        }
-    }
-    pub fn rotate(&mut self, angle:f32) {
-        for contour in self.0.iter_mut() {
-            contour.rotate(angle);
-        }
-    }
     pub fn all_edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point2<f32>,&'a Point2<f32>)>{
         self.0.iter().flat_map(|contour|contour.edges())
     }
