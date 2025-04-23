@@ -8,7 +8,7 @@ use std::io::{self, prelude::*, BufWriter};
 use std::fmt::Display;
 use nalgebra::Point2;
 use stl_io::{IndexedTriangle, Triangle, Vector};
-use crate::geo::{self, Contour, Polygon, Contour3d, Polygon3d};
+use crate::geo::{self, Contour, Polygon, Contour3d, Polygon3d, ContorTrait};
 use crate::gcode;
 
 #[derive(Debug,Clone)]
