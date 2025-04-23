@@ -1,4 +1,5 @@
 #![allow(unused)]
+mod settings;
 mod contours;
 mod stl_op;
 mod skeleton;
