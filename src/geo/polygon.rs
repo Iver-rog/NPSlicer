@@ -7,7 +7,17 @@ pub struct Polygon(pub Vec<Contour>);
 
 impl FromUnChecked<Vec<Contour>> for Polygon {
     fn from_unchecked(contours:Vec<Contour>) -> Self {
-        Self(contours)
+        Self(contours.into_iter()
+            .enumerate()
+            .map(|(i,mut contour)|{
+                match i {
+                    0 => if contour.area().is_sign_negative() { contour.reverse_order() },
+                    _ => if contour.area().is_sign_positive() { contour.reverse_order() },
+                }
+                contour
+            })
+            .collect()
+        )
     }
 }
 
