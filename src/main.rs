@@ -212,8 +212,7 @@ fn mesh_gen(blender:&mut Blender){
         .enumerate()
         .map(|(i,layer)|{
             let polygons:Vec<Polygon> = layer.into_iter()
-                // .map(|p|{let mut p = p.clone(); p.invert(); p})
-                .cloned()
+                .map(|p|{let mut p = p.clone(); p.invert(); p})
                 .collect();
             (i,polygons)
         })

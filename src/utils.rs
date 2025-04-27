@@ -1,6 +1,5 @@
 #![allow(unused)]
 use core::iter::IntoIterator;
-use core::result;
 use std::{os::unix::process::CommandExt, process::Command};
 use std::fs::{self, File, OpenOptions};
 use std::path::Path;
