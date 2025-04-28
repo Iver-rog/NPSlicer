@@ -3,6 +3,39 @@ use ordered_float::OrderedFloat;
 use crate::*;
 use crate::skeleton::split_event::is_point_on_edge;
 use super::*;
+#[cfg(test)]
+use std::{println as info, println as warn};
+
+#[test]
+fn notched_line_test(){
+    let mut contour = contour!(
+        [ 0.0, 0.0],
+        [ 4.0, 0.0],
+        [ 5.0,-1.0],
+        [ 6.0, 0.0],
+        [10.0, 0.0],
+        [10.0,10.0],
+        [ 0.0,10.0]
+        );
+
+    let mut blender = Blender::new();
+    blender.contour(&contour, 0.0);
+    let mut skeleton = SkeletonBuilder::new();
+    skeleton.add_loop(contour.points);
+    // let offset_polygon = skeleton.offset_polygon(3.0).unwrap();
+    let (skeleton,contours)=skeleton.compute_skeleton().unwrap();
+    for contour in contours{
+        if contour.len() != 0 {
+            blender.polygon(&contour[0], 0.0);
+        }
+    }
+    blender.line_body3d(skeleton.vertices.into_iter().map(|v| [v[0],v[1],-0.3*v[2]]).collect(), skeleton.edges);
+    // blender.show();
+
+    assert!(false)
+}
+
+
 
 #[test]
 fn polygon_iterator_test(){
