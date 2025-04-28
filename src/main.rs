@@ -35,7 +35,8 @@ fn main(){
     // boolean_layers2(&mut blender);
     mesh_gen(&mut blender);
 
-    blender.show();
+    // blender.show();
+    blender.apply_boolean();
 }
 #[allow(dead_code)]
 fn polygon_boolean(blender:&mut Blender) {
@@ -141,11 +142,11 @@ fn offset_polygon(blender:&mut Blender){
 
 fn mesh_gen(blender:&mut Blender){
     // let file_path = "../mesh/bunny2.stl";
-    let file_path = "../mesh/stanford-armadillo.stl";
+    // let file_path = "../mesh/stanford-armadillo.stl";
     // let file_path = "../mesh/curved overhang.stl";
-    // let file_path = "../mesh/simple_overhang.stl";
+    let file_path = "../mesh/simple_overhang.stl";
     // let file_path = "../mesh/wine_glass3.stl";
-    // let file_path = "../mesh/internal_external.stl";
+    // let file_path = "../mesh/internal_external_simplified.stl";
 
     let file = File::open(file_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
@@ -162,6 +163,7 @@ fn mesh_gen(blender:&mut Blender){
     let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h; 
 
     let mut layers = stl_op::extract_planar_layers(&mesh, layer_h ,blender);
+    layers.iter_mut().for_each(|layer| layer.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
 
     // let layers:Vec<Vec<_>> = layers.into_iter()
     //     .for_each(|layer|{

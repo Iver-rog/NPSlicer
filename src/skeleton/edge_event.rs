@@ -40,7 +40,7 @@ impl SkeletonBuilder {
         }
     }
 
-    pub (super) fn handle_edge_event(&mut self,events:&mut PriorityQueue<Event, OrderedFloat<f32>>, event:Event ) -> Result<bool, SkeletonError> {
+    pub (super) fn handle_edge_event2(&mut self,events:&mut PriorityQueue<Event, OrderedFloat<f32>>, event:Event ) -> Result<bool, SkeletonError> {
         if !self.shrinking_polygon.contains(&event.node.ndx) || 
            !self.shrinking_polygon.contains(&event.node.next_ndx) {
             info!("t:{:.3} skipping Edge  Event node: {} \x1b[031minactive node in edge\x1b[0m",
@@ -53,9 +53,11 @@ impl SkeletonBuilder {
         // Calculate new vertex position
         let edge_start_v = &self.vertices[edge_start.vertex_ndx];
         let new_vertex = edge_start_v.coords + edge_start.bisector() * (event.time.0-edge_start_v.time);
-        // Add new vertex to list
-        let new_vertex_ndx = self.vertices.len();
-        self.vertices.push(Vertex{coords:new_vertex,time:*event.time});
+        // reuse last vertex if it shares the same location or add new vertex to list
+        if (self.vertices.last().unwrap().coords-new_vertex).magnitude() > 1e-4 {
+            self.vertices.push(Vertex{coords:new_vertex,time:*event.time});
+        }
+        let new_vertex_ndx = self.vertices.len()-1;
         // Add new skeleton vertex and edges
         self.edges.push(Edge{start:edge_start.vertex_ndx, end:new_vertex_ndx});
         self.edges.push(Edge{start:edge_end.vertex_ndx, end:new_vertex_ndx});
@@ -107,7 +109,7 @@ impl SkeletonBuilder {
         Ok(true)
     }
 
-    pub (super) fn handle_edge_event2(&mut self,events:&mut PriorityQueue<Event, OrderedFloat<f32>>, event:Event ) -> Result<bool, SkeletonError> {
+    pub (super) fn handle_edge_event(&mut self,events:&mut PriorityQueue<Event, OrderedFloat<f32>>, event:Event ) -> Result<bool, SkeletonError> {
         // println!("{}",event);
         // println!("{}",self);
         // The condition bellow checks if two edge events occured at the same time in the same place.
@@ -141,7 +143,7 @@ impl SkeletonBuilder {
             // println!("edge_end_ndx:{edge_end_ndx} {next_vertex_pos}");
             // println!("{}",(next_vertex_pos - new_vertex).magnitude());
             // if (next_vertex_pos - new_vertex).magnitude() > 1e-4 {println!("not converging {edge_end_ndx}");break}
-            if (next_vertex_pos - new_vertex).magnitude() > 1e-5 {;break}
+            if (next_vertex_pos - new_vertex).magnitude() > 1e-4 {;break}
             if edge_end_ndx2 == edge_start.ndx {println!("complete loop");break}
             self.edges.push(Edge{start:edge_end.vertex_ndx, end:new_vertex_ndx});
             self.shrinking_polygon.deactivate(&edge_end_ndx2);
@@ -155,7 +157,7 @@ impl SkeletonBuilder {
         // Add new skeleton vertex and edges
         self.edges.push(Edge{start:edge_start.vertex_ndx, end:new_vertex_ndx});
         self.edges.push(Edge{start:edge_end.vertex_ndx, end:new_vertex_ndx});
-        println!("{}",&self);
+        // println!("{}",&self);
 
         if edge_start.ndx == edge_end.next_ndx {
             // println!("vertex event");
@@ -177,6 +179,12 @@ impl SkeletonBuilder {
                 event.time,edge_start.ndx,edge_end.ndx,remaining_vertex.ndx);
             return Ok(true);
         }
+        if edge_end == edge_start {
+            self.edges.push(Edge{start:edge_start.vertex_ndx, end:new_vertex_ndx});
+            self.shrinking_polygon.nodes[edge_start.prev_ndx].next_ndx = edge_start.next_ndx;
+            self.shrinking_polygon.nodes[edge_start.next_ndx].prev_ndx = edge_start.prev_ndx;
+            self.shrinking_polygon.deactivate(&edge_start.ndx);
+        }
 
         // Calculate bisecotr for newly created vertex
         let edge_end_next = self.shrinking_polygon.next(edge_end);
@@ -186,9 +194,9 @@ impl SkeletonBuilder {
         let edge_start_prev = self.shrinking_polygon.prev(edge_start);
         let edge_start_prev_v = &self.vertices[edge_start_prev.vertex_ndx];
         let edge_start_prev_p = edge_start_prev_v.coords + (edge_start_prev.bisector()*(event.time.0-edge_start_prev_v.time)) ;
-        println!("start_n{} ->{} end_n {} <- {}",edge_start_prev.ndx,edge_start_prev.next_ndx,edge_end_next.ndx,edge_end_next.prev_ndx);
-        println!("start_n {}",edge_start_prev);
-        println!("end_n {}",edge_end_next);
+        // println!("start_n{} ->{} end_n {} <- {}",edge_start_prev.ndx,edge_start_prev.next_ndx,edge_end_next.ndx,edge_end_next.prev_ndx);
+        // println!("start_n {}",edge_start_prev);
+        // println!("end_n {}",edge_end_next);
 
         let bisector = match bisector(new_vertex,edge_end_next_p,edge_start_prev_p){
             Ok(bisector) => bisector,
