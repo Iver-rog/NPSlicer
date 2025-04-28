@@ -184,16 +184,16 @@ pub fn clip_poly(obj:Vec<Polygon>,mask:Vec<Polygon>)-> Vec<Vec<Point2<f32>>>{
 pub fn ss_offset(mut polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
     let mut skeleton = SkeletonBuilder::new();
     if distance.is_sign_negative() {
-        let err:Vec<_> = polygons.into_iter()
+        polygons.into_iter()
             .map(|mut polygon|{polygon.invert();polygon})
             .map(|p|{skeleton.add_polygon(p)})
-            .collect();
+            .for_each(|result| assert!(result.is_ok()));
     }else{
         for polygon in polygons {
             skeleton.add_polygon(polygon).unwrap();
         }
     }
-    skeleton.offset_polygon(distance.abs()).unwrap()
+    skeleton.offset_polygon(distance.abs()).unwrap_or(Vec::new())
 }
 
 pub fn offset(polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
