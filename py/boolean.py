@@ -250,6 +250,50 @@ def create_boolean_obj():
 
         return new_cube
 
+def batch_export(collection_name, export_directory):
+
+    # Ensure the export directory exists
+    if not os.path.exists(export_directory):
+        os.makedirs(export_directory)
+
+    # Check that collection exists
+    collection = bpy.data.collections.get(collection_name)
+
+    if collection:
+        print(f"Exporting all objects from collection: {collection_name}")
+
+        # Deselect all objects first
+        bpy.ops.object.select_all(action='DESELECT')
+
+        # Select only objects from the target collection
+        for obj in collection.objects:
+            if obj.type == 'MESH':
+                obj.select_set(True)
+
+        # Set an active object (required for some operators, though not strictly necessary here)
+        bpy.context.view_layer.objects.active = collection.objects[0]
+
+        # Perform batch export
+        bpy.ops.wm.stl_export(
+            filepath=export_directory,
+            use_batch=True,
+            export_selected_objects=True,
+            apply_modifiers=True,
+            ascii_format=False
+        )
+
+        print("Batch export completed successfully.")
+
+    else:
+        print(f"Collection '{collection_name}' not found.")
+
+
+
+# ---- SETTINGS ----
+
+# -------------------
+layer_collection = "Edge_loops"  # Name of the collection to export
+export_directory = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/export/"
 # Clear existing objects
 clear_scene()
 
@@ -257,6 +301,9 @@ import_stl_files()
 
 boolean_obj = create_boolean_obj()
 
-import_edge_loops("Edge_loops")
+import_edge_loops(layer_collection)
 
-apply_boolean_to_collection("Edge_loops",boolean_obj)
+apply_boolean_to_collection(layer_collection,boolean_obj)
+
+batch_export(layer_collection,export_directory)
+
