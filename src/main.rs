@@ -6,10 +6,12 @@ mod skeleton;
 mod utils;
 mod gcode;
 mod geo;
+mod server;
 use geo::{Enclosed,Contour,Polygon};
 use boolean::{boolean, clip_poly, i_simplify, offset, offset_line, ss_offset};
 use i_overlay::core::overlay_rule::OverlayRule;
-use utils::Blender;
+use server::Blender;
+// use utils::Blender;
 mod data;
 
 use std::f32::consts::PI;
@@ -141,10 +143,10 @@ fn offset_polygon(blender:&mut Blender){
 }
 
 fn mesh_gen(blender:&mut Blender){
-    // let file_path = "../mesh/bunny2.stl";
+    let file_path = "../mesh/bunny2.stl";
     // let file_path = "../mesh/stanford-armadillo.stl";
     // let file_path = "../mesh/curved overhang.stl";
-    let file_path = "../mesh/simple_overhang.stl";
+    // let file_path = "../mesh/simple_overhang.stl";
     // let file_path = "../mesh/wine_glass3.stl";
     // let file_path = "../mesh/internal_external_simplified.stl";
 
@@ -313,8 +315,8 @@ fn boolean_layers2(blender:&mut Blender){
         new_overhangs.push(new_support5.clone());
         prev_layer = new_support5;
     }
-    blender.clone().show();
-    panic!();
+    // blender.clone().show();
+    // panic!();
 
     for (i,support) in new_overhangs.iter().enumerate().flat_map(|(i,vec)|vec.into_iter().map(move |p|(i,p))) { 
         if support.0.iter().map(|c|c.points.len()).sum::<usize>() == 0 {panic!()}
@@ -433,7 +435,7 @@ fn offset_layers(blender:&mut Blender){
             polygon.simplify(0.08);
             let layer_height = i as f32 * 0.2;
             print!("layer {i} of {} ",nr_layers);
-            println!("contour {}",blender.line_objects.len());
+            // println!("contour {}",blender.line_objects.len());
 
 
             for contour in polygon.contours(){

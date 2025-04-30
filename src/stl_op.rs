@@ -1,4 +1,4 @@
-use crate::utils::Blender;
+use crate::Blender;
 use crate::geo::{Contour,Polygon,polygons_from_contours};
 
 use std::iter::{IntoIterator, Iterator};

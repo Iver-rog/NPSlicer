@@ -10,7 +10,7 @@ use stl_io::{IndexedTriangle, Triangle, Vector};
 use crate::geo::{self, Contour, Polygon, Contour3d, Polygon3d, ContorTrait};
 use crate::gcode;
 
-#[derive(Debug,Clone)]
+#[derive(Debug)]
 pub struct Blender<'a> {
     tmp_path:Box<Path>,
     mesh_path:Box<Path>,
