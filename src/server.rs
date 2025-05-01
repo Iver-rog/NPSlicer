@@ -1,4 +1,3 @@
-use core::result::Result;
 use std::io::Write;
 use std::net::TcpStream;
 use std::net::ToSocketAddrs;
@@ -6,6 +5,7 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::process::Command;
 use std::thread;
+use std::path::Path;
 
 use std::io;
 
@@ -36,6 +36,22 @@ pub enum BlenderMsg{
 pub struct BlenderObj{
     collection: String,
     name: String,
+    vertices: Vec<[f32;3]>,
+    edges: Vec<[usize;2]>,
+    faces: Vec<Vec<usize>>,
+}
+impl BlenderObj {
+    fn from_mesh<T:Into<String>>(mesh:BlenderMesh,name:T,collection:T) -> Self {
+        Self{
+            name: name.into(),
+            collection: collection.into(),
+            vertices: mesh.vertices,
+            edges: mesh.edges,
+            faces: mesh.faces,
+        }
+    }
+}
+pub struct BlenderMesh{
     vertices: Vec<[f32;3]>,
     edges: Vec<[usize;2]>,
     faces: Vec<Vec<usize>>,
@@ -76,27 +92,13 @@ fn connect_or_launch_blender() -> Blender {
 }
 fn launch_blender() -> std::io::Result<()> {
     println!("launching blender");
+    let python_server_path = Path::new("../py/server.py");
     Command::new("blender")
         // .arg("--background")
         .arg("--python")
-        .arg("/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/py/server.py")
+        .arg(python_server_path)
         .spawn()?;
     Ok(())
-}
-#[test]
-fn blender_tcp_connection_test(){
-    let mut b = Blender::new();
-    let mut msg = BlenderMsg::CreateMesh(
-        BlenderObj { 
-            collection: "test_collection".into(), 
-            name: "tset_obj_halla".into(),
-            vertices: vec![[0.0,0.0,0.0],[1.0,0.0,0.0],[0.0,1.0,0.0]],
-            edges: vec![[0,1],[1,2],[2,0]],
-            faces: vec![vec![0,1,2] ]
-        }
-    );
-    b.send(msg);
-    assert!(false)
 }
 
 impl Blender {
@@ -128,6 +130,15 @@ impl Blender {
 
         // todo!()
     }
+    pub fn display2d<O: Into2d<BlenderMesh>,T:Into<String>>(&mut self,obj:O,h:f32,name:T,collection:T) {
+        // let mesh = BlenderMesh::into2d(obj, h);
+        let blend_obj = BlenderObj::from_mesh(obj.into2d(h),name,collection);
+        self.send(BlenderMsg::CreateMesh(blend_obj))
+    }
+    pub fn display3d<O:Into<BlenderMesh>,T:Into<String>>(&mut self,obj:O,name:T,collection:T) {
+        let blend_obj = BlenderObj::from_mesh(obj.into(),name,collection);
+        self.send(BlenderMsg::CreateMesh(blend_obj))
+    }
     pub fn show(self){
         todo!()
     }
@@ -138,20 +149,21 @@ impl Blender {
     //     todo!()
     // }
     pub fn n_gon(&mut self,vertices:Vec<[f32;3]>, edges:Vec<[usize;2]>, faces:Vec<Vec<usize>> ){
-        let name = "TEST".into();
-        let collection = "collection_name".into();
+        let name = "layer".into();
+        let collection = "np-surface".into();
         let obj = BlenderObj { name, collection, vertices, edges, faces };
         self.send(BlenderMsg::CreateMesh(obj))
     }
     pub fn path(&mut self, path:&gcode::Path){
-        todo!()
+        let name = "Path".into();
+        let collection = format!("{}",path.path_type);
+        self.display3d(path, name, collection);
     }
     pub fn polygon3d(&mut self, polygon:&Polygon3d) {
         todo!()
     }
     pub fn polygon(&mut self, polygon:&Polygon,h:f32) {
-        let obj = blender_obj_from_polygon(polygon, h,"polygon","debug");
-        self.send(BlenderMsg::CreateMesh(obj));
+        self.display2d(polygon, h, "polygon", "debug");
     }
     pub fn contour(&mut self, contour:&Contour,h:f32){
         todo!()
@@ -166,7 +178,12 @@ impl Blender {
         todo!()
     }
     pub fn line(&mut self, points:&Vec<Point2<f32>>,z_height:f32){
-        todo!()
+        let edges = (0..(points.len()-1)).map(|i|[i,i+1]).collect();
+        let vertices = points.into_iter().map(|p|[p.x,p.y,z_height]).collect();
+        let mesh = BlenderMesh{vertices,edges,faces:vec![]};
+
+        let obj = BlenderObj::from_mesh(mesh,"line","debug");
+        self.send(BlenderMsg::CreateMesh(obj));
     }
     pub fn line_body2d(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
         todo!()
@@ -178,25 +195,54 @@ impl Blender {
         todo!()
     }
 }
-fn blender_obj_from_polygon<T:Into<String>>(polygon:&Polygon,h:f32,name:T,collection:T) -> BlenderObj {
-    let mut vertices:Vec<[f32;3]> = Vec::new();
-    let mut edges:Vec<[usize;2]> = Vec::new();
-    for hole in polygon.contours(){
-        let offset = vertices.len();
-        vertices.extend(hole.points.iter().map(|p|[p.x,p.y,h]));
-        edges.extend((offset..(vertices.len()-1)).map(|i|[i,i+1]));
-        edges.push([offset,vertices.len()-1]);
-    }
-    BlenderObj{
-        collection:collection.into(),
-        name:name.into(),
-        vertices,
-        edges,
-        faces:vec![],
+
+impl From<&crate::gcode::Path> for BlenderMesh {
+    fn from(value:&crate::gcode::Path) -> BlenderMesh {
+        let vertices:Vec<_> = value.points.iter().map(|p|[p.x,p.y,p.z]).collect();
+        let edges = (0..vertices.len()-1).map(|i|[i,i+1]).collect();
+        BlenderMesh{vertices,edges,faces:vec![]}
     }
 }
-impl From<&Polygon> for BlenderObj {
-    fn from(polygon:&Polygon) -> Self {
-        blender_obj_from_polygon(polygon, 0.0,"polygon","debug")
+
+
+trait From2d<T> {
+    fn from2d(obj:T,h:f32) -> Self;
+}
+pub trait Into2d<T>: Sized {
+    fn into2d(self,h:f32) -> T;
+}
+impl<T: From2d<U>, U> Into2d<T> for U {
+    fn into2d(self,h:f32) -> T {
+        T::from2d(self,h)
     }
 }
+
+impl From2d<&Polygon> for BlenderMesh {
+    fn from2d(polygon:&Polygon,h:f32) -> Self {
+        let mut vertices:Vec<[f32;3]> = Vec::new();
+        let mut edges:Vec<[usize;2]> = Vec::new();
+        for hole in polygon.contours(){
+            let offset = vertices.len();
+            vertices.extend(hole.points.iter().map(|p|[p.x,p.y,h]));
+            edges.extend((offset..(vertices.len()-1)).map(|i|[i,i+1]));
+            edges.push([offset,vertices.len()-1]);
+        }
+        BlenderMesh{ vertices, edges, faces:vec![] }
+    }
+}
+
+impl From2d<&Contour> for BlenderMesh {
+    fn from2d(contour:&Contour,h:f32) -> Self {
+        if contour.points.len() == 0 {println!("Blender Error: attempted to displey empty loop");}
+        let vertices: Vec<[f32;3]>= contour.points.iter()
+            .map(|p| [ p.x, p.y, h ] )
+            .collect();
+        let mut edges:Vec<[usize;2]> = (0..vertices.len()-1)
+            .map(|i| [i, i+1])
+            .collect();
+        edges.push([edges.len(),0]);
+
+        return BlenderMesh{ vertices, edges, faces:vec![] }
+    }
+}
+

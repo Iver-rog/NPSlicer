@@ -199,7 +199,7 @@ fn mesh_gen(blender:&mut Blender){
         // .collect();
         let mut support = boolean(layer,offset_sup.clone(),OverlayRule::Intersect);
         // support.iter_mut().for_each(|layer| layer.0.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
-        support.iter().for_each(|polygon|blender.polygon(polygon,(i as f32)*layer_h));
+        support.iter().for_each(|polygon|blender.polygon(polygon,((i+1) as f32)*layer_h));
 
         // for polygon in &support {
         //     polygon.validate();
