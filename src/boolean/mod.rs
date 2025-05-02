@@ -111,7 +111,7 @@ impl Polygon{
     pub fn offset(self,distance:f32)->Vec<Polygon>{
         if self.outer_loop().points.len() == 0 {panic!("BBBBB Bad input shape no outerloop")}
         let shape:Vec<Vec<IOverlayCompatibleType>> =  self.0.into_iter()
-            .map(|c|c.points.into_iter().rev().map(|p|p.into()).collect() )
+            .map(|c|c.points.into_iter().map(|p|p.into()).collect() )
             .collect();
         //dbg!(&shape);
         if shape.len() == 0 {panic!("BBBBB Bad input shape no polygons")}
@@ -126,7 +126,7 @@ impl Polygon{
     }
     fn into_ioverlay_type(self)->Vec<Vec<IOverlayCompatibleType>>{
         self.0.into_iter()
-            .map(|c|c.points.into_iter().rev().map(|p|p.into()).collect() )
+            .map(|c|c.points.into_iter().map(|p|p.into()).collect() )
             .collect()
     }
 }
@@ -135,7 +135,7 @@ impl From<Vec<Vec<IOverlayCompatibleType>>> for Polygon{
     fn from(c:Vec<Vec<IOverlayCompatibleType>>)-> Self{
         let mut contours = c.into_iter();
         let outer_loop = match contours.next() {
-            Some(contour) => Contour::from_points(contour.into_iter().rev().map(|p|p.into()).collect()),
+            Some(contour) => Contour::from_points(contour.into_iter().map(|p|p.into()).collect()),
             None => return Polygon::new(Contour::from_points(vec![]),vec![]),
         };
         let holes:Vec<Contour> = contours.map(|c| Contour::from_points(
@@ -212,7 +212,7 @@ pub fn boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Pol
         .flatten()
         .map(|c|
             c.points.into_iter()
-            .rev()
+            // .rev()
             .map(|p|[p.x,p.y])
             .collect()
             )
@@ -223,7 +223,7 @@ pub fn boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Pol
         .flatten()
         .map(|c|
             c.points.into_iter()
-            .rev()
+            // .rev()
             .map(|p|[p.x,p.y])
             .collect()
             )
@@ -232,16 +232,16 @@ pub fn boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Pol
     let result = subj.overlay(&clip, mode, FillRule::NonZero);
 
     return result.into_iter()
-        .map(|p_loop|{
-            let contours = p_loop.into_iter()
+        .map(|polygon| Polygon(
+            polygon.into_iter()
                 .map(|contour| Contour::from_points(
                     contour.into_iter()
                     .map(|p| Point2::new(p[0],p[1]) )
                     .collect()
                     )
                 )
-                .filter(|contour| contour.area.abs() > 0.1)
-                .collect();
-            polygons_from_contours(contours).into_iter()
-        }).flatten().collect()
+                .collect()
+            )
+        )
+        .collect()
 }
