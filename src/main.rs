@@ -8,7 +8,7 @@ mod gcode;
 mod geo;
 mod server;
 use geo::{Enclosed,Contour,Polygon};
-use boolean::{boolean, clip_poly, i_simplify, offset, offset_line, ss_offset};
+use boolean::{boolean, clip_poly, offset, offset_line, ss_offset};
 use i_overlay::core::overlay_rule::OverlayRule;
 use server::Blender;
 // use utils::Blender;

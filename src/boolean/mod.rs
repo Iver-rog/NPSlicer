@@ -116,7 +116,7 @@ impl Polygon{
         //dbg!(&shape);
         if shape.len() == 0 {panic!("BBBBB Bad input shape no polygons")}
         let style = OutlineStyle::new(distance).line_join(LineJoin::Round(0.5));
-        let shapes = shape.outline(style);
+        let shapes = shape.outline(&style);
 
         let p:Vec<Contour> = shapes.into_iter()
             .flatten()
@@ -129,11 +129,6 @@ impl Polygon{
             .map(|c|c.points.into_iter().rev().map(|p|p.into()).collect() )
             .collect()
     }
-}
-pub fn i_simplify(polygons: Vec<Polygon>,min_a:f32)->Vec<Polygon>{
-    let p: Vec<Vec<Vec<IOverlayCompatibleType>>>= polygons.into_iter().map(|p|p.into_ioverlay_type()).collect();
-    let p_simple = p.simplify_shape(FillRule::EvenOdd,min_a);
-    p.into_iter().map(|p|p.into()).collect()
 }
 
 impl From<Vec<Vec<IOverlayCompatibleType>>> for Polygon{
@@ -202,7 +197,7 @@ pub fn offset(polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
         .collect();
 
     let style = OutlineStyle::new(distance).line_join(LineJoin::Miter(0.0));
-    let shapes = shapes.outline(style);
+    let shapes = shapes.outline(&style);
 
     let p:Vec<Contour> = shapes.into_iter()
         .flatten()
