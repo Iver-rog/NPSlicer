@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 mod tagged_bool;
+pub use tagged_bool::tagged_boolean;
 
 use crate::geo::{Polygon,Contour,polygons_from_contours};
 use crate::skeleton::SkeletonBuilder;

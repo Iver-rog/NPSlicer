@@ -85,6 +85,7 @@ impl <'a> Blender<'a> {
         let python_launch_script = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/py/boolean.py";
         println!("================== Blender stdout: =================");
         let _ = Command::new("blender")
+            // .arg("--background")
             .arg("--python")
             .arg(python_launch_script)
             .exec();

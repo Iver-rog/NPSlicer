@@ -8,7 +8,7 @@ mod gcode;
 mod geo;
 mod server;
 use geo::{Enclosed,Contour,Polygon};
-use boolean::{boolean, clip_poly, offset, offset_line, ss_offset};
+use boolean::{boolean, clip_poly, offset, offset_line, ss_offset, tagged_boolean};
 use i_overlay::core::overlay_rule::OverlayRule;
 use server::Blender;
 // use utils::Blender;
@@ -161,8 +161,8 @@ fn mesh_gen(blender:&mut Blender){
     // let theta = PI/6.; // overhang angle 30deg
     let theta:f32 = 0.3490659; // overhang angle 20deg
     // let d_x = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
-    // let d_x = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
-    let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h; 
+    let d_x = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
+    // let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h; 
 
     let mut layers = stl_op::extract_planar_layers(&mesh, layer_h ,blender);
     layers.iter_mut().for_each(|layer| layer.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
@@ -178,6 +178,13 @@ fn mesh_gen(blender:&mut Blender){
     //         })
     //     .collect();
 
+    for (i,layer) in layers.iter().enumerate(){
+        let z = (i+1) as f32 * layer_h;
+        for polygon in layer{
+            blender.display2d(polygon,z,"outer perimeter","part perimeter");
+        }
+    }
+
     for polygon in &layers[0] {
         polygon.validate();
     }
@@ -189,7 +196,6 @@ fn mesh_gen(blender:&mut Blender){
         println!("layer {i}");
         let mut offset_sup = ss_offset(support_regions.last().unwrap().clone(),-d_x);
 
-
         // let support:Vec<_> = offset_sup.into_iter()
         //     .map(|polygon|{
         //     let result = polygon.intersect(layer.clone());
@@ -197,18 +203,23 @@ fn mesh_gen(blender:&mut Blender){
         //     })
         // .flatten()
         // .collect();
-        let mut support = boolean(layer,offset_sup.clone(),OverlayRule::Intersect);
-        // support.iter_mut().for_each(|layer| layer.0.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
-        support.iter().for_each(|polygon|blender.polygon(polygon,((i+1) as f32)*layer_h));
 
-        // for polygon in &support {
-        //     polygon.validate();
-        // }
-        support_regions.push(support.clone());
-        // if i == 80 {break}
+        let support = boolean(layer,offset_sup.clone(),OverlayRule::Intersect);
+
+        // let (support,tags) = tagged_boolean(layer,offset_sup.clone(),OverlayRule::Intersect);
+        // let nr_of_edges = support.iter().map(|polygon|polygon.0.clone()).flatten().map(|contour|contour.points).flatten().count();
+        // let nr_of_clip_edges:usize = tags.iter().flatten().flatten().map(|is_clip|usize::from(*is_clip)).sum();
+        // println!("{nr_of_clip_edges}/{nr_of_edges} are clip {}",
+        //     if nr_of_edges == nr_of_clip_edges{"\x1b[033mno-need\x1b[0m"}else{"\x1b[032myes-need\x1b[0m"});
+
+        // let support_identical_to_perimeter = tags.iter().flatten().flatten().map(|is_clip|).all(|is_clip| *is_clip);
+        // println!("{}",if support_identical_to_perimeter {"\x1b[033mno-need\x1b[0m"}else{"\x1b[032myes-need\x1b[0m"});
+
+        // support.iter_mut().for_each(|layer| layer.0.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
+        support.iter().for_each(|polygon|blender.polygon(polygon,((i+2) as f32)*layer_h));
+
+        support_regions.push(support);
     }
-    // blender.clone().show();
-    // panic!();
 
     println!("created {} layers",support_regions.len());
 
@@ -238,7 +249,7 @@ fn mesh_gen(blender:&mut Blender){
 
             println!(" => meshing");
             let mut mesh = skeleton.skeleton_mesh();
-            mesh.append(&mut input_polygon_mesh);
+            // mesh.append(&mut input_polygon_mesh);
             let edges = skeleton.edges;
             let points = skeleton.vertices.into_iter()
                 .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
