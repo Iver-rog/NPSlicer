@@ -49,7 +49,7 @@ pub fn contour_and_mesh_colider_from_mesh(mesh:stl_io::IndexedMesh) -> (Vec<Poly
         .map(|contour| Contour::from(contour) )
         .collect();
 
-    contours.iter_mut().for_each(|contour| contour.simplify(0.05));
+    contours.iter_mut().for_each(|contour| contour.simplify(0.005));
 
     let polygons = polygons_from_contours(contours);
     return (polygons,mesh_collider)
