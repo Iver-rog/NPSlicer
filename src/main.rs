@@ -154,7 +154,7 @@ fn mesh_gen(blender:&mut Blender){
     let mut reader = BufReader::new(file);
 
     let mut mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    blender.save_mesh(&mesh.faces, &mesh.vertices, format!("input mesh"));
+    blender.load_mesh(file_path,"input mesh");
 
     let min_a = 0.05;   // min area for contour simplification
     let layer_h = 0.4; // layer height in mm

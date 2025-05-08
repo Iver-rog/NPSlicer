@@ -3,6 +3,7 @@ import json
 import queue
 import threading
 import bpy
+import os
 
 message_queue = queue.Queue()
 
@@ -34,18 +35,46 @@ def server_loop():
 def process_messages():
     while not message_queue.empty():
         msg = message_queue.get()
-        try:
-            obj = msg["CreateMesh"]
-            import_edge_loops(
-                obj["collection"],
-                obj["name"],
-                obj["vertices"],
-                obj["edges"],
-                obj["faces"]
-            )
-        except Exception as e:
-            print(f"Processing error: {e}")
+        for command in msg.keys():
+            match command:
+                case "CreateMesh":
+                    obj = msg["CreateMesh"]
+                    import_edge_loops(
+                        obj["collection"],
+                        obj["name"],
+                        obj["vertices"],
+                        obj["edges"],
+                        obj["faces"]
+                    )
+                case "LoadSTL":
+                    stl_path,obj_name = msg["LoadSTL"]
+                    import_stl(stl_path,obj_name)
+                    print(stl_path)
+                case _:
+                    print("Did not recognice the command")
+
     return 0.1  # Run this function again in 0.1s
+
+def import_stl(filepath, name, color=(1.0,0.2,0.2,1.0)):
+    if not os.path.exists(filepath):
+        print(f"Error: File {filepath} not found")
+        return False
+        
+    try:
+        # Import the STL file
+        bpy.ops.wm.stl_import(filepath=filepath)
+        print("STL imported successfully")
+        
+        # Select the imported object
+        imported_object = bpy.context.selected_objects[0]
+        imported_object.name = name
+        imported_object.color = color
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error importing STL: {str(e)}")
+        return False
 
 def clear_scene():
     """Remove all objects from the scene"""

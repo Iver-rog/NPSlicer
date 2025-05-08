@@ -30,7 +30,7 @@ pub struct Blender {
 #[derive(Serialize, Deserialize)]
 pub enum BlenderMsg{
     CreateMesh(BlenderObj),
-    ClearSeene,
+    LoadSTL(String,String),
 }
 #[derive(Serialize, Deserialize)]
 pub struct BlenderObj{
@@ -127,8 +127,11 @@ impl Blender {
     //     self.tcp.write_all(b"\n").unwrap();
     // }
     pub fn save_mesh(&self, tris:&Vec<IndexedTriangle>, vertices:&Vec<Vector<f32>>,name:String){
-
-        // todo!()
+    }
+    pub fn load_mesh(&mut self,path:&str ,name:&str){
+        let binding = std::path::absolute(path).unwrap();
+        let abs_path = binding.to_string_lossy();
+        self.send(BlenderMsg::LoadSTL(abs_path.into(),name.into()))
     }
     pub fn display2d<O: Into2d<BlenderMesh>,T:Into<String>>(&mut self,obj:O,h:f32,name:T,collection:T) {
         // let mesh = BlenderMesh::into2d(obj, h);
