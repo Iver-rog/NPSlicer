@@ -131,17 +131,8 @@ def apply_boolean(target_obj):
     # Set the target object for the Boolean modifier
     boolean_modifier.object = boolean_obj
     
-    # Set the operation type (choose from 'INTERSECT', 'UNION', 'DIFFERENCE')
-    # boolean_modifier.operation = 'DIFFERENCE'  # Change this to 'DIFFERENCE' or 'INTERSECT' if needed
-    
-    # Apply the modifier (optional: this will apply the boolean operation immediately)
-    # bpy.ops.object.modifier_apply(modifier=boolean_modifier.name)
-#=========================== Boolean ==================================
-
     # Deselect the object (optional)
     boolean_obj.select_set(False)
-
-    print(f"Flipped normals for '{boolean_obj.name}'.")
 
 def apply_boolean_slow(target_obj):
 
@@ -155,26 +146,14 @@ def apply_boolean_slow(target_obj):
     # Set the target object for the Boolean modifier
     boolean_modifier.object = boolean_obj
     
-    # Set the operation type (choose from 'INTERSECT', 'UNION', 'DIFFERENCE')
-    # boolean_modifier.operation = 'DIFFERENCE'  # Change this to 'DIFFERENCE' or 'INTERSECT' if needed
-    
-    # Apply the modifier (optional: this will apply the boolean operation immediately)
-    # bpy.ops.object.modifier_apply(modifier=boolean_modifier.name)
-#=========================== Boolean ==================================
-
-    # Deselect the object (optional)
+    # Deselect the object
     boolean_obj.select_set(False)
 
-    # print("2 target obj ",target_obj.name, face_count_after_modifier(target_obj)," ",face_count_without_modifier(target_obj))
     face_n_after_mod = face_count_after_modifier(target_obj)
     face_n_b_mod = face_count_without_modifier(target_obj)
     if face_n_after_mod > 2*face_n_b_mod or face_n_after_mod < 3:
-        print("flipp")
         flip_normals(target_obj)
-    else:
-        print("no flipp")
-
-    #print(f"Flipped normals for '{boolean_obj.name}'.")
+        # print(f"Flipped normals for '{target_obj.name}'.")
 
 def face_count_after_modifier(obj):
     bpy.ops.object.select_all(action='DESELECT')
