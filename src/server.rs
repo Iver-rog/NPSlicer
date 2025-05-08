@@ -153,7 +153,8 @@ impl Blender {
     // }
     pub fn n_gon(&mut self,vertices:Vec<[f32;3]>, edges:Vec<[usize;2]>, faces:Vec<Vec<usize>> ){
         let name = "layer".into();
-        let collection = "np-surface".into();
+        // let collection = "np-surface".into();
+        let collection = "result".into();
         let obj = BlenderObj { name, collection, vertices, edges, faces };
         self.send(BlenderMsg::CreateMesh(obj))
     }

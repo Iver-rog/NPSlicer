@@ -39,17 +39,19 @@ def process_messages():
             match command:
                 case "CreateMesh":
                     obj = msg["CreateMesh"]
-                    import_edge_loops(
+                    b_obj = import_edge_loops(
                         obj["collection"],
                         obj["name"],
                         obj["vertices"],
                         obj["edges"],
                         obj["faces"]
                     )
+                    if obj["collection"] == "result":
+                        apply_boolean(b_obj)
+
                 case "LoadSTL":
                     stl_path,obj_name = msg["LoadSTL"]
                     import_stl(stl_path,obj_name)
-                    print(stl_path)
                 case _:
                     print("Did not recognice the command")
 
@@ -113,11 +115,32 @@ def import_edge_loops(collection_name,name,points,lines,faces):
         return ob
 
     # Create the object
-    pc = point_cloud(name, points, lines, faces)
+    obj = point_cloud(name, points, lines, faces)
 
     # Link object to the active collection
-    new_collection.objects.link(pc)
+    new_collection.objects.link(obj)
+    return obj
 
+def apply_boolean(target_obj):
+    boolean_obj = bpy.data.objects["input mesh"]
+    
+    boolean_modifier = target_obj.modifiers.new(name="Boolean", type='BOOLEAN')
+    boolean_modifier.operation = 'INTERSECT'
+    
+    # Set the target object for the Boolean modifier
+    boolean_modifier.object = boolean_obj
+    
+    # Set the operation type (choose from 'INTERSECT', 'UNION', 'DIFFERENCE')
+    # boolean_modifier.operation = 'DIFFERENCE'  # Change this to 'DIFFERENCE' or 'INTERSECT' if needed
+    
+    # Apply the modifier (optional: this will apply the boolean operation immediately)
+    # bpy.ops.object.modifier_apply(modifier=boolean_modifier.name)
+#=========================== Boolean ==================================
+
+    # Deselect the object (optional)
+    boolean_obj.select_set(False)
+
+    print(f"Flipped normals for '{boolean_obj.name}'.")
 
 # remove default cube n stuff
 clear_scene()
