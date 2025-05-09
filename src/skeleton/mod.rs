@@ -56,6 +56,9 @@ impl StraightSkeleton {
             .collect()
     }
     pub fn skeleton_mesh(&self) -> Vec<Vec<usize>>{
+        todo!()
+    }
+    pub fn skeleton_mesh_with_mask(&self,mask:Vec<Vec<Vec<bool>>>) -> Vec<Vec<usize>>{
         let mut vertex_connections:HashMap<usize,Vec<usize>> = HashMap::with_capacity((self.vertices.len()+5)*3);
         self.edges.iter()
             .for_each(|[edge_start,edge_end]|{
@@ -68,13 +71,21 @@ impl StraightSkeleton {
                     Some(connections) => {connections.push(*edge_start);},
                 }
             });
+
         let mut faces = Vec::new();
-        for polygon in self.input_polygons.iter().cloned() {
+        for (polygon,mask) in self.input_polygons.iter().cloned().zip(mask.into_iter()) {
             let outer_loop = polygon.outer_loop.clone().zip(polygon.outer_loop.skip(1).cycle());
             let holes = polygon.holes.into_iter()
                 .map(|hole| { hole.clone().zip( hole.skip(1).cycle() ) })
                 .flatten();
-            for (start_vert,last_vert) in outer_loop.chain(holes) {
+
+            let oriented_mask = mask.iter()
+                .flat_map(|contour| contour.into_iter().rev());
+
+            let starting_ndeces = outer_loop.chain(holes)
+                .zip(oriented_mask)
+                .filter_map(|(edge,remove)|if *remove {Some(edge)}else{None});
+            for (start_vert,last_vert) in starting_ndeces {
                 let mut face:Vec<usize> = vec![start_vert];
                 let mut prev_vert = last_vert;
                 let mut i = 0;

@@ -191,6 +191,7 @@ fn mesh_gen(blender:&mut Blender){
 
     let mut layers = layers.into_iter();
     let mut support_regions:Vec<Vec<Polygon>> = vec![layers.next().unwrap()];
+    let mut face_masks: Vec<_> = vec![Vec::new()];
 
     for (i, layer) in layers.enumerate(){
         println!("layer {i}");
@@ -204,9 +205,9 @@ fn mesh_gen(blender:&mut Blender){
         // .flatten()
         // .collect();
 
-        let support = boolean(layer,offset_sup.clone(),OverlayRule::Intersect);
+        // let support = boolean(layer,offset_sup,OverlayRule::Intersect);
 
-        // let (support,tags) = tagged_boolean(layer,offset_sup.clone(),OverlayRule::Intersect);
+        let (support,tags) = tagged_boolean(layer,offset_sup,OverlayRule::Intersect);
         // let nr_of_edges = support.iter().map(|polygon|polygon.0.clone()).flatten().map(|contour|contour.points).flatten().count();
         // let nr_of_clip_edges:usize = tags.iter().flatten().flatten().map(|is_clip|usize::from(*is_clip)).sum();
         // println!("{nr_of_clip_edges}/{nr_of_edges} are clip {}",
@@ -216,9 +217,10 @@ fn mesh_gen(blender:&mut Blender){
         // println!("{}",if support_identical_to_perimeter {"\x1b[033mno-need\x1b[0m"}else{"\x1b[032myes-need\x1b[0m"});
 
         // support.iter_mut().for_each(|layer| layer.0.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
-        support.iter().for_each(|polygon|blender.polygon(polygon,((i+2) as f32)*layer_h));
 
+        support.iter().for_each(|polygon|blender.polygon(polygon,((i+2) as f32)*layer_h));
         support_regions.push(support);
+        face_masks.push(tags);
     }
 
     println!("created {} layers",support_regions.len());
@@ -232,8 +234,7 @@ fn mesh_gen(blender:&mut Blender){
             (i,polygons)
         })
         .filter_map(|(i,polygons)|{
-            print!("layer {i}: skeleton");
-            match skeleton::skeleton_from_polygons_with_limit(polygons.clone(),20.0){
+            match skeleton::skeleton_from_polygons_with_limit(polygons.clone(),10.0){
                 Ok(skeleton) => Some((i,skeleton)),
                 Err(err) => {
                     println!("\x1b[031m{err}\x1b[0m");
@@ -243,19 +244,18 @@ fn mesh_gen(blender:&mut Blender){
             }
         })
         .for_each(|(i,skeleton)|{ 
-            print!(" => crating iterator");
             let layer_height = (i+1) as f32 * layer_h;
             let mut input_polygon_mesh = skeleton.input_polygons_mesh_outer_loop();
 
-            println!(" => meshing");
-            let mut mesh = skeleton.skeleton_mesh();
-            // mesh.append(&mut input_polygon_mesh);
+            // let mut mesh = skeleton.skeleton_mesh();
+            let mut mesh = skeleton.skeleton_mesh_with_mask(face_masks[i].clone());
+            mesh.append(&mut input_polygon_mesh);
             let edges = skeleton.edges;
             let points = skeleton.vertices.into_iter()
                 .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
                 .collect();
 
-            blender.n_gon(points, edges, mesh);
+            blender.n_gon(points, vec![], mesh);
             // blender.n_gon(points, edges, input_polygon_mesh);
             //blender.line_body3d( points, edges );
          });
