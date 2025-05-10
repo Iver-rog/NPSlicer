@@ -53,6 +53,11 @@ def process_messages():
                 case "LoadSTL":
                     stl_path,obj_name = msg["LoadSTL"]
                     import_stl(stl_path,obj_name)
+                case "ExportLayers":
+                    export_dir = msg["ExportLayers"]
+                    if export_dir[-1] != "/" or export_dir[-1] != "\\":
+                        export_dir += "/"
+                    batch_export("result",export_dir)
                 case _:
                     print("Did not recognice the command")
 
@@ -188,6 +193,42 @@ def flip_normals(obj):
     # Switch back to Object mode
     bpy.ops.object.mode_set(mode='OBJECT')
 
+def batch_export(collection_name, export_directory):
+
+    # Ensure the export directory exists
+    if not os.path.exists(export_directory):
+        os.makedirs(export_directory)
+
+    # Check that collection exists
+    collection = bpy.data.collections.get(collection_name)
+
+    if collection:
+        print(f"Exporting all objects from collection: {collection_name}")
+
+        # Deselect all objects first
+        bpy.ops.object.select_all(action='DESELECT')
+
+        # Select only objects from the target collection
+        for obj in collection.objects:
+            if obj.type == 'MESH':
+                obj.select_set(True)
+
+        # Set an active object (required for some operators, though not strictly necessary here)
+        bpy.context.view_layer.objects.active = collection.objects[0]
+
+        # Perform batch export
+        bpy.ops.wm.stl_export(
+            filepath=export_directory,
+            use_batch=True,
+            export_selected_objects=True,
+            apply_modifiers=True,
+            ascii_format=False
+        )
+
+        print("Batch export completed successfully.")
+
+    else:
+        print(f"Collection '{collection_name}' not found.")
 
 # remove default cube n stuff
 clear_scene()

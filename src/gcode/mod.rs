@@ -62,7 +62,7 @@ pub fn generate_perimeter_offsets(polygon:Polygon,nr_of_perimeters:usize,layer_w
         .flat_map(move |(i,polygon)| polygon.offset(-((i as f32 + 0.5)*layer_w)).into_iter() )
 }
 
-pub fn main(blender:&mut Blender) {
+pub fn main<T:AsRef<std::path::Path>>(blender:&mut Blender,mesh_layer_dir:T) {
     // let mut args = env::args();
     // let path = args.next().expect("first arg should be the path");
     // let mesh_layer_dir = args.next().expect("missing argument: stl-layers directory");
@@ -73,7 +73,9 @@ pub fn main(blender:&mut Blender) {
 
     // let mesh_layer_dir = "../curving_overhang/p0.2";
     // let mesh_layer_dir = "../simple_overhang";
-    let mesh_layer_dir = "../simple_overhang_half_layers";
+    // let mesh_layer_dir = "../simple_overhang_half_layers";
+    // let mesh_layer_dir = "../bunny_model";
+    // let mesh_layer_dir = "../bunny_2x";
     // let mesh_layer_dir = "../wine_glass";
     // let mesh_layer_dir = "../flat_wine_glass";
 
@@ -428,7 +430,7 @@ impl Contour {
     }
 }
 
-pub fn import_layers(layer_dir:&str) -> impl Iterator<Item = IndexedMesh> {
+pub fn import_layers<T:AsRef<std::path::Path>>(layer_dir:T) -> impl Iterator<Item = IndexedMesh> {
     let paths = fs::read_dir(layer_dir).expect("could not find directory");
 
     let mut stl_files:Vec<_> = paths.filter_map(|path|path.ok())

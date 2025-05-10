@@ -1,5 +1,6 @@
 use std::io::{self,BufWriter,Write};
 use std::fs::File;
+use std::path::PathBuf;
 use std::f32::consts::PI;
 
 use nalgebra::{partial_max, Point3};
@@ -17,9 +18,12 @@ pub struct GcodeFile<'a>{
 }
 
 impl GcodeFile<'_> {
-    pub fn new<'a>(path:&'_ str, settings:&'a Settings) -> GcodeFile<'a> {
+    pub fn new<'a, T:AsRef<std::path::Path>>(dir:T, settings:&'a Settings) -> GcodeFile<'a> {
+        let mut path = PathBuf::new();
+        path.push(dir);
+        path.push("gcode.gcode");
 
-        let mut file = File::create(format!("{path}/gcode.gcode")).unwrap();
+        let mut file = File::create(path).unwrap();
         let mut buffer = BufWriter::new(file);
 
         writeheader(&mut buffer, settings).unwrap();

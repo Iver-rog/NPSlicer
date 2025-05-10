@@ -31,6 +31,7 @@ pub struct Blender {
 pub enum BlenderMsg{
     CreateMesh(BlenderObj),
     LoadSTL(String,String),
+    ExportLayers(String),
 }
 #[derive(Serialize, Deserialize)]
 pub struct BlenderObj{
@@ -127,6 +128,12 @@ impl Blender {
     //     self.tcp.write_all(b"\n").unwrap();
     // }
     pub fn save_mesh(&self, tris:&Vec<IndexedTriangle>, vertices:&Vec<Vector<f32>>,name:String){
+    }
+    /// export layers form blender to disk at the spesified path
+    pub fn export_layers(&mut self, path:&str){
+        let binding = std::path::absolute(path).unwrap();
+        let abs_path = binding.to_string_lossy();
+        self.send(BlenderMsg::ExportLayers(path.into()))
     }
     pub fn load_mesh(&mut self,path:&str ,name:&str){
         let binding = std::path::absolute(path).unwrap();

@@ -18,14 +18,16 @@ use std::f32::consts::PI;
 use nalgebra::{Point2, Point3,Vector2};
 use log::{error, Level};
 use std::io::{Write, BufReader};
-use std::fs::File;
+use std::fs::{self,File};
+use std::io;
 
+/// Warning: the TMP_DIR is deleted and recreated each time the project is run
+const TMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
 
 fn main(){
     init_logger();
 
     let mut blender = Blender::new();
-    // gcode::main(&mut blender);
     // pipe_line(&mut blender);
 
     // straight_skeleton(&mut blender);
@@ -36,9 +38,24 @@ fn main(){
     // skeleton_layers(&mut blender);
     // boolean_layers2(&mut blender);
     mesh_gen(&mut blender);
+    get_user_confimation();
+    crate_or_clear_dir(TMP_DIR);
+    blender.export_layers(TMP_DIR);
+    get_user_confimation();
 
-    // blender.show();
-    blender.apply_boolean();
+    gcode::main(&mut blender,TMP_DIR);
+}
+fn crate_or_clear_dir<T:AsRef<std::path::Path>>(tmp:T){
+    let _ = fs::remove_dir_all(&tmp); // <- dont care if dir does not exist
+    fs::create_dir(&tmp).unwrap();
+}
+fn get_user_confimation(){
+    println!("\x1b[033mpress enter to generate gcode from the planes in blender's results folder\x1b[0m");
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read line");
+    println!("nice");
 }
 #[allow(dead_code)]
 fn polygon_boolean(blender:&mut Blender) {
