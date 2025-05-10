@@ -133,7 +133,7 @@ impl Blender {
     pub fn export_layers(&mut self, path:&str){
         let binding = std::path::absolute(path).unwrap();
         let abs_path = binding.to_string_lossy();
-        self.send(BlenderMsg::ExportLayers(path.into()))
+        self.send(BlenderMsg::ExportLayers(abs_path.into()))
     }
     pub fn load_mesh<T>(&mut self,path:T ,name:&str)
     where T: std::convert::AsRef<std::path::Path>{
