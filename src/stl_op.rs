@@ -4,10 +4,10 @@ use crate::geo::{Contour,Polygon,polygons_from_contours};
 use std::iter::{IntoIterator, Iterator};
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use stl_io::{self, IndexedMesh, IndexedTriangle, Vector};
-use nalgebra::{Point2, Point3};
+use nalgebra::Point3;
 
 
-pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut Blender) -> Vec<Vec<Polygon>> {
+pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32) -> Vec<Vec<Polygon>> {
     let z_max = mesh.vertices.iter().map(|vert| (vert[2]/layer_height).ceil() as usize).max().unwrap();
 
     // Identify which faces intersect which z-planes and save result in look_up_table
@@ -26,14 +26,6 @@ pub fn extract_planar_layers( mesh:&IndexedMesh, layer_height:f32 , blender:&mut
                 look_up_table[layer_nr].insert(face_ndx);
             }
         }
-
-    // Debug: export faces to blender
-    //for (layer_nr,face_ndxes) in look_up_table.iter().enumerate() {
-    //    let owned_faces:Vec<IndexedTriangle> = face_ndxes.into_iter()
-    //        .map(|face_ndx| mesh.faces[*face_ndx].clone())
-    //        .collect();
-    //    blender.save_mesh(&owned_faces,&mesh.vertices,format!("layer {layer_nr}"));
-    //}
 
     let edges_to_tri_map = edges_to_triangles_map( mesh );
 

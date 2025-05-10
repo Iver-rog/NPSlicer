@@ -157,11 +157,6 @@ impl Contour {
         points.zip(points_offset_by_one)
     }
     // returns a iterator over edges/(pairs of points)
-    pub fn into_edges(self) -> impl Iterator<Item = (Point2<f32>,Point2<f32>)> {
-        let points = self.points.into_iter();
-        let points_offset_by_one = points.clone().cycle().skip(1);
-        points.zip(points_offset_by_one)
-    }
     pub fn simplify(&mut self, min_a:f32){
         let len = self.points.len();
         for i in (0..len).rev(){

@@ -107,11 +107,12 @@ where
 /// NOTE: weight value when merging the first and last vertex is not accurate.
 pub(self) fn merge_by_distance<const D:usize>(contour:&[Point<f32,D>], distance:f32) -> (Vec<Point<f32,D>>,usize) {
     let mut old_points = contour.iter();
-    let mut new_points = vec![*old_points.next().unwrap()];
+    let mut new_points:Vec<Point<f32,D>> = Vec::with_capacity(contour.len());
+    new_points.push(*old_points.next().unwrap());
     let mut prev_merged = 0;
     let mut removed_vertices = 0;
 
-    for point in old_points.into_iter() {
+    for point in old_points {
         let last_ndx = new_points.len()-1;
         if (point - new_points[last_ndx]).magnitude() < distance {
             let weight = 1./((2+prev_merged) as f32);

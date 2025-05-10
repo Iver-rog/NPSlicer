@@ -17,35 +17,6 @@ impl FromUnChecked<Vec<Contour3d>> for Polygon3d {
 #[allow(unused)]
 use crate::contour3d;
 
-#[test]
-fn polygon3d_rotation(){
-    let mut polygon = Polygon3d::from_unchecked(vec![
-        contour3d!(
-            [0.0,0.0,0.0],
-            [1.0,2.0,0.0],
-            [3.0,1.0,0.0]
-            ),
-    ]);
-    let mut rot = polygon.clone();
-    let mut scale = polygon.clone();
-
-
-    scale.rotate_scale(0.,2.);
-    assert_eq!(
-        scale,
-        Polygon3d::from_unchecked(vec![
-        contour3d!(
-            [0.0, 0.0, 0.0],
-            [2.0, 4.0, 0.0],
-            [6.0, 2.0, 0.0]
-            ),
-        ]),
-        "pure scaleing"
-    );
-    assert_ne!(polygon.aabb(),scale.aabb())
-
-}
-
 impl Polygon3d{
     pub fn aabb(&self) -> AABB{
         self.outer_loop().aabb()

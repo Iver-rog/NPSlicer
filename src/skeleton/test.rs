@@ -4,11 +4,11 @@ use crate::*;
 use crate::skeleton::split_event::is_point_on_edge;
 use super::*;
 #[cfg(test)]
-use std::{println as info, println as warn};
 
 #[test]
+#[ignore = "requires blender"]
 fn notched_line_test(){
-    let mut contour = contour!(
+    let contour = contour!(
         [ 0.0, 0.0],
         [ 4.0, 0.0],
         [ 5.0,-1.0],
@@ -21,7 +21,7 @@ fn notched_line_test(){
     let mut blender = Blender::new();
     blender.contour(&contour, 0.0);
     let mut skeleton = SkeletonBuilder::new();
-    skeleton.add_loop(contour.points);
+    skeleton.add_loop(contour.points).unwrap();
     // let offset_polygon = skeleton.offset_polygon(3.0).unwrap();
     let (skeleton,contours)=skeleton.compute_skeleton().unwrap();
     for contour in contours{
@@ -30,9 +30,6 @@ fn notched_line_test(){
         }
     }
     blender.line_body3d(skeleton.vertices.into_iter().map(|v| [v[0],v[1],-0.3*v[2]]).collect(), skeleton.edges);
-    // blender.show();
-
-    assert!(false)
 }
 
 
@@ -59,12 +56,12 @@ fn polygon_iterator_test(){
             ]
         );
     let mut skeleton = SkeletonBuilder::new();
-        skeleton.add_polygon(polygon.clone());
-        skeleton.add_polygon(polygon.clone());
+        skeleton.add_polygon(polygon.clone()).unwrap();
+        skeleton.add_polygon(polygon.clone()).unwrap();
 
     dbg!(&skeleton.input_polygon_refs);
     //let mut polygon_iterator = PolygonIterator::from(&skeleton.input_polygon_refs[0]);
-    let mut polygon_iterator = &mut skeleton.input_polygon_refs[0];
+    let polygon_iterator = &mut skeleton.input_polygon_refs[0];
     assert_eq!(polygon_iterator.outer_loop.next(),Some(0));
     assert_eq!(polygon_iterator.outer_loop.next(),Some(1));
     assert_eq!(polygon_iterator.outer_loop.next(),Some(2));
@@ -80,7 +77,8 @@ fn polygon_iterator_test(){
     assert_eq!(polygon_iterator.holes[1].next(),Some(8));
     assert_eq!(polygon_iterator.holes[1].next(),Some(9));
     assert_eq!(polygon_iterator.holes[1].next(),None);
-    let mut polygon_iterator = &mut skeleton.input_polygon_refs[1];
+
+    let polygon_iterator = &mut skeleton.input_polygon_refs[1];
     assert_eq!(polygon_iterator.outer_loop.next(),Some(10));
     assert_eq!(polygon_iterator.outer_loop.next(),Some(11));
     assert_eq!(polygon_iterator.outer_loop.next(),Some(12));

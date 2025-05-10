@@ -10,14 +10,6 @@ pub struct AABB{
     pub y_min:f32,
     pub y_max:f32,
 }
-impl AABB{
-    pub fn scale(&mut self,scale:f32) {
-        self.x_min *= scale;
-        self.x_max *= scale;
-        self.y_min *= scale;
-        self.y_max *= scale;
-    }
-}
 impl Enclosed for AABB {
     fn area(&self) -> f32 {
         (self.x_max - self.x_min) * (self.y_max - self.y_min)

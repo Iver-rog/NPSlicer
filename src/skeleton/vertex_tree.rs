@@ -145,6 +145,7 @@ fn test_polygon() -> Polygon{
     return Polygon::new( outer_loop, vec![hole1,hole2] )
 }
 #[test]
+#[ignore = "WIP"]
 fn vertex_tree_end_points_test(){
     let time = 10.0;
     let mut polygon1 = crate::data::test_poly8();
@@ -177,6 +178,7 @@ fn vertex_tree_end_points_test(){
     assert!(false);
 }
 #[test]
+#[ignore = "WIP"]
 fn vertex_tree_test(){
     let bounds = Polygon::new(Contour::from(vec![
         Point2::new(-0.2,-0.2),

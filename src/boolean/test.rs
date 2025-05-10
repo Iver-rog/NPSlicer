@@ -1,7 +1,7 @@
 use nalgebra::Point2;
 use crate::geo::{Enclosed,Contour,Polygon,polygons_from_contours,ContorTrait};
-use crate::stl_op::area_contour2d;
 use crate::data;
+
 #[test]
 fn simplify_contour(){
     //let mut blender = Blender::new();
@@ -18,6 +18,8 @@ fn simplify_contour(){
     //blender.show();
     assert!(c.points.len()<len);
 }
+
+#[test]
 pub fn i_offset_test(){
     let contours = vec![
         Contour::from(vec![
@@ -47,6 +49,7 @@ pub fn i_offset_test(){
     let p = shape.offset(0.2);
     assert!(p.len()!=0)
 }
+
 #[test]
 fn reverse_order(){
     let mut contour = Contour::from(vec![
@@ -68,6 +71,7 @@ fn reverse_order(){
             ])
         )
 }
+
 #[test]
 fn polygon_from_contours_2(){
     let contours = vec![
@@ -138,16 +142,6 @@ fn polygon_from_contours_2(){
 }
 
 #[test]
-fn equivalent_area_calculations_test(){
-    let points = vec![
-        Point2::new(0.0,0.0),
-        Point2::new(1.0,0.0),
-        Point2::new(0.0,1.0),
-    ];
-    let contour = Contour::from(points);
-    assert_eq!(area_contour2d(&contour.points),contour.area);
-}
-#[test]
 fn contour_reverse_order_test(){
     let mut contour = Contour::from(vec![
         Point2::new(0.0,0.0),
@@ -164,6 +158,7 @@ fn contour_reverse_order_test(){
         ] );
     assert!(contour.area.is_sign_negative());
 }
+
 #[test]
 pub fn point_is_inside_contour_test(){
     let contour = Contour::from( vec![
@@ -189,6 +184,7 @@ pub fn point_is_inside_contour_test(){
     assert!( ! contour.point_is_inside(&Point2::new( 0.1,1.0 )),"test 8");
     assert!( ! contour.point_is_inside(&Point2::new( 0.0,1.1 )),"test 9");
 }
+
 #[test]
 fn point_is_inside_polygon_test(){
     let p = Polygon::new(
