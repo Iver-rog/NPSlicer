@@ -185,6 +185,7 @@ impl Contour {
     }
 }
 
+#[allow(unused)]
 use crate::contour;
 
 #[macro_export]

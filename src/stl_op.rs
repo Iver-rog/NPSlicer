@@ -387,23 +387,6 @@ fn extract_perimeter(triangles: Vec<IndexedTriangle>) -> Vec<usize> {
     return edge_loop
 }
 
-pub fn area_contour2d(point_index:&Vec<Point2<f32>>) -> f32 {
-    // computes the area of a edge perimeter using Green's theorem
-    let point_index_offset_by_one = point_index.iter()
-        .skip(1)
-        .chain( point_index.iter() );
-
-    return 0.5 * point_index.iter()
-        .zip(point_index_offset_by_one)
-        .map(|(p1,p2)|{
-            let x1 = p1[0];
-            let y1 = p1[1];
-            let x2 = p2[0];
-            let y2 = p2[1];
-            return x1*y2 - x2*y1
-        })
-        .sum::<f32>();
-}
 pub fn area_indexed_contour(point_index:&Vec<usize>, points: &Vec<Vector<f32>>) -> f32 {
     // computes the area of a edge perimeter projected onto the xy-plane using Green's theorem
     let point_index_offset_by_one = point_index.iter()

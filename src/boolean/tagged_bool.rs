@@ -18,19 +18,19 @@ use crate::contour;
 /// byte flags used by the i_overlay crate:
 type SegmentFill = u8;
 
-pub const NONE: SegmentFill = 0;
+// pub const NONE: SegmentFill = 0;
 
-pub const SUBJ_TOP: SegmentFill = 0b0001;
-pub const SUBJ_BOTTOM: SegmentFill = 0b0010;
+// pub const SUBJ_TOP: SegmentFill = 0b0001;
+// pub const SUBJ_BOTTOM: SegmentFill = 0b0010;
 pub const CLIP_TOP: SegmentFill = 0b0100;
 pub const CLIP_BOTTOM: SegmentFill = 0b1000;
 
-pub const SUBJ_BOTH: SegmentFill = SUBJ_TOP | SUBJ_BOTTOM;
-pub const CLIP_BOTH: SegmentFill = CLIP_TOP | CLIP_BOTTOM;
-pub const BOTH_TOP: SegmentFill = SUBJ_TOP | CLIP_TOP;
-pub const BOTH_BOTTOM: SegmentFill = SUBJ_BOTTOM | CLIP_BOTTOM;
+// pub const SUBJ_BOTH: SegmentFill = SUBJ_TOP | SUBJ_BOTTOM;
+// pub const CLIP_BOTH: SegmentFill = CLIP_TOP | CLIP_BOTTOM;
+// pub const BOTH_TOP: SegmentFill = SUBJ_TOP | CLIP_TOP;
+// pub const BOTH_BOTTOM: SegmentFill = SUBJ_BOTTOM | CLIP_BOTTOM;
 
-pub const ALL: SegmentFill = SUBJ_BOTH | CLIP_BOTH;
+// pub const ALL: SegmentFill = SUBJ_BOTH | CLIP_BOTH;
 
 
 /// Performes a boolean opperation while keeping trach of which of the 
@@ -220,119 +220,3 @@ pub fn tagged_bool_union_test(){
     }
 }
 
-// #[test]
-// pub fn tagged_bool_subj_test(){
-//     let subj = subj();
-//     let clip = clip();
-//     let correct_result = [
-//         // contour point        is part of clip?
-//         (Point2::new(1.0,3.0),  false),
-//         (Point2::new(0.0,2.0),  false),
-//         (Point2::new(1.0,1.0),  true),
-//         (Point2::new(1.0,0.0),  true),
-//         (Point2::new(2.0,0.0),  true),
-//         (Point2::new(4.0,0.0),  true),
-//         (Point2::new(5.0,0.0),  true),
-//         (Point2::new(5.0,1.0),  false),
-//         (Point2::new(6.0,2.0),  false),
-//         (Point2::new(5.0,3.0),  true),
-//         (Point2::new(5.0,4.0),  true),
-//         (Point2::new(4.0,4.0),  true),
-//         (Point2::new(2.0,4.0),  true),
-//         (Point2::new(1.0,4.0),  true),
-//     ];
-//
-//     let (polygons,tags) = tagged_boolean(subj, clip, OverlayRule::Union);
-//     let contour = polygons.first().unwrap().0.first().unwrap();
-//     let tags = tags.first().unwrap().first().unwrap();
-//     let contour_tag = contour.points.iter().zip(tags.iter());
-//
-//     for (i,(point,tag)) in contour_tag.enumerate() {
-//         let (correct_point,correct_tag) = correct_result[i];
-//         assert_eq!(*point,correct_point,"point at ndx: {i} did not match");
-//         assert_eq!(*tag,correct_tag,"tag at ndx: {i} did not match");
-//     }
-// }
-
-
-
-
-
-// fn print_vector_edge(vector_edge:&VectorEdge){
-//     let fill = vector_edge.fill;
-//     let bit_mask = 0b0011u8;
-//     let subj_flag = fill & bit_mask;
-//     println!(
-//    "a: ({},{}) b: ({},{}) fill:{:010b}       {} {}",
-//     vector_edge.a.x,
-//     vector_edge.a.y,
-//     vector_edge.b.x,
-//     vector_edge.b.y,
-//     vector_edge.fill,
-//     if (subj_flag == SUBJ_TOP) {"\x1b[032mT\x1b[0m"}else{"\x1b[031mF\x1b[0m"},
-//     if (subj_flag == SUBJ_BOTTOM) {"\x1b[032mT\x1b[0m"}else{"\x1b[031mF\x1b[0m"},
-//     // print_segment_fill(vector_edge.fill),
-//     // print_segment_fill(invert(vector_edge.fill)),
-//     )
-// }
-//
-// fn print_segment_fill_new(fill:u8) -> &'static str {
-//     // let subj = fill & 00000000000000000011u8;
-//     let subj = fill & 0011u8;
-//     println!("subj:{:010b} {}",subj,
-//         match subj{
-//             0b0001u8 => "top",
-//             0b0010u8 => "bottom",
-//             0b0011u8 => "t&b",
-//             0b0000u8 => "none",
-//         _ => "",
-//         }
-//         );
-//     match fill{
-//         NONE        => "None",
-//         SUBJ_TOP    => "SUBJ_TOP",
-//         SUBJ_BOTTOM => "SUBJ_BOTTOM",
-//         CLIP_TOP    => "CLIP_TOP",
-//         CLIP_BOTTOM => "CLIP_BOTTOM",
-//
-//         SUBJ_BOTH   => "SUBJ_BOTH",
-//         CLIP_BOTH   => "CLIP_BOTH",
-//         BOTH_TOP    => "BOTH_TOP",
-//         BOTH_BOTTOM => "BOTH_BOTTOM",
-//         ALL         => "ALL",
-//         _ => "unknown"
-//     }
-// }
-// fn print_segment_fill(fill:u8) -> &'static str {
-//     match fill{
-//         NONE        => "None",
-//         SUBJ_TOP    => "SUBJ_TOP",
-//         SUBJ_BOTTOM => "SUBJ_BOTTOM",
-//         CLIP_TOP    => "CLIP_TOP",
-//         CLIP_BOTTOM => "CLIP_BOTTOM",
-//
-//         SUBJ_BOTH   => "SUBJ_BOTH",
-//         CLIP_BOTH   => "CLIP_BOTH",
-//         BOTH_TOP    => "BOTH_TOP",
-//         BOTH_BOTTOM => "BOTH_BOTTOM",
-//         ALL         => "ALL",
-//         _ => "unknown"
-//     }
-// }
-// #[test]
-// fn byte_flagg_readout(){
-//     println!("
-//    NONE        {NONE:10b}            {NONE}
-//    SUBJ_TOP    {SUBJ_TOP:10b}            {SUBJ_TOP}
-//    SUBJ_BOTTOM {SUBJ_BOTTOM:10b}            {SUBJ_BOTTOM}
-//    CLIP_TOP    {CLIP_TOP:10b}            {CLIP_TOP}
-//    CLIP_BOTTOM {CLIP_BOTTOM:10b}            {CLIP_BOTTOM}
-//
-//    SUBJ_BOTH   {SUBJ_BOTH:10b}            {SUBJ_BOTH}
-//    CLIP_BOTH   {CLIP_BOTH:10b}            {CLIP_BOTH}
-//    BOTH_TOP    {BOTH_TOP:10b}            {BOTH_TOP}
-//    BOTH_BOTTOM {BOTH_BOTTOM:10b}            {BOTH_BOTTOM}
-//    ALL         {ALL:10b}            {ALL}
-//    ");
-//    assert!(false)
-// }

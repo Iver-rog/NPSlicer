@@ -1,18 +1,14 @@
 use std::io::Write;
 use std::net::TcpStream;
-use std::net::ToSocketAddrs;
-use std::thread::sleep;
 use std::time::Duration;
 use std::process::Command;
 use std::thread;
 use std::path::Path;
 
-use std::io;
-
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-use nalgebra::{Point2,};
+use nalgebra::Point2;
 use stl_io::IndexedTriangle;
 use stl_io::Vector;
 
@@ -21,7 +17,6 @@ use crate::gcode;
 
 const BLENDER_HOST: &str = "localhost";
 const BLENDER_PORT: u16 = 9000;
-const BLENDER_ADR: &str = "localhost:9000";
 
 #[derive(Debug)]
 pub struct Blender {
@@ -71,7 +66,8 @@ fn connect_to_blender() -> Result<Blender,String>{
 fn connect_to_blender2() -> Result<TcpStream,String>{
     const MAX_RETRIES: u32 = 5;
     const RETRY_DELAY_MS: u64 = 500;
-    for i in 0..MAX_RETRIES {
+    // for _ in 0..MAX_RETRIES {
+    for _ in 0..MAX_RETRIES {
         if let Ok(tcp) = TcpStream::connect((BLENDER_HOST, BLENDER_PORT)) {
             return Ok(tcp)
         }
@@ -85,7 +81,7 @@ fn connect_or_launch_blender() -> Blender {
             println!("connected to blender");
             return blender
         },
-        Err(error) => {
+        Err(_) => {
             launch_blender().unwrap();
             connect_to_blender().expect("could not connect to blender:(")
         }
@@ -150,15 +146,6 @@ impl Blender {
         let blend_obj = BlenderObj::from_mesh(obj.into(),name,collection);
         self.send(BlenderMsg::CreateMesh(blend_obj))
     }
-    pub fn show(self){
-        todo!()
-    }
-    pub fn apply_boolean(self){
-        // todo!()
-    }
-    // fn create_python_lib(self) -> Result<(),io::Error>{
-    //     todo!()
-    // }
     pub fn n_gon(&mut self,vertices:Vec<[f32;3]>, edges:Vec<[usize;2]>, faces:Vec<Vec<usize>> ){
         let name = "layer".into();
         // let collection = "np-surface".into();
@@ -177,10 +164,7 @@ impl Blender {
     pub fn polygon(&mut self, polygon:&Polygon,h:f32) {
         self.display2d(polygon, h, "polygon", "debug");
     }
-    pub fn contour(&mut self, contour:&Contour,h:f32){
-        todo!()
-    }
-    pub fn contour3d(&mut self, contour:&Contour3d){
+    pub fn contour(&mut self, contours:&Contour,h:f32){
         todo!()
     }
     pub fn edge_loop(&mut self, edge_loop:&Vec<usize>,stl:&stl_io::IndexedMesh){

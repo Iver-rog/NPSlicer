@@ -1,8 +1,7 @@
-use nalgebra::{Point2, Point3, Rotation3, Similarity3, Vector3};
+use nalgebra::{Point2, Point3};
 use path::PathType;
 use stl_io::IndexedMesh;
 
-use std::f32::consts::PI;
 use std::iter::Iterator;
 use std::io::BufReader;
 use std::fs::{self, File};
@@ -27,7 +26,6 @@ mod test;
 
 pub fn contour_and_mesh_colider_from_mesh(mesh:stl_io::IndexedMesh) -> (Vec<Polygon>,MeshCollider){
     let (indexed_contours,indexed_edges) = stl_op::extract_perimeters_and_edges(&mesh.faces);
-    // indexed_contours.iter().for_each(|contour| blender.edge_loop(contour, &mesh) );
 
     let vertices = mesh.vertices.into_iter().map(|v|Point3::new( v[0],v[1],v[2]) ).collect();
 
@@ -94,7 +92,7 @@ pub fn main<T:AsRef<std::path::Path>>(blender:&mut Blender,mesh_layer_dir:T,s:&S
         .chain(first_layer_infill)
         .inspect(|path| blender.path(&path) );
 
-    gcodefile.layer(first_layer_paths);
+    gcodefile.layer(first_layer_paths).unwrap();
 
    
     for (layer_nr,(mut polygons, mesh_collider)) in mesh_layers.enumerate()
@@ -140,32 +138,9 @@ pub fn main<T:AsRef<std::path::Path>>(blender:&mut Blender,mesh_layer_dir:T,s:&S
                 .chain(infill.into_iter())
                 .inspect(|path|blender.path(&path));
 
-            gcodefile.layer(layer_paths);
+            gcodefile.layer(layer_paths).unwrap();
 
         }
-
-
-
-    // for (layer_nr,(mut polygons, mesh_collider)) in mesh_layers.enumerate(){
-    //     println!("layer: {layer_nr}");
-    //     // blender.save_mesh(&mesh.faces,&mesh.vertices,format!("mesh_layer: {layer_nr}"));
-    //
-    //     // let (mut polygons, mesh_collider) = contour_and_mesh_colider_from_mesh(mesh);
-    //
-    //     // polygons.iter_mut().for_each(|polygon| polygon.set_start());
-    //
-    //     // polygons.iter().for_each(|polygon|blender.polygon(polygon, 10.0));
-    //
-    //     polygons.into_iter()
-    //         .flat_map(|polygon|{
-    //             iter::repeat(polygon.clone())
-    //                 .take(nr_of_perimeters)
-    //                 .enumerate()
-    //         })
-    //         .flat_map(|(i,polygon)| polygon.offset(-((i as f32 + 0.5)*layer_w)).into_iter() )
-    //         .map(|polygon| polygon.project_onto(&mesh_collider) )
-    //         .for_each(|polygon3d| blender.polygon3d(&polygon3d) );
-    // }
 }
 
 

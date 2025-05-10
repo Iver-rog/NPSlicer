@@ -1,4 +1,4 @@
-#![allow(unused)]
+// #![allow(unused)]
 mod settings;
 mod boolean;
 mod stl_op;
@@ -7,11 +7,10 @@ mod utils;
 mod gcode;
 mod geo;
 mod server;
-use geo::{Enclosed,Contour,Polygon};
-use boolean::{boolean, clip_poly, offset, offset_line, ss_offset, tagged_boolean};
+use geo::{Contour,Polygon};
+use boolean::{boolean, offset, ss_offset, tagged_boolean};
 use i_overlay::core::overlay_rule::OverlayRule;
 use server::Blender;
-// use utils::Blender;
 mod data;
 
 use std::f32::consts::PI;
@@ -220,7 +219,7 @@ fn mesh_gen<T:AsRef<std::path::Path>>(blender:&mut Blender,stl_path:T,s:& settin
 
     for (i, layer) in layers.enumerate(){
         println!("layer {i}");
-        let mut offset_sup = ss_offset(support_regions.last().unwrap().clone(),-d_x);
+        let offset_sup = ss_offset(support_regions.last().unwrap().clone(),-d_x);
 
         // let support:Vec<_> = offset_sup.into_iter()
         //     .map(|polygon|{

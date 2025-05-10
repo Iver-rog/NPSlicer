@@ -3,7 +3,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::f32::consts::PI;
 
-use nalgebra::{partial_max, Point3};
+use nalgebra::Point3;
 
 use super::path::PathType;
 use super::Path;

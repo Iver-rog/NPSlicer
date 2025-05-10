@@ -133,17 +133,14 @@ impl SkeletonBuilder {
         // Check if neighbouring vertices are also merging to the same point
         let mut edge_end_ndx = edge_start.ndx;
         let mut edge_end_ndx2 = edge_start.next_ndx;
-        let mut i = 0;
         loop {
-            i+=1;
-            // println!("i:{i}");
             let edge_end = self.shrinking_polygon.nodes[edge_end_ndx2];
             let next_vertex_pos = self.vertices[edge_end.vertex_ndx].coords
                 + edge_end.bisector() * (event.time.0-self.vertices[edge_end.vertex_ndx].time);
             // println!("edge_end_ndx:{edge_end_ndx} {next_vertex_pos}");
             // println!("{}",(next_vertex_pos - new_vertex).magnitude());
             // if (next_vertex_pos - new_vertex).magnitude() > 1e-4 {println!("not converging {edge_end_ndx}");break}
-            if (next_vertex_pos - new_vertex).magnitude() > 1e-4 {;break}
+            if (next_vertex_pos - new_vertex).magnitude() > 1e-4 {break}
             if edge_end_ndx2 == edge_start.ndx {println!("complete loop");break}
             self.edges.push(Edge{start:edge_end.vertex_ndx, end:new_vertex_ndx});
             self.shrinking_polygon.deactivate(&edge_end_ndx2);
@@ -152,7 +149,6 @@ impl SkeletonBuilder {
             // assert!(self.shrinking_polygon.contains(&edge_end_ndx));
         }
         // println!("edge_end_ndx{edge_end_ndx}");
-        let edge_start_v = &self.vertices[edge_start.vertex_ndx];
         let edge_end = self.shrinking_polygon.nodes[edge_end_ndx];
         // Add new skeleton vertex and edges
         self.edges.push(Edge{start:edge_start.vertex_ndx, end:new_vertex_ndx});

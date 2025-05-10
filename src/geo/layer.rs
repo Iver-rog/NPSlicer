@@ -1,3 +1,4 @@
+#![allow(unused)]
 use super::{Polygon, Polygon3d};
 use crate::stl_op::Edge;
 

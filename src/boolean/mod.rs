@@ -16,7 +16,6 @@ use i_overlay::core::{
 use i_overlay::float::{
     single::SingleFloatOverlay,
     clip::FloatClip,
-    simplify::SimplifyShape,
 };
 use i_overlay::mesh::{
     style::{LineJoin,OutlineStyle,LineCap,StrokeStyle},
@@ -27,12 +26,10 @@ use i_overlay::mesh::{
 #[derive(Copy,Debug,Clone)]
 struct IOverlayCompatibleType(Point2<f32>);
 impl From<IOverlayCompatibleType> for nalgebra::Point2<f32> {
-    fn from(t:IOverlayCompatibleType)-> Point2<f32>{
-        t.0
-    }
+    fn from(t:IOverlayCompatibleType) -> Point2<f32> { t.0 }
 }
 impl Display for IOverlayCompatibleType{
-    fn fmt(&self,b:&mut std::fmt::Formatter<'_>)->Result<(),std::fmt::Error>{
+    fn fmt(&self,b:&mut std::fmt::Formatter<'_>) -> Result<(),std::fmt::Error>{
         write!(b,"({},{})",self.0.x,self.0.y)
     }
 }
@@ -41,19 +38,15 @@ impl From<Point2<f32>> for IOverlayCompatibleType{
         Self(p)
     }
 }
+
 impl FloatPointCompatible<f32> for IOverlayCompatibleType {
      fn from_xy(x: f32, y: f32) -> Self {
          Self ( Point2::new(x,y) )
      }
-
-     fn x(&self) -> f32 {
-         self.0.x
-     }
-
-     fn y(&self) -> f32 {
-         self.0.y
-     }
+     fn x(&self) -> f32 { self.0.x }
+     fn y(&self) -> f32 { self.0.y }
 }
+
 impl Polygon{
     pub fn intersect(&self, sub_shape:Vec<Self>) -> Vec<Polygon>{
         // subtracts sub_shape from self
@@ -115,7 +108,6 @@ impl Polygon{
         let shape:Vec<Vec<IOverlayCompatibleType>> =  self.0.into_iter()
             .map(|c|c.points.into_iter().map(|p|p.into()).collect() )
             .collect();
-        //dbg!(&shape);
         if shape.len() == 0 {panic!("BBBBB Bad input shape no polygons")}
         let style = OutlineStyle::new(distance).line_join(LineJoin::Round(0.5));
         let shapes = shape.outline(&style);
@@ -178,7 +170,7 @@ pub fn clip_poly(obj:Vec<Polygon>,mask:Vec<Polygon>)-> Vec<Vec<Point2<f32>>>{
         .map(|c|c.into_iter().map(|p|p.into()).collect())
         .collect()
 }
-pub fn ss_offset(mut polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
+pub fn ss_offset(polygons:Vec<Polygon>,distance:f32)-> Vec<Polygon>{
     let mut skeleton = SkeletonBuilder::new();
     if distance.is_sign_negative() {
         polygons.into_iter()
@@ -214,7 +206,6 @@ pub fn boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Pol
         .flatten()
         .map(|c|
             c.points.into_iter()
-            // .rev()
             .map(|p|[p.x,p.y])
             .collect()
             )
@@ -225,7 +216,6 @@ pub fn boolean(poly:Vec<Polygon>,mask:Vec<Polygon>, mode:OverlayRule) -> Vec<Pol
         .flatten()
         .map(|c|
             c.points.into_iter()
-            // .rev()
             .map(|p|[p.x,p.y])
             .collect()
             )

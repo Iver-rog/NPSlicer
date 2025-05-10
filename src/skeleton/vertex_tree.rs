@@ -1,3 +1,4 @@
+#![allow(unused)]
 use core::{option::Option, unreachable};
 use crate::geo::Enclosed;
 

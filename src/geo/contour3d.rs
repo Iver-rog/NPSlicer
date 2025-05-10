@@ -1,7 +1,7 @@
 #[cfg(test)]
 use std::f32::EPSILON;
 
-use nalgebra::{Point2, Point3, Rotation3, Similarity3, Vector3};
+use nalgebra::Point3;
 use super::{ContorTrait, Contour, AABB};
 
 #[derive(Debug,Clone,PartialEq)]
@@ -89,22 +89,8 @@ impl Contour3d {
         self.0 = new_points;
         return points_removed
     }
-    pub fn rotate_scale(&mut self, angle:f32, scale:f32){
-        let translation = Vector3::zeros();
-        let axisangle = Vector3::z() * angle;
-        let transform = Similarity3::new(translation,axisangle,scale);
-        // let transform = Similarity3::from_parts(translation,axisangle,scale);
-        let rot = Rotation3::from_axis_angle(&Vector3::z_axis(), angle);
-
-        let tanformed_points:Vec<_> = self.0.iter()
-            // .map(|p| transform.transform_point(&p) )
-            // .map(|p| transform * p )
-            .map(|p| rot * p * scale )
-            .collect();
-        *self = Contour3d::from(tanformed_points);
-    }
-
 }
+
 #[test]
 fn merge_by_distance_test(){
     let mut contour3d = contour3d!(
@@ -129,6 +115,7 @@ fn merge_by_distance_test(){
     assert_eq!(removed_vertices,5);
 }
 
+#[allow(unused)]
 use crate::contour3d;
 
 #[macro_export]

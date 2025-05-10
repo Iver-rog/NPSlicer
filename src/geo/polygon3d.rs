@@ -14,7 +14,9 @@ impl FromUnChecked<Vec<Contour3d>> for Polygon3d {
     }
 }
 
+#[allow(unused)]
 use crate::contour3d;
+
 #[test]
 fn polygon3d_rotation(){
     let mut polygon = Polygon3d::from_unchecked(vec![
@@ -27,18 +29,6 @@ fn polygon3d_rotation(){
     let mut rot = polygon.clone();
     let mut scale = polygon.clone();
 
-    // rot.rotate_scale(PI, 1.);
-    // assert_eq!(
-    //     rot,
-    //     Polygon3d::from_unchecked(vec![
-    //     contour3d!(
-    //         [ 0.0, 0.0, 0.0],
-    //         [-2.0,-4.0, 0.0],
-    //         [-6.0,-2.0, 0.0]
-    //         ),
-    //     ]),
-    //     "pure rotation"
-    // );
 
     scale.rotate_scale(0.,2.);
     assert_eq!(
@@ -63,9 +53,6 @@ impl Polygon3d{
     pub fn outer_loop(&self) -> &Contour3d{
         &self.0[0]
     }
-    pub fn rotate_scale(&mut self, angle:f32, scale:f32) {
-        self.0.iter_mut().for_each(|contour|contour.rotate_scale(angle,scale))
-    }
     pub fn all_edges<'a>(&'a self) -> impl Iterator<Item = (&'a Point3<f32>,&'a Point3<f32>)>{
         self.0.iter().flat_map(|contour|contour.edges())
     }
@@ -73,12 +60,6 @@ impl Polygon3d{
         self.0.iter_mut()
             .map(|contour| contour.merge_by_distance(distance))
             .sum()
-    }
-    pub fn invert(&mut self) {
-        todo!()
-    }
-    pub fn area(&self) -> f32 {
-        todo!()
     }
     pub fn contours<'a>(&'a self) -> core::slice::Iter<'a,Contour3d>{
         self.0.iter()
