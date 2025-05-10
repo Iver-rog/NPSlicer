@@ -3,10 +3,9 @@ mod settings;
 mod boolean;
 mod stl_op;
 mod skeleton;
-mod utils;
 mod gcode;
 mod geo;
-mod server;
+mod blender;
 
 #[cfg(test)]
 mod tests;
@@ -16,7 +15,7 @@ mod data;
 use geo::Polygon;
 use boolean::{ss_offset, tagged_boolean};
 use i_overlay::core::overlay_rule::OverlayRule;
-use server::Blender;
+use blender::Blender;
 
 use log::Level;
 use std::io::{Write, BufReader};
