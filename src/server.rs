@@ -135,7 +135,8 @@ impl Blender {
         let abs_path = binding.to_string_lossy();
         self.send(BlenderMsg::ExportLayers(path.into()))
     }
-    pub fn load_mesh(&mut self,path:&str ,name:&str){
+    pub fn load_mesh<T>(&mut self,path:T ,name:&str)
+    where T: std::convert::AsRef<std::path::Path>{
         let binding = std::path::absolute(path).unwrap();
         let abs_path = binding.to_string_lossy();
         self.send(BlenderMsg::LoadSTL(abs_path.into(),name.into()))

@@ -21,29 +21,40 @@ use std::io::{Write, BufReader};
 use std::fs::{self,File};
 use std::io;
 
-/// Warning: the TMP_DIR is deleted and recreated each time the project is run
-const TMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
+/// WARNING: all content in the TMP_DIR is deleted each time the project is run
+const TEMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
 
 fn main(){
+    // let mut args = env::args();
+    // let path = args.next().expect("first arg should be the path");
+    // let mesh_layer_dir = args.next().expect("missing argument: stl-layers directory");
+ 
     init_logger();
-
     let mut blender = Blender::new();
-    // pipe_line(&mut blender);
 
-    // straight_skeleton(&mut blender);
-    // offset_polygon(&mut blender);
-    // straight_skeleton_with_bounds(&mut blender);
+    let settings = settings::Settings{
+        overhang_angle: 0.2,
+        infill_percentage: 20,
+        brim: 0,
+        ..Default::default()
+    };
+    dbg!(&settings);
 
-    // offset_layers(&mut blender);
-    // skeleton_layers(&mut blender);
-    // boolean_layers2(&mut blender);
-    mesh_gen(&mut blender);
+    // let stl_path = "../mesh/bunny2.stl";
+    // let file_path = "../mesh/stanford-armadillo.stl";
+    // let file_path = "../mesh/curved overhang.stl";
+    // let file_path = "../mesh/simple_overhang.stl";
+    // let file_path = "../mesh/wine_glass3.stl";
+    // let file_path = "../mesh/internal_external_simplified.stl";
+    let stl_path = "../mesh/bunny2.stl";
+
+    mesh_gen(&mut blender,stl_path,&settings);
     get_user_confimation();
-    crate_or_clear_dir(TMP_DIR);
-    blender.export_layers(TMP_DIR);
+    crate_or_clear_dir(TEMP_DIR);
+    blender.export_layers(TEMP_DIR);
     get_user_confimation();
 
-    gcode::main(&mut blender,TMP_DIR);
+    gcode::main(&mut blender,TEMP_DIR,&settings);
 }
 fn crate_or_clear_dir<T:AsRef<std::path::Path>>(tmp:T){
     let _ = fs::remove_dir_all(&tmp); // <- dont care if dir does not exist
@@ -159,27 +170,24 @@ fn offset_polygon(blender:&mut Blender){
     offset_poly.iter().for_each(|p|blender.polygon(p, 4.0));
 }
 
-fn mesh_gen(blender:&mut Blender){
-    let file_path = "../mesh/bunny2.stl";
-    // let file_path = "../mesh/stanford-armadillo.stl";
-    // let file_path = "../mesh/curved overhang.stl";
-    // let file_path = "../mesh/simple_overhang.stl";
-    // let file_path = "../mesh/wine_glass3.stl";
-    // let file_path = "../mesh/internal_external_simplified.stl";
+fn mesh_gen<T:AsRef<std::path::Path>>(blender:&mut Blender,stl_path:T,s:& settings::Settings){
 
-    let file = File::open(file_path).expect("Failed to open STL file");
+    let file = File::open(&stl_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
 
     let mut mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    blender.load_mesh(file_path,"input mesh");
+    blender.load_mesh(stl_path,"input mesh");
+
+    let theta = s.overhang_angle;
+    let layer_h = s.layer_height;
 
     let min_a = 0.05;   // min area for contour simplification
     let layer_h = 0.4; // layer height in mm
     // let theta = PI/6.; // overhang angle 30deg
     let theta:f32 = 0.3490659; // overhang angle 20deg
     // let d_x = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
-    let d_x = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
-    // let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h; 
+    // let d_x = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
+    let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h; 
 
     let mut layers = stl_op::extract_planar_layers(&mesh, layer_h ,blender);
     layers.iter_mut().for_each(|layer| layer.iter_mut().for_each(|polygon|polygon.simplify(min_a)));

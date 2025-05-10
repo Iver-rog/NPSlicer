@@ -62,22 +62,10 @@ pub fn generate_perimeter_offsets(polygon:Polygon,nr_of_perimeters:usize,layer_w
         .flat_map(move |(i,polygon)| polygon.offset(-((i as f32 + 0.5)*layer_w)).into_iter() )
 }
 
-pub fn main<T:AsRef<std::path::Path>>(blender:&mut Blender,mesh_layer_dir:T) {
-    // let mut args = env::args();
-    // let path = args.next().expect("first arg should be the path");
-    // let mesh_layer_dir = args.next().expect("missing argument: stl-layers directory");
-    let mut s = Settings::default();
+pub fn main<T:AsRef<std::path::Path>>(blender:&mut Blender,mesh_layer_dir:T,s:&Settings) {
 
     let layer_w = s.perimeter_line_width;
     let infill_scale = (s.infill_percentage as f32/100.0)*(1.0/s.infill_line_width);
-
-    // let mesh_layer_dir = "../curving_overhang/p0.2";
-    // let mesh_layer_dir = "../simple_overhang";
-    // let mesh_layer_dir = "../simple_overhang_half_layers";
-    // let mesh_layer_dir = "../bunny_model";
-    // let mesh_layer_dir = "../bunny_2x";
-    // let mesh_layer_dir = "../wine_glass";
-    // let mesh_layer_dir = "../flat_wine_glass";
 
     let mut mesh_layers = import_layers(&mesh_layer_dir)
         .map(|layer_mesh| contour_and_mesh_colider_from_mesh(layer_mesh));

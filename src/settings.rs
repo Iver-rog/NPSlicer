@@ -1,7 +1,12 @@
+use std::f32::consts::PI;
 
+#[derive(Debug)]
 pub struct Settings{
     pub nozzle_diameter: f32,       // mm
     pub layer_height: f32,          // mm
+    /// [rad] The angle of non-planar layers (relative to the xy-plane)
+    pub overhang_angle: f32,         // radians
+
     pub infill_percentage: usize,   // %
     pub nr_of_perimeters: usize,    // int
     pub perimeter_line_width: f32,  // mm
@@ -38,6 +43,7 @@ pub struct Settings{
     pub feedrates:Feedrates,
 }
 
+#[derive(Debug)]
 pub struct Feedrates {
     /// [mm/min] The feedrate of the axis during first layer perimeter
     pub initial_layer:usize,
@@ -71,6 +77,7 @@ impl Default for Settings {
         Self {
             nozzle_diameter,
             layer_height: 0.2,
+            overhang_angle: PI/9.0, // <- 20 deg
             infill_percentage,
             nr_of_perimeters: 2,
             perimeter_line_width: 0.45,
