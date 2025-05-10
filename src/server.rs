@@ -115,20 +115,15 @@ impl Blender {
             
         };
         self.tcp.write_all(&json).unwrap();
-        // self.tcp.write_all(b"\n").unwrap();  // Important: delimiter
         self.tcp.flush().unwrap();
     }
-    // pub fn send(&mut self, obj:BlenderMsg) {
-    //     let msg = serde_json::to_string(&obj).unwrap();
-    //     self.tcp.write_all(msg.as_bytes()).unwrap();
-    //     self.tcp.write_all(b"\n").unwrap();
-    // }
     /// export layers form blender to disk at the spesified path
     pub fn export_layers(&mut self, path:&str){
         let binding = std::path::absolute(path).unwrap();
         let abs_path = binding.to_string_lossy();
         self.send(BlenderMsg::ExportLayers(abs_path.into()))
     }
+    /// loads the stl file at the given path in blender
     pub fn load_mesh<T>(&mut self,path:T ,name:&str)
     where T: std::convert::AsRef<std::path::Path>{
         let binding = std::path::absolute(path).unwrap();
@@ -155,9 +150,6 @@ impl Blender {
         let name = "Path".into();
         let collection = format!("{}",path.path_type);
         self.display3d(path, name, collection);
-    }
-    pub fn polygon(&mut self, polygon:&Polygon,h:f32) {
-        self.display2d(polygon, h, "polygon", "debug");
     }
 }
 

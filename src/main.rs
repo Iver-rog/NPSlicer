@@ -148,7 +148,12 @@ fn mesh_gen<T:AsRef<std::path::Path>>(blender:&mut Blender,stl_path:T,s:& settin
 
         // support.iter_mut().for_each(|layer| layer.0.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
 
-        support.iter().for_each(|polygon|blender.polygon(polygon,((i+2) as f32)*layer_h));
+        support.iter().for_each(|polygon|blender.display2d(
+                polygon,
+                ((i+2) as f32)*layer_h,
+                "support_polygon",
+                "debug")
+            );
         support_regions.push(support);
         face_masks.push(tags);
     }
