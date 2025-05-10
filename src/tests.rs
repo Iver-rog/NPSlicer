@@ -18,7 +18,7 @@ fn straight_skeleton() {
     let mut vertices = data::test_poly8();
     vertices.invert();
 
-    blender.polygon(&vertices, 0.0);
+    blender.display2d(&vertices, 0.0,"polygon","straight_skeleton");
 
     //match skeleton::SkeletonBuilder::new(vertices){
     match skeleton::SkeletonBuilder::from_polygon(vertices){
@@ -27,10 +27,8 @@ fn straight_skeleton() {
             Err(error) => error!("{error}"),
             //Ok((skeleton,debug_contours)) => {
             Ok(skeleton) => {
-                //blender.line_body3d(
-                //    skeleton.vertices.into_iter().map(|p|[p.x,p.y,p.z]).collect(), 
-                //    skeleton.edges
-                //    );
+                blender.display3d(&skeleton,"skeleton","straight_skeleton");
+
                 let mesh = skeleton.skeleton_mesh();
                 blender.n_gon(
                     skeleton.vertices.into_iter().map(|v| [v[0],v[1],v[2]]).collect(), 
@@ -62,8 +60,9 @@ fn straight_skeleton_with_bounds() {
     ]);
 
     polygon.invert();
-    blender.polygon(&polygon, 0.0);
-    blender.contour(&bounds, 0.0);
+    blender.display2d(&polygon, 0.0, "polygon","straight_skeleton_with_bounds");
+    blender.display2d(&bounds, 0.0, "bounds","straight_skeleton_with_bounds");
+
     let secound_polygon = polygon.outer_loop().points.iter().map(|p|p+Vector2::new(1.0,50.0)).collect();
 
     match skeleton::SkeletonBuilder::from_polygon(polygon){
@@ -74,9 +73,9 @@ fn straight_skeleton_with_bounds() {
             match builder.compute_skeleton() {
                 Err(error) => error!("{error}"),
                 Ok((skeleton,debug_contours)) => {
-                    blender.line_body3d(skeleton.vertices.into_iter().map(|v| [v[0],v[1],-0.3*v[2]]).collect(), skeleton.edges);
+                    blender.display3d(&skeleton, "skeleton","straight_skeleton_with_bounds");
                     for polygon in debug_contours.iter().flatten() {
-                        blender.polygon(polygon,0.0);
+                        blender.display2d(polygon,0.0,"debug_contour","straight_skeleton_with_bounds");
                     }
                 } 
             }

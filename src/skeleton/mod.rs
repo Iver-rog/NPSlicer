@@ -157,8 +157,8 @@ impl Display for Event {
 }
 #[derive(Debug)]
 pub struct Vertex {
-    coords: Point2<f32>,
-    time: f32,
+    pub coords: Point2<f32>,
+    pub time: f32,
 }
 #[derive(Debug,Clone)]
 pub struct PolygonIterator {
@@ -185,8 +185,8 @@ pub struct SkeletonBuilder {
     shrinking_polygon: Nodes,
     original_polygon: Nodes,
     input_polygon_refs: Vec<PolygonIterator>,
-    vertices: Vec<Vertex>,
-    edges: Vec<Edge>,
+    pub vertices: Vec<Vertex>,
+    pub edges: Vec<Edge>,
     bounding_contour: Option<Contour>,
 }
 impl SkeletonBuilder {

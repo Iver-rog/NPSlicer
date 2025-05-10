@@ -19,17 +19,18 @@ fn notched_line_test(){
         );
 
     let mut blender = Blender::new();
-    blender.contour(&contour, 0.0);
+    blender.display2d(&contour, 0.0,"contour","notched_line_test");
     let mut skeleton = SkeletonBuilder::new();
     skeleton.add_loop(contour.points).unwrap();
     // let offset_polygon = skeleton.offset_polygon(3.0).unwrap();
     let (skeleton,contours)=skeleton.compute_skeleton().unwrap();
     for contour in contours{
         if contour.len() != 0 {
-            blender.polygon(&contour[0], 0.0);
+            blender.display2d(&contour[0], 0.0,"contour","notched_line_test");
         }
     }
-    blender.line_body3d(skeleton.vertices.into_iter().map(|v| [v[0],v[1],-0.3*v[2]]).collect(), skeleton.edges);
+    blender.display3d(&skeleton, "skeleton", "notched_line_test");
+    // blender.line_body3d(skeleton.vertices.into_iter().map(|v| [v[0],v[1],-0.3*v[2]]).collect(), skeleton.edges);
 }
 
 

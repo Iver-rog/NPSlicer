@@ -160,17 +160,18 @@ fn vertex_tree_end_points_test(){
     );
 
     let mut blender = crate::Blender::new();
-    blender.polygon(&polygon1,0.0);
-    blender.polygon(&polygon2,0.0);
+    blender.display2d(&polygon1,0.0,"polygon1","vertex_tree_end_points");
+    blender.display2d(&polygon2,0.0,"polygon2","vertex_tree_end_points");
 
     let mut skeleton = SkeletonBuilder::new();
     skeleton.add_polygon(polygon1);
     skeleton.add_polygon(polygon2);
     skeleton.compute_untill(time).unwrap();
-    blender.line_body2d(
-        &skeleton.vertices.iter().map(|v|[v.coords.x,v.coords.y]).collect(),
-        skeleton.edges.iter().map(|e|[e.start,e.end]).collect()
-        );
+    blender.display3d(&skeleton, "skeleton", "vertex_tree_end_points");
+    // blender.line_body2d(
+    //     &skeleton.vertices.iter().map(|v|[v.coords.x,v.coords.y]).collect(),
+    //     skeleton.edges.iter().map(|e|[e.start,e.end]).collect()
+    //     );
     let vertex_tree = skeleton.vertex_tree();
     let endpoints = vertex_tree.end_points( 6 );
     dbg!(endpoints);
@@ -193,8 +194,8 @@ fn vertex_tree_test(){
     let time = 0.1;
     let mut skeleton = SkeletonBuilder::new();
     let mut blender = crate::Blender::new();
-    blender.polygon(&polygon,0.0);
-    blender.polygon(&bounds,0.1);
+    blender.display2d(&polygon,0.0,"polygon","vertex tree test");
+    blender.display2d(&bounds,0.1,"bounds","vertex tree test");
     skeleton.add_polygon(polygon);
     skeleton.compute_untill(time).unwrap();
     //blender.line_body2d(
@@ -202,7 +203,7 @@ fn vertex_tree_test(){
     //    skeleton.edges.iter().map(|e|[e.start,e.end]).collect()
     //    );
     let offset_contours = skeleton.offset_inside_bounds(bounds, time);
-    offset_contours.iter().for_each(|contour| blender.contour(contour,0.2));
+    offset_contours.iter().for_each(|contour| blender.display2d(contour,0.2,"shrinking_poly","vertex tree test"));
     //blender.show();
     assert!(false)
 }

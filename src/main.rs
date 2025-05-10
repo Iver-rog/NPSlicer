@@ -1,4 +1,4 @@
-// #![allow(unused)]
+#![allow(unused)]
 mod settings;
 mod boolean;
 mod stl_op;

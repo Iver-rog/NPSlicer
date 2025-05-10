@@ -123,8 +123,6 @@ impl Blender {
     //     self.tcp.write_all(msg.as_bytes()).unwrap();
     //     self.tcp.write_all(b"\n").unwrap();
     // }
-    pub fn save_mesh(&self, tris:&Vec<IndexedTriangle>, vertices:&Vec<Vector<f32>>,name:String){
-    }
     /// export layers form blender to disk at the spesified path
     pub fn export_layers(&mut self, path:&str){
         let binding = std::path::absolute(path).unwrap();
@@ -137,7 +135,7 @@ impl Blender {
         let abs_path = binding.to_string_lossy();
         self.send(BlenderMsg::LoadSTL(abs_path.into(),name.into()))
     }
-    pub fn display2d<O: Into2d<BlenderMesh>,T:Into<String>>(&mut self,obj:O,h:f32,name:T,collection:T) {
+    pub fn display2d<O: Into3d<BlenderMesh>,T:Into<String>>(&mut self,obj:O,h:f32,name:T,collection:T) {
         // let mesh = BlenderMesh::into2d(obj, h);
         let blend_obj = BlenderObj::from_mesh(obj.into2d(h),name,collection);
         self.send(BlenderMsg::CreateMesh(blend_obj))
@@ -158,37 +156,8 @@ impl Blender {
         let collection = format!("{}",path.path_type);
         self.display3d(path, name, collection);
     }
-    pub fn polygon3d(&mut self, polygon:&Polygon3d) {
-        todo!()
-    }
     pub fn polygon(&mut self, polygon:&Polygon,h:f32) {
         self.display2d(polygon, h, "polygon", "debug");
-    }
-    pub fn contour(&mut self, contours:&Contour,h:f32){
-        todo!()
-    }
-    pub fn edge_loop(&mut self, edge_loop:&Vec<usize>,stl:&stl_io::IndexedMesh){
-        todo!()
-    }
-    pub fn edge_loop_points(&mut self, edge_loop:&Vec<[f32;3]>){
-        todo!()
-    }
-    pub fn line(&mut self, points:&Vec<Point2<f32>>,z_height:f32){
-        let edges = (0..(points.len()-1)).map(|i|[i,i+1]).collect();
-        let vertices = points.into_iter().map(|p|[p.x,p.y,z_height]).collect();
-        let mesh = BlenderMesh{vertices,edges,faces:vec![]};
-
-        let obj = BlenderObj::from_mesh(mesh,"line","debug");
-        self.send(BlenderMsg::CreateMesh(obj));
-    }
-    pub fn line_body2d(&mut self,points:&Vec<[f32;2]>,edges:Vec<[usize;2]>) {
-        todo!()
-    }
-    pub fn line_body3d(&mut self,points:Vec<[f32;3]>,edges:Vec<[usize;2]>) {
-        todo!()
-    }
-    pub fn line_body_points(&mut self, edges:&Vec<[[f32;2];2]>) {
-        todo!()
     }
 }
 
@@ -204,10 +173,10 @@ impl From<&crate::gcode::Path> for BlenderMesh {
 trait From2d<T> {
     fn from2d(obj:T,h:f32) -> Self;
 }
-pub trait Into2d<T>: Sized {
+pub trait Into3d<T>: Sized {
     fn into2d(self,h:f32) -> T;
 }
-impl<T: From2d<U>, U> Into2d<T> for U {
+impl<T: From2d<U>, U> Into3d<T> for U {
     fn into2d(self,h:f32) -> T {
         T::from2d(self,h)
     }
@@ -219,7 +188,7 @@ impl From2d<&Polygon> for BlenderMesh {
         let mut edges:Vec<[usize;2]> = Vec::new();
         for hole in polygon.contours(){
             let offset = vertices.len();
-            vertices.extend(hole.points.iter().map(|p|[p.x,p.y,h]));
+            vertices.extend(hole.points().map(|p|[p.x,p.y,h]));
             edges.extend((offset..(vertices.len()-1)).map(|i|[i,i+1]));
             edges.push([offset,vertices.len()-1]);
         }
@@ -230,7 +199,7 @@ impl From2d<&Polygon> for BlenderMesh {
 impl From2d<&Contour> for BlenderMesh {
     fn from2d(contour:&Contour,h:f32) -> Self {
         if contour.points.len() == 0 {println!("Blender Error: attempted to displey empty loop");}
-        let vertices: Vec<[f32;3]>= contour.points.iter()
+        let vertices: Vec<[f32;3]> = contour.points()
             .map(|p| [ p.x, p.y, h ] )
             .collect();
         let mut edges:Vec<[usize;2]> = (0..vertices.len()-1)
@@ -242,3 +211,55 @@ impl From2d<&Contour> for BlenderMesh {
     }
 }
 
+impl From<&Contour3d> for BlenderMesh {
+    fn from(contour:&Contour3d) -> Self {
+        if contour.0.len() == 0 {println!("Blender Error: attempted to displey empty loop");}
+        let vertices: Vec<[f32;3]> = contour.points()
+            .map(|p| [ p.x, p.y, p.z ] )
+            .collect();
+        let mut edges:Vec<[usize;2]> = (0..vertices.len()-1)
+            .map(|i| [i, i+1])
+            .collect();
+        edges.push([edges.len(),0]);
+
+        return BlenderMesh{ vertices, edges, faces:vec![] }
+    }
+}
+
+impl From<&Polygon3d> for BlenderMesh {
+    fn from(polygon:&Polygon3d) -> Self {
+        let mut vertices:Vec<[f32;3]> = Vec::new();
+        let mut edges:Vec<[usize;2]> = Vec::new();
+        for hole in polygon.contours(){
+            let offset = vertices.len();
+            vertices.extend(hole.points().map(|p|[p.x,p.y,p.z]));
+            edges.extend((offset..(vertices.len()-1)).map(|i|[i,i+1]));
+            edges.push([offset,vertices.len()-1]);
+        }
+        BlenderMesh{ vertices, edges, faces:vec![] }
+    }
+}
+
+impl From<&crate::skeleton::StraightSkeleton> for BlenderMesh {
+    fn from(skeleton:&crate::skeleton::StraightSkeleton) -> Self {
+        let vertices = skeleton.vertices.iter().map(|p|[p.x,p.y,p.z]).collect();
+        let edges = skeleton.edges.clone();
+        BlenderMesh{
+            vertices,
+            edges,
+            faces:vec![] 
+        }
+    }
+}
+
+impl From<&crate::skeleton::SkeletonBuilder> for BlenderMesh {
+    fn from(skeleton:&crate::skeleton::SkeletonBuilder) -> Self {
+        let vertices = skeleton.vertices.iter().map(|v|[v.coords.x,v.coords.y,v.time]).collect();
+        let edges = skeleton.edges.iter().map(|e|[e.start,e.end]).collect();
+        BlenderMesh{
+            vertices,
+            edges,
+            faces:vec![] 
+        }
+    }
+}
