@@ -106,7 +106,7 @@ pub fn main<T:AsRef<std::path::Path>>(blender:&mut Blender,mesh_layer_dir:T,s:&S
             let infill:Vec<Path> = polygons.iter().cloned()
                 .flat_map(|polygon| polygon.offset(infill_offset).into_iter() )
                 .flat_map(|offset_polygon|{
-                    let direction = if layer_nr%2 == 0 { InfillDirection::Y }else{ InfillDirection::X };
+                    let direction = if layer_nr%3 == 0 { InfillDirection::Y }else{ InfillDirection::X };
                     generate_3d_infill(offset_polygon, &mesh_collider_copy,infill_scale,direction)
                     })
                 .collect();
@@ -371,7 +371,7 @@ impl Polygon {
 impl Contour3d {
     fn set_start(&mut self) {
         let start_point_ndx = self.points()
-            .map(|p|p.x-p.y)
+            .map(|p|-p.x-p.y)
             .enumerate()
             .max_by(|(_,a),(_,b)|a.total_cmp(b))
             .map(|(index,_)| index)

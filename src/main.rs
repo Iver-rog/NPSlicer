@@ -18,6 +18,7 @@ use i_overlay::core::overlay_rule::OverlayRule;
 use blender::Blender;
 
 use log::Level;
+use settings::Feedrates;
 use std::io::{Write, BufReader};
 use std::fs::{self,File};
 use std::io;
@@ -37,21 +38,31 @@ fn main(){
     let settings = settings::Settings{
         overhang_angle: 0.2,
         infill_percentage: 20,
-        brim: 0,
+        nr_of_perimeters: 3,
+        brim: 3,
+        outer_wall_first: false,
+        translate_xy: [50., 50.],
+        feedrates:Feedrates{
+            initial_layer:800,
+            initial_layer_infill:1200,
+            travel: 2000,
+            ..Default::default()
+        },
         ..Default::default()
     };
     dbg!(&settings);
 
     // let stl_path = "../mesh/bunny2.stl";
-    // let file_path = "../mesh/stanford-armadillo.stl";
-    // let file_path = "../mesh/curved overhang.stl";
-    // let file_path = "../mesh/simple_overhang.stl";
-    // let file_path = "../mesh/wine_glass3.stl";
-    // let file_path = "../mesh/internal_external_simplified.stl";
-    let stl_path = "../mesh/bunny2.stl";
+    // let stl_path = "../mesh/stanford-armadillo.stl";
+    // let stl_path = "../mesh/curved overhang.stl";
+    // let stl_path = "../mesh/simple_overhang.stl";
+    // let stl_path = "../mesh/wine_glass3.stl";
+    let stl_path = "../mesh/internal_external_simplified.stl";
+    // blender.load_mesh(stl_path, "input_mesh");
+    // let stl_path = "../mesh/bunny2.stl";
 
-    mesh_gen(&mut blender,stl_path,&settings);
-    get_user_confimation();
+    // mesh_gen(&mut blender,stl_path,&settings);
+    // get_user_confimation();
     crate_or_clear_dir(TEMP_DIR);
     blender.export_layers(TEMP_DIR);
     get_user_confimation();
@@ -76,7 +87,7 @@ fn get_user_confimation(){
 
 
 
-fn mesh_gen<T:AsRef<std::path::Path>>(blender:&mut Blender,stl_path:T,s:& settings::Settings){
+fn mesh_gen<T:AsRef<std::path::Path>>(blender:&mut Blender, stl_path:T, s:&settings::Settings){
 
     let file = File::open(&stl_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
@@ -89,9 +100,10 @@ fn mesh_gen<T:AsRef<std::path::Path>>(blender:&mut Blender,stl_path:T,s:& settin
 
     let min_a = 0.05;   // min area for contour simplification
 
-    // let d_x = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
-    // let d_x = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
-    let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h; 
+    let d_x1 = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
+    let d_x2 = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
+    // let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h;
+    let d_x = d_x1+d_x2;
 
     let mut layers = stl_op::extract_planar_layers(&mesh, layer_h);
     layers.iter_mut().for_each(|layer| layer.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
@@ -179,19 +191,23 @@ fn mesh_gen<T:AsRef<std::path::Path>>(blender:&mut Blender,stl_path:T,s:& settin
         })
         .for_each(|(i,skeleton)|{ 
             let layer_height = (i+1) as f32 * layer_h;
-            let mut input_polygon_mesh = skeleton.input_polygons_mesh_outer_loop();
+            // let mut input_polygon_mesh = skeleton.input_polygons_mesh_outer_loop();
+            let mut input_polygon_mesh = skeleton.mesh_input_polygon();
 
             // let mut mesh = skeleton.skeleton_mesh();
             let mut mesh = skeleton.skeleton_mesh_with_mask(face_masks[i].clone());
-            mesh.append(&mut input_polygon_mesh);
             let edges = skeleton.edges;
-            let points = skeleton.vertices.into_iter()
+            let points:Vec<_> = skeleton.vertices.into_iter()
                 .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
                 .collect();
 
+            let d_h = layer_h + d_x2*theta.tan();
+            let p2 = points.iter().map(|p|[ p[0], p[1],p[2]+d_h ]).collect();
+            let m2 = mesh.clone();
+            mesh.append(&mut input_polygon_mesh);
             blender.n_gon(points, vec![], mesh);
-            // blender.n_gon(points, edges, input_polygon_mesh);
-            //blender.line_body3d( points, edges );
+
+            blender.n_gon(p2, vec![], m2);
          });
 }
 

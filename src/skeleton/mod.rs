@@ -39,6 +39,24 @@ pub struct StraightSkeleton {
     pub input_polygons: Vec<PolygonIterator>
 }
 impl StraightSkeleton {
+    pub fn mesh_input_polygon(&self) -> Vec<Vec<usize>>{
+        let faces = self.input_polygons.iter()
+            .map(|p|{
+                iter::once(&p.outer_loop).chain(p.holes.iter())
+                .flat_map(|p| ((p.start)..(p.end)).into_iter() )
+                .collect::<Vec<usize>>()
+            });
+
+        let linking_faces = self.input_polygons.iter()
+            .map(|p|{
+                iter::once(&p.outer_loop).chain(p.holes.iter())
+                .flat_map(|p| [p.start,p.end-1].into_iter() )
+                .rev()
+                .collect::<Vec<usize>>()
+            });
+
+        faces.chain(linking_faces).collect()
+    }
     pub fn input_polygons_mesh_holes(&self) -> Vec<Vec<usize>> {
         self.input_polygons.iter()
             .flat_map(|p|p.holes.iter())
