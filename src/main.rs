@@ -36,19 +36,19 @@ fn main(){
     init_logger();
     let mut blender = Blender::new();
 
-    let settings = settings::Settings{
-        overhang_angle: 0.2,
+    let settings = Settings{
+        layer_height: 0.4,
         infill_percentage: 20,
         nr_of_perimeters: 3,
-        brim: 3,
-        outer_wall_first: false,
+        brim: 0,
+        // outer_wall_first: false,
         translate_xy: [50., 50.],
-        feedrates:Feedrates{
-            initial_layer:800,
-            initial_layer_infill:1200,
-            travel: 2000,
-            ..Default::default()
-        },
+        // feedrates:Feedrates{
+        //     initial_layer:800,
+        //     initial_layer_infill:1200,
+        //     travel: 2000,
+        //     ..Default::default()
+        // },
         ..Default::default()
     };
     dbg!(&settings);
@@ -58,9 +58,8 @@ fn main(){
     // let stl_path = "../mesh/curved overhang.stl";
     // let stl_path = "../mesh/simple_overhang.stl";
     // let stl_path = "../mesh/wine_glass3.stl";
-    let stl_path = "../mesh/internal_external_simplified.stl";
-    // blender.load_mesh(stl_path, "input_mesh");
-    // let stl_path = "../mesh/bunny2.stl";
+    // let stl_path = "../mesh/internal_external_simplified.stl";
+    let stl_path = "../mesh/bunny2.stl";
 
     blender.load_mesh(stl_path,"input mesh");
     let layer_perimeters = extract_planar_layers_from_mesh(stl_path,&settings);
@@ -113,10 +112,9 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
     let d_x1 = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
     let d_x2 = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
     // let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h;
-    let d_x = d_x1+d_x2;
+    // let d_x = d_x1+d_x2;
+    let d_x = d_x2;
 
-    let mut layers = stl_op::extract_planar_layers(&mesh, layer_h);
-    layers.iter_mut().for_each(|layer| layer.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
 
     // let layers:Vec<Vec<_>> = layers.into_iter()
     //     .for_each(|layer|{
@@ -141,11 +139,12 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
     }
 
     let mut layers = layers.into_iter();
-    let mut support_regions:Vec<Vec<Polygon>> = vec![layers.next().unwrap()];
+    let mut support_regions:Vec<Vec<Polygon>> = vec![layers.next().unwrap().clone()];
     let mut face_masks: Vec<_> = vec![Vec::new()];
 
     for (i, layer) in layers.enumerate(){
         println!("layer {i}");
+        let d_x = if i % 2 == 0 {d_x2} else {d_x1+d_x2};
         let offset_sup = ss_offset(support_regions.last().unwrap().clone(),-d_x);
 
         // let support:Vec<_> = offset_sup.into_iter()
@@ -158,7 +157,7 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
         // let support = boolean(layer,offset_sup,OverlayRule::Intersect);
 
-        let (support,tags) = tagged_boolean(layer,offset_sup,OverlayRule::Intersect);
+        let (support,tags) = tagged_boolean(layer.clone(),offset_sup,OverlayRule::Intersect);
         // let nr_of_edges = support.iter().map(|polygon|polygon.0.clone()).flatten().map(|contour|contour.points).flatten().count();
         // let nr_of_clip_edges:usize = tags.iter().flatten().flatten().map(|is_clip|usize::from(*is_clip)).sum();
         // println!("{nr_of_clip_edges}/{nr_of_edges} are clip {}",
@@ -201,8 +200,8 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
         })
         .for_each(|(i,skeleton)|{ 
             let layer_height = (i+1) as f32 * layer_h;
-            // let mut input_polygon_mesh = skeleton.input_polygons_mesh_outer_loop();
-            let mut input_polygon_mesh = skeleton.mesh_input_polygon();
+            let mut input_polygon_mesh = skeleton.input_polygons_mesh_outer_loop();
+            // let mut input_polygon_mesh = skeleton.mesh_input_polygon();
 
             // let mut mesh = skeleton.skeleton_mesh();
             let mut mesh = skeleton.skeleton_mesh_with_mask(face_masks[i].clone());
@@ -211,13 +210,18 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
                 .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
                 .collect();
 
+            if i%2 == 1 {
             let d_h = layer_h + d_x2*theta.tan();
-            let p2 = points.iter().map(|p|[ p[0], p[1],p[2]+d_h ]).collect();
-            let m2 = mesh.clone();
+            blender.n_gon_result(
+                points.iter().map(|p|[ p[0], p[1],p[2]+d_h ]).collect(),
+                vec![],
+                mesh.clone(),
+                format!("{i:03}-layer2")
+                );
+            }
             mesh.append(&mut input_polygon_mesh);
-            blender.n_gon(points, vec![], mesh);
+            blender.n_gon_result(points, vec![], mesh, format!("{i:03}-layer1"));
 
-            blender.n_gon(p2, vec![], m2);
          });
 }
 

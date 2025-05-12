@@ -140,10 +140,14 @@ impl Blender {
         self.send(BlenderMsg::CreateMesh(blend_obj))
     }
     pub fn n_gon(&mut self,vertices:Vec<[f32;3]>, edges:Vec<[usize;2]>, faces:Vec<Vec<usize>> ){
-        let name = "layer".into();
-        // let collection = "np-surface".into();
-        let collection = "result".into();
+        let name = "n_gon".into();
+        let collection = "n_gons".into();
         let obj = BlenderObj { name, collection, vertices, edges, faces };
+        self.send(BlenderMsg::CreateMesh(obj))
+    }
+    pub fn n_gon_result<T:Into<String>>(&mut self,vertices:Vec<[f32;3]>, edges:Vec<[usize;2]>, faces:Vec<Vec<usize>>, name:T){
+        let collection = "result".into();
+        let obj = BlenderObj { name:name.into(), collection, vertices, edges, faces };
         self.send(BlenderMsg::CreateMesh(obj))
     }
     pub fn path(&mut self, path:&gcode::Path){
