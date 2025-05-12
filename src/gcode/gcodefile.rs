@@ -53,7 +53,7 @@ impl GcodeFile<'_> {
         let [x_offset,y_offset] = s.translate_xy;
 
         writeln!(f,"G92 E0.0 ; Reset extruder distance")?;
-        writeln!(f,"G1 Z{:.3} F{:.3}",self.safe_z,s.feedrates.z_max)?;
+        writeln!(f,"G1 Z{:.3} F{:.3}",self.safe_z+0.1,s.feedrates.z_max)?;
         writeln!(f,"G1 E{} F{} ; De-retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // De-Retraction
         let mut end_of_previous_layer:Option<Point3<f32>> = None; 
 
@@ -72,7 +72,7 @@ impl GcodeFile<'_> {
 
             if should_retract {
                 writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // Retraction
-                writeln!(f,"G1 Z{:.3} F{:.3}",self.safe_z,s.feedrates.z_max)?;
+                writeln!(f,"G1 Z{:.3} F{:.3}",self.safe_z+0.1,s.feedrates.z_max)?;
                 writeln!(f,"G1 X{start_x:.3} Y{start_y:.3} F{:.3}", s.feedrates.travel)?;
                 writeln!(f,"G1 Z{start_z:.3} F{:.3}",s.feedrates.z_max)?;
                 writeln!(f,"G1 E{} F{} ; De-retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // De-Retraction
@@ -117,7 +117,7 @@ impl GcodeFile<'_> {
         }
 
         writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // Retraction
-        writeln!(f,"G1 Z{:.3} F{}",self.safe_z, s.feedrates.z_max)?;
+        writeln!(f,"G1 Z{:.3} F{}",self.safe_z+0.1, s.feedrates.z_max)?;
         writeln!(f,";LAYER_CHANGE")?;
         Ok(())
     }
