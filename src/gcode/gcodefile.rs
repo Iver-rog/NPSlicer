@@ -35,6 +35,7 @@ impl GcodeFile<'_> {
     pub fn layer(&mut self,mut paths: impl Iterator<Item = Path>) -> Result<(),io::Error> {
         let f = &mut self.file;
         let s = self.settings;
+        let [x_offset,y_offset] = s.translate_xy;
 
         let (outer_wall_feedrate, inner_wall_feedrate) = match self.n_layer == 0 {
             true  => (s.feedrates.initial_layer, s.feedrates.initial_layer),
@@ -47,14 +48,11 @@ impl GcodeFile<'_> {
 
         writeln!(f,"\n;Start layer {}",self.n_layer)?;
         writeln!(f,"M117 Layer {}",self.n_layer)?;
+        writeln!(f,"G92 E0.0 ; Reset extruder distance")?;
+
         if s.fan_start == self.n_layer { writeln!(f,"M106 ; Fan on")?; }
         self.n_layer += 1;
 
-        let [x_offset,y_offset] = s.translate_xy;
-
-        writeln!(f,"G92 E0.0 ; Reset extruder distance")?;
-        writeln!(f,"G1 Z{:.3} F{:.3}",self.safe_z+0.3,s.feedrates.z_max)?;
-        writeln!(f,"G1 E{} F{} ; De-retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // De-Retraction
         let mut end_of_previous_layer:Option<Point3<f32>> = None; 
 
         for path in paths {
@@ -116,8 +114,6 @@ impl GcodeFile<'_> {
             end_of_previous_layer = Some(*prev_point);
         }
 
-        writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // Retraction
-        writeln!(f,"G1 Z{:.3} F{}",self.safe_z+0.3, s.feedrates.z_max)?;
         writeln!(f,";LAYER_CHANGE")?;
         Ok(())
     }
