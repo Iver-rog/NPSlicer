@@ -362,34 +362,17 @@ fn generate_infill_allong_x_2d(bounds:Polygon, height:f32, scale:f32) -> Vec<Pat
     }
     return paths
 }
-impl Polygon {
-    fn set_start(&mut self) {
-        self.0.iter_mut().for_each(|contour| contour.set_start() );
-    }
-}
 
 impl Contour3d {
     fn set_start(&mut self) {
         let start_point_ndx = self.points()
-            .map(|p|-p.x-p.y)
+            .map(|p|-p.x-p.y+10.0*p.z)
             .enumerate()
             .max_by(|(_,a),(_,b)|a.total_cmp(b))
             .map(|(index,_)| index)
             .expect("contour contains NAN coordinates");
 
         self.0.rotate_left(start_point_ndx);
-    }
-}
-impl Contour {
-    fn set_start(&mut self) {
-        let start_point_ndx = self.points()
-            .map(|p|p.x+p.y)
-            .enumerate()
-            .max_by(|(_,a),(_,b)|a.total_cmp(b))
-            .map(|(index,_)| index)
-            .expect("contour contains NAN coordinates");
-
-        self.points.rotate_left(start_point_ndx);
     }
 }
 
