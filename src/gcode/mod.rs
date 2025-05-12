@@ -45,11 +45,10 @@ pub fn contour_and_mesh_colider_from_mesh(mesh:stl_io::IndexedMesh) -> (Vec<Poly
                 .collect::<Vec<Point2<f32>>>()
         })
         .map(|contour| Contour::from(contour) )
+        .filter_map(|contour|contour.simplify(0.005))
         .collect();
 
-    contours.iter_mut().for_each(|contour| contour.simplify(0.005));
-
-    let polygons = polygons_from_contours(contours);
+    let polygons = if contours.len() !=0 {polygons_from_contours(contours)} else {vec![]};
     return (polygons,mesh_collider)
 }
 pub fn generate_perimeter_offsets(polygon:Polygon,nr_of_perimeters:usize,layer_w:f32) -> impl Iterator<Item = Polygon>{

@@ -157,7 +157,7 @@ impl Contour {
         points.zip(points_offset_by_one)
     }
     // returns a iterator over edges/(pairs of points)
-    pub fn simplify(&mut self, min_a:f32){
+    pub fn simplify(mut self, min_a:f32) -> Option<Self>{
         let len = self.points.len();
         for i in (0..len).rev(){
             let i_pluss = (i+1)%self.points.len();
@@ -173,7 +173,7 @@ impl Contour {
             let area_x2 = cross2d(&v1, &v2);
             if area_x2.abs() < min_a*2. {self.points.remove(i);}
         }
-        if self.points.len() < 3 {self.points.clear(); self.area = 0.0;}
+        if self.points.len() > 3 {Some(self)} else {None}
     }
     pub fn from_points(points:Vec<Point2<f32>>) -> Self {
         Self::from(points)

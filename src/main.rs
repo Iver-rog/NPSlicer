@@ -13,6 +13,7 @@ mod tests;
 mod data;
 
 use geo::Polygon;
+use settings::Settings;
 use boolean::{ss_offset, tagged_boolean};
 use i_overlay::core::overlay_rule::OverlayRule;
 use blender::Blender;
@@ -61,8 +62,11 @@ fn main(){
     // blender.load_mesh(stl_path, "input_mesh");
     // let stl_path = "../mesh/bunny2.stl";
 
-    // mesh_gen(&mut blender,stl_path,&settings);
-    // get_user_confimation();
+    blender.load_mesh(stl_path,"input mesh");
+    let layer_perimeters = extract_planar_layers_from_mesh(stl_path,&settings);
+
+    mesh_gen(&mut blender,&layer_perimeters,&settings);
+    get_user_confimation();
     crate_or_clear_dir(TEMP_DIR);
     blender.export_layers(TEMP_DIR);
     get_user_confimation();
@@ -85,20 +89,26 @@ fn get_user_confimation(){
 }
 
 
-
-
-fn mesh_gen<T:AsRef<std::path::Path>>(blender:&mut Blender, stl_path:T, s:&settings::Settings){
+fn extract_planar_layers_from_mesh<T:AsRef<std::path::Path>>(stl_path:T,s:&Settings) -> Vec<Vec<Polygon>> {
 
     let file = File::open(&stl_path).expect("Failed to open STL file");
     let mut reader = BufReader::new(file);
 
     let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
-    blender.load_mesh(stl_path,"input mesh");
+
+    let min_a = 0.05;   // min area for contour simplification
+    let layers = stl_op::extract_planar_layers(&mesh, s.layer_height).into_iter()
+        .map(|layer| 
+            layer.into_iter().filter_map(|p|p.simplify(min_a)).collect()
+        ).collect();
+    return layers
+}
+
+
+fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
     let theta = s.overhang_angle;
     let layer_h = s.layer_height;
-
-    let min_a = 0.05;   // min area for contour simplification
 
     let d_x1 = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
     let d_x2 = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer

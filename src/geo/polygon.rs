@@ -57,15 +57,15 @@ impl Polygon {
 
         Self(holes)
     }
-    pub fn simplify(&mut self, min_a:f32){
-        self.0[0].simplify(min_a);
-        if (self.outer_loop().area < min_a) | (self.outer_loop().points.len() < 3){
-            self.0[0].points.clear();
-            self.0[0].area = 0.0;
-            self.0.truncate(1);
-        };
-        self.holes_mut().iter_mut().for_each(|hole|hole.simplify(min_a));
-        self.0.retain(|c|c.area.abs() > min_a);
+    pub fn simplify(self, min_a:f32)-> Option<Self>{
+        let mut contour_iter = self.0.into_iter();
+        let outer_contour = contour_iter.next()?.simplify(min_a)?;
+        let mut new_poly = Polygon(vec![outer_contour]);
+
+        for hole in contour_iter.filter_map(|c|c.simplify(min_a)){
+            new_poly.0.push(hole)
+        }
+        return Some(new_poly);
     }
     pub fn flatten(self) -> Vec<Contour>{
         self.0
