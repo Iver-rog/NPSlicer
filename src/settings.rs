@@ -4,7 +4,7 @@ use std::f32::consts::PI;
 pub struct Settings{
     pub nozzle_diameter: f32,       // mm
     pub layer_height: f32,          // mm
-    /// [rad] The angle of non-planar layers (relative to the xy-plane)
+    /// (rad) The angle of non-planar layers relative to the xy-plane
     pub overhang_angle: f32,         // radians
 
     pub infill_percentage: usize,   // %
@@ -16,28 +16,28 @@ pub struct Settings{
     /// or from the inside out (false)
     pub outer_wall_first: bool,
 
-    /// [int] The number of brim contours. set to zero to dissable brims
+    /// (int) The number of brim contours. set to zero to dissable brims
     pub brim: usize,
     
-    /// [%] The overlap between the infill lines and inner most contour
+    /// (%) The overlap between the infill lines and inner most contour
     pub infill_overlap_percentage: usize,
 
-    /// [mm] The maximum lenght a travel move can have without requiering a 
+    /// (mm) The maximum lenght a travel move can have without requiering a 
     /// retract opperation. Used to allow the hotend to travel to the 
     /// start of the next path without moving up to the safe z-height.
     pub max_staydown_distance: f32,
 
-    /// [mm] Diameter of the fillament (usually 1.75mm)
+    /// (mm) Diameter of the fillament (usually 1.75mm)
     pub filament_diameter: f32,
 
-    /// [(x,y) mm] A displacement applied to the model during gcode parsing.
+    /// (x,y mm) A displacement applied to the model during gcode parsing.
     /// Used to center the model on the build plate.
     pub translate_xy: [f32;2],
 
-    /// [int] The layer number at which the fan should turn on (first layer is 0)
+    /// (int) The layer number at which the fan should turn on (first layer is 0)
     pub fan_start:usize,
 
-    /// [nm (10⁻³ mm)] The length of fillament to retract before travel moves
+    /// (nm/10⁻³ mm) The length of fillament to retract before travel moves
     pub retract_distance: usize,
 
     pub feedrates:Feedrates,
@@ -45,28 +45,28 @@ pub struct Settings{
 
 #[derive(Debug)]
 pub struct Feedrates {
-    /// [mm/min] The feedrate of the axis during first layer perimeter
+    /// (mm/min) The feedrate of the axis during first layer perimeter
     pub initial_layer:usize,
 
-    /// [mm/min] The feedrate of the axis during first layer perimeter
+    /// (mm/min) The feedrate of the axis during first layer perimeter
     pub initial_layer_infill:usize,
 
-    /// [mm/min] The feedrate for the outer wall during normal printing
+    /// (mm/min) The feedrate for the outer wall during normal printing
     pub outer_wall:usize,
 
-    /// [mm/min] The feedrate for the inner walls during normal printing
+    /// (mm/min) The feedrate for the inner walls during normal printing
     pub inner_wall:usize,
 
-    /// [mm/min] The feedrate for infill during normal printing
+    /// (mm/min) The feedrate for infill during normal printing
     pub infill:usize,
 
-    /// [mm/min] The feedrate of the axis during travel moves
+    /// (mm/min) The feedrate of the axis during travel moves
     pub travel:usize,
 
-    /// [mm/min] The feedrate of the extruder during retraction
+    /// (mm/min) The feedrate of the extruder during retraction
     pub retract:usize,
 
-    /// [mm/min] The feddrate of the z-axis during strictly vertical movement
+    /// (mm/min) The feddrate of the z-axis during strictly vertical movement
     pub z_max:usize,
 }
 
