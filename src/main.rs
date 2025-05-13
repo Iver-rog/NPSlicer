@@ -12,7 +12,7 @@ mod tests;
 #[cfg(test)]
 mod data;
 
-use geo::Polygon;
+use geo::{Polygon,Enclosed};
 use settings::Settings;
 use boolean::{ss_offset, tagged_boolean};
 use i_overlay::core::overlay_rule::OverlayRule;
@@ -102,7 +102,58 @@ fn extract_planar_layers_from_mesh<T:AsRef<std::path::Path>>(stl_path:T,s:&Setti
         ).collect();
     return layers
 }
+// fn generate_support_profile(){}
+// fn generate_partial_layer(i:usize,layer:Vec<Polygon>,face_mask:Vec<Vec<usize>>)->([]){
+fn generate_full_layer(
+    layer:Vec<Polygon>,
+    face_mask:Vec<Vec<Vec<bool>>>,
+    layer_height:f32,
+    theta:f32,
+    ) -> Option<(Vec<[f32;3]>,Vec<Vec<usize>>)>{
+    let (vertices,mut np_faces,mut planar_faces) = generate_layer(layer, face_mask, layer_height, theta )?;
+    np_faces.append(&mut planar_faces);
+    return Some((vertices,np_faces))
+}
+fn generate_partial_layer(
+    layer:Vec<Polygon>,
+    face_mask:Vec<Vec<Vec<bool>>>,
+    layer_height:f32,
+    theta:f32,
+    ) -> Option<(Vec<[f32;3]>,Vec<Vec<usize>>)>{
+    let (vertices,np_faces,planar_faces) = generate_layer(layer, face_mask, layer_height, theta )?;
+    return Some((vertices,np_faces))
+}
 
+fn generate_layer(
+    layer:Vec<Polygon>,
+    face_mask:Vec<Vec<Vec<bool>>>,
+    layer_height:f32,
+    theta:f32,
+    )
+    ->Option<(Vec<[f32;3]>,Vec<Vec<usize>>,Vec<Vec<usize>>)>{
+            let polygons:Vec<Polygon> = layer.into_iter()
+                .map(|p|{let mut p = p.clone(); p.invert(); p})
+                .collect();
+
+            let skeleton = match skeleton::skeleton_from_polygons_with_limit(polygons.clone(),30.0){
+                Ok(skeleton) => skeleton,
+                Err(err) => {
+                    println!("\x1b[031m{err}\x1b[0m");
+                    dbg!(&polygons); 
+                    return None;
+                }
+            };
+            let planar_faces = skeleton.input_polygons_mesh_outer_loop();
+            // let mut input_polygon_mesh = skeleton.mesh_input_polygon();
+
+            let mut np_faces = skeleton.skeleton_mesh_with_mask(face_mask.clone());
+            let edges = skeleton.edges;
+            let points:Vec<_> = skeleton.vertices.into_iter()
+                .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
+                .collect();
+
+         return   Some((points, np_faces, planar_faces))
+}
 
 fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
@@ -111,21 +162,9 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
     let d_x1 = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
     let d_x2 = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
-    // let d_x = layer_h/theta.tan() + (theta*0.5).tan()*layer_h;
     // let d_x = d_x1+d_x2;
     let d_x = d_x2;
 
-
-    // let layers:Vec<Vec<_>> = layers.into_iter()
-    //     .for_each(|layer|{
-    //         layer.into_iter()
-    //         .filter_map(|mut polygon|{
-    //             polygon.simplify(min_a);
-    //             if polygon.0.len() == 0 {None} else {Some(polygon)}
-    //         })
-    //         .collect()
-    //         })
-    //     .collect();
 
     for (i,layer) in layers.iter().enumerate(){
         let z = (i+1) as f32 * layer_h;
@@ -134,95 +173,51 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
         }
     }
 
-    for polygon in &layers[0] {
-        polygon.validate();
-    }
-
     let mut layers = layers.into_iter();
-    let mut support_regions:Vec<Vec<Polygon>> = vec![layers.next().unwrap().clone()];
-    let mut face_masks: Vec<_> = vec![Vec::new()];
+    let mut prev_support:Vec<Polygon> = layers.next().unwrap().clone();
+    blender.display2d(&prev_support[0], layer_h, "000-layer1", "result");
+    let mut prev_a_ratio = 1.0;
 
     for (i, layer) in layers.enumerate(){
-        println!("layer {i}");
-        let d_x = if i % 2 == 0 {d_x2} else {d_x1+d_x2};
-        let offset_sup = ss_offset(support_regions.last().unwrap().clone(),-d_x);
+        let layer_nr = i + 1;
+        let z_height = ((layer_nr+1) as f32)*layer_h;
+        println!("layer {layer_nr}");
 
-        // let support:Vec<_> = offset_sup.into_iter()
-        //     .map(|polygon|{
-        //     let result = polygon.intersect(layer.clone());
-        //     if result.len() == 0 { vec![polygon] }else{result}
-        //     })
-        // .flatten()
-        // .collect();
-
-        // let support = boolean(layer,offset_sup,OverlayRule::Intersect);
+        let offset_sup = ss_offset(prev_support.clone(),-d_x2);
 
         let (support,tags) = tagged_boolean(layer.clone(),offset_sup,OverlayRule::Intersect);
-        // let nr_of_edges = support.iter().map(|polygon|polygon.0.clone()).flatten().map(|contour|contour.points).flatten().count();
-        // let nr_of_clip_edges:usize = tags.iter().flatten().flatten().map(|is_clip|usize::from(*is_clip)).sum();
-        // println!("{nr_of_clip_edges}/{nr_of_edges} are clip {}",
-        //     if nr_of_edges == nr_of_clip_edges{"\x1b[033mno-need\x1b[0m"}else{"\x1b[032myes-need\x1b[0m"});
 
-        // let support_identical_to_perimeter = tags.iter().flatten().flatten().map(|is_clip|).all(|is_clip| *is_clip);
-        // println!("{}",if support_identical_to_perimeter {"\x1b[033mno-need\x1b[0m"}else{"\x1b[032myes-need\x1b[0m"});
-
-        // support.iter_mut().for_each(|layer| layer.0.iter_mut().for_each(|polygon|polygon.simplify(min_a)));
+        let support_a:f32 = support.iter().map(|polygon|polygon.area()).sum();
+        let perimeter_a:f32 = layer.iter().map(|polygon|polygon.area()).sum();
+        let support_ratio = support_a / perimeter_a;
+        let make_half_layer = support_ratio < 0.5;
 
         support.iter().for_each(|polygon|blender.display2d(
                 polygon,
-                ((i+2) as f32)*layer_h,
+                z_height,
                 "support_polygon",
                 "debug")
             );
-        support_regions.push(support);
-        face_masks.push(tags);
+
+        if let Some( (vertices,faces) ) = generate_full_layer(support.clone(), tags, z_height, theta){
+        blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-layer1"));
+        }
+
+        // if layer_nr % 2 == 0 {
+        if make_half_layer {
+            let offset_sup = ss_offset(prev_support.clone(),-d_x1);
+
+            let (support,tags) = tagged_boolean(layer.clone(),offset_sup,OverlayRule::Intersect);
+            if let Some( (vertices,faces) ) = generate_partial_layer(support.clone(), tags, z_height, theta){
+            blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-layer2"));
+            prev_support = support;
+            };
+        }else {
+
+        prev_support = support;
+        };
+
     }
-
-    println!("created {} layers",support_regions.len());
-
-    let skeletons = support_regions.iter()
-        .enumerate()
-        .map(|(i,layer)|{
-            let polygons:Vec<Polygon> = layer.into_iter()
-                .map(|p|{let mut p = p.clone(); p.invert(); p})
-                .collect();
-            (i,polygons)
-        })
-        .filter_map(|(i,polygons)|{
-            match skeleton::skeleton_from_polygons_with_limit(polygons.clone(),10.0){
-                Ok(skeleton) => Some((i,skeleton)),
-                Err(err) => {
-                    println!("\x1b[031m{err}\x1b[0m");
-                    dbg!(&polygons); 
-                    None
-                }
-            }
-        })
-        .for_each(|(i,skeleton)|{ 
-            let layer_height = (i+1) as f32 * layer_h;
-            let mut input_polygon_mesh = skeleton.input_polygons_mesh_outer_loop();
-            // let mut input_polygon_mesh = skeleton.mesh_input_polygon();
-
-            // let mut mesh = skeleton.skeleton_mesh();
-            let mut mesh = skeleton.skeleton_mesh_with_mask(face_masks[i].clone());
-            let edges = skeleton.edges;
-            let points:Vec<_> = skeleton.vertices.into_iter()
-                .map(|x| [x[0],x[1],layer_height-x[2]*theta.tan()])
-                .collect();
-
-            if i%2 == 1 {
-            let d_h = layer_h + d_x2*theta.tan();
-            blender.n_gon_result(
-                points.iter().map(|p|[ p[0], p[1],p[2]+d_h ]).collect(),
-                vec![],
-                mesh.clone(),
-                format!("{i:03}-layer2")
-                );
-            }
-            mesh.append(&mut input_polygon_mesh);
-            blender.n_gon_result(points, vec![], mesh, format!("{i:03}-layer1"));
-
-         });
 }
 
 
