@@ -40,13 +40,16 @@ def process_messages():
             match command:
                 case "CreateMesh":
                     obj = msg["CreateMesh"]
-                    b_obj = import_edge_loops(
-                        obj["collection"],
-                        obj["name"],
-                        obj["vertices"],
-                        obj["edges"],
-                        obj["faces"]
-                    )
+                    try:
+                        b_obj = import_edge_loops(
+                            obj["collection"],
+                            obj["name"],
+                            obj["vertices"],
+                            obj["edges"],
+                            obj["faces"]
+                        )
+                    except:
+                        print(obj)
                     if obj["collection"] == "result":
                         apply_boolean_slow(b_obj)
 
@@ -91,7 +94,7 @@ def clear_scene():
     # Delete selected objects
     bpy.ops.object.delete()
 
-def import_edge_loops(collection_name,name,points,lines,faces):
+def import_edge_loops(collection_name,name,points,edges,faces):
     # edge_loop_collection = bpy.data.collections.new(collection_name)
 
     if collection_name not in bpy.data.collections:
@@ -100,32 +103,19 @@ def import_edge_loops(collection_name,name,points,lines,faces):
     else:
         new_collection = bpy.data.collections[collection_name]
 
-    def point_cloud(ob_name, coords, edges=[], faces=[]):
-        """Create point cloud object based on given coordinates and name.
+    me = bpy.data.meshes.new(name + "Mesh")
+    ob = bpy.data.objects.new(name, me)
 
-        Keyword arguments:
-        ob_name -- new object name
-        coords -- float triplets eg: [(-1.0, 1.0, 0.0), (-1.0, -1.0, 0.0)]
-        """
+    # Make a mesh from a list of vertices/edges/faces
+    me.from_pydata(points, edges, faces)
 
-        # Create new mesh and a new object
-        me = bpy.data.meshes.new(ob_name + "Mesh")
-        ob = bpy.data.objects.new(ob_name, me)
-
-        # Make a mesh from a list of vertices/edges/faces
-        me.from_pydata(coords, edges, faces)
-
-        # Display name and update the mesh
-        ob.show_name = True
-        me.update()
-        return ob
-
-    # Create the object
-    obj = point_cloud(name, points, lines, faces)
+    # Display name and update the mesh
+    ob.show_name = True
+    me.update()
 
     # Link object to the active collection
-    new_collection.objects.link(obj)
-    return obj
+    new_collection.objects.link(ob)
+    return ob
 
 def apply_boolean(target_obj):
     boolean_obj = bpy.data.objects["input mesh"]
