@@ -40,7 +40,7 @@ fn main(){
         layer_height: 0.4,
         infill_percentage: 20,
         nr_of_perimeters: 3,
-        brim: 0,
+        // brim: 0,
         // outer_wall_first: false,
         translate_xy: [50., 50.],
         // feedrates:Feedrates{
@@ -53,13 +53,14 @@ fn main(){
     };
     dbg!(&settings);
 
+    let stl_path = "../mesh/pipe.stl";
+    // let stl_path = "../mesh/3dbenchy.stl";
     // let stl_path = "../mesh/bunny2.stl";
     // let stl_path = "../mesh/stanford-armadillo.stl";
     // let stl_path = "../mesh/curved overhang.stl";
     // let stl_path = "../mesh/simple_overhang.stl";
     // let stl_path = "../mesh/wine_glass3.stl";
     // let stl_path = "../mesh/internal_external_simplified.stl";
-    let stl_path = "../mesh/bunny2.stl";
 
     blender.load_mesh(stl_path,"input mesh");
     let layer_perimeters = extract_planar_layers_from_mesh(stl_path,&settings);
@@ -96,10 +97,13 @@ fn extract_planar_layers_from_mesh<T:AsRef<std::path::Path>>(stl_path:T,s:&Setti
     let mesh = stl_io::read_stl(&mut reader).expect("Failed to parse STL file");
 
     let min_a = 0.05;   // min area for contour simplification
-    let layers = stl_op::extract_planar_layers(&mesh, s.layer_height).into_iter()
+    let mut layers:Vec<Vec<Polygon>> = stl_op::extract_planar_layers(&mesh, s.layer_height).into_iter()
         .map(|layer| 
             layer.into_iter().filter_map(|p|p.simplify(min_a)).collect()
         ).collect();
+    while layers.last().unwrap().len() == 0 {
+        layers.pop();
+    }
     return layers
 }
 // fn generate_support_profile(){}
@@ -172,11 +176,11 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
             blender.display2d(polygon,z,"outer perimeter","part perimeter");
         }
     }
+    let last_layer = layers.len() - 1;
 
     let mut layers = layers.into_iter();
     let mut prev_support:Vec<Polygon> = layers.next().unwrap().clone();
-    blender.display2d(&prev_support[0], layer_h, "000-layer1", "result");
-    let mut prev_a_ratio = 1.0;
+    blender.solid_polygon(&prev_support, layer_h, "000-layer1", "result");
 
     for (i, layer) in layers.enumerate(){
         let layer_nr = i + 1;
@@ -185,9 +189,9 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
         let offset_sup = ss_offset(prev_support.clone(),-d_x2);
 
-        let (support,tags) = tagged_boolean(layer.clone(),offset_sup,OverlayRule::Intersect);
+        let (mut support,tags) = tagged_boolean(layer.clone(),offset_sup,OverlayRule::Intersect);
 
-        let support_a:f32 = support.iter().map(|polygon|polygon.area()).sum();
+        let mut support_a:f32 = support.iter().map(|polygon|polygon.area()).sum();
         let perimeter_a:f32 = layer.iter().map(|polygon|polygon.area()).sum();
         let support_ratio = support_a / perimeter_a;
         let make_half_layer = support_ratio < 0.5;
@@ -200,22 +204,35 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
             );
 
         if let Some( (vertices,faces) ) = generate_full_layer(support.clone(), tags, z_height, theta){
-        blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-layer1"));
+            blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-layer1"));
         }
 
-        // if layer_nr % 2 == 0 {
-        if make_half_layer {
-            let offset_sup = ss_offset(prev_support.clone(),-d_x1);
+        let mut i = 0;
+        println!("last_layer{last_layer}");
+        let min_support_ratio = if layer_nr == last_layer {0.95} else {0.5};
+        println!("perimeter_a: {perimeter_a}");
+        while { support_a / perimeter_a } < min_support_ratio {
+            // if i > 3 {break}
+        // if make_half_layer {
+            println!("support_a: {support_a}");
+            i += 1;
+            let offset_sup = ss_offset(support.clone(),-d_x1);
 
-            let (support,tags) = tagged_boolean(layer.clone(),offset_sup,OverlayRule::Intersect);
+            let (support2,tags) = tagged_boolean(layer.clone(),offset_sup,OverlayRule::Intersect);
+            support_a = support2.iter().map(|polygon|polygon.area()).sum();
+            support = support2;
             if let Some( (vertices,faces) ) = generate_partial_layer(support.clone(), tags, z_height, theta){
             blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-layer2"));
-            prev_support = support;
-            };
-        }else {
+            }else{println!("fail");break};
 
-        prev_support = support;
+            support.iter().for_each(|polygon|blender.display2d(
+                    polygon,
+                    z_height,
+                    "support_polygon",
+                    "debug2")
+                );
         };
+        prev_support = support;
 
     }
 }

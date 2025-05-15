@@ -135,6 +135,35 @@ impl Blender {
         let blend_obj = BlenderObj::from_mesh(obj.into2d(h),name,collection);
         self.send(BlenderMsg::CreateMesh(blend_obj))
     }
+    pub fn solid_polygon<T: Into<String>>(&mut self, polygons:&[Polygon],h:f32,name:T,collection:T){
+        let len = polygons.iter()
+            .flat_map(|polygon|polygon.0.iter())
+            .map(|c|c.points.len())
+            .sum();
+        let mut vertices = Vec::with_capacity(len);
+        let mut faces = Vec::with_capacity(polygons.len());
+
+        let mut i = 0;
+        for polygon in polygons {
+            let mut face = Vec::new();
+            for contour in polygon.contours(){
+                for p in &contour.points{
+                    vertices.push([p.x,p.y,h]);
+                    face.push(i);
+                    i+=1;
+                }
+            }
+            faces.push(face)
+        }
+        let obj = BlenderObj{
+            name:name.into(),
+            collection:collection.into(),
+            vertices,
+            edges:vec![],
+            faces
+        };
+        self.send(BlenderMsg::CreateMesh(obj))
+    }
     pub fn display3d<O:Into<BlenderMesh>,T:Into<String>>(&mut self,obj:O,name:T,collection:T) {
         let blend_obj = BlenderObj::from_mesh(obj.into(),name,collection);
         self.send(BlenderMsg::CreateMesh(blend_obj))
@@ -145,7 +174,21 @@ impl Blender {
         let obj = BlenderObj { name, collection, vertices, edges, faces };
         self.send(BlenderMsg::CreateMesh(obj))
     }
-    pub fn n_gon_result<T:Into<String>>(&mut self,vertices:Vec<[f32;3]>, edges:Vec<[usize;2]>, faces:Vec<Vec<usize>>, name:T){
+    pub fn n_gon_result<T:Into<String>>(&mut self,mut vertices:Vec<[f32;3]>, edges:Vec<[usize;2]>, faces:Vec<Vec<usize>>, name:T){
+        // #[cfg(debug_assertions)]
+        // if vertices.iter().any(|v|v[0].is_nan() | v[1].is_nan() |v[2].is_nan()){
+        //     println!("\x1b[031mError:\x1b[0m mesh contains NaN value substituting with 0")
+        // }
+        let vertices:Vec<[f32;3]> = vertices.into_iter().map(|v|{
+            let mut coords = v.into_iter().map(|coord|
+                if coord.is_nan() {
+                    println!("\x1b[031mError:\x1b[0m mesh contains NaN value substituting with -10");
+                    -10.0
+                } else {coord} 
+                );
+                [coords.next().unwrap(),coords.next().unwrap(),coords.next().unwrap()]
+            }).collect();
+
         let collection = "result".into();
         let obj = BlenderObj { name:name.into(), collection, vertices, edges, faces };
         self.send(BlenderMsg::CreateMesh(obj))
@@ -238,8 +281,15 @@ impl From<&Polygon3d> for BlenderMesh {
 
 impl From<&crate::skeleton::StraightSkeleton> for BlenderMesh {
     fn from(skeleton:&crate::skeleton::StraightSkeleton) -> Self {
-        let vertices = skeleton.vertices.iter().map(|p|[p.x,p.y,p.z]).collect();
+        let vertices:Vec<[f32;3]> = skeleton.vertices.iter().map(|p|[p.x,p.y,p.z]).collect();
         let edges = skeleton.edges.clone();
+        // #[cfg(debug_assertions)]
+        for vertex in &vertices {
+            assert!(false);
+            assert!(!vertex[0].is_nan());
+            assert!(!vertex[1].is_nan());
+            assert!(!vertex[2].is_nan());
+        }
         BlenderMesh{
             vertices,
             edges,
@@ -250,7 +300,14 @@ impl From<&crate::skeleton::StraightSkeleton> for BlenderMesh {
 
 impl From<&crate::skeleton::SkeletonBuilder> for BlenderMesh {
     fn from(skeleton:&crate::skeleton::SkeletonBuilder) -> Self {
-        let vertices = skeleton.vertices.iter().map(|v|[v.coords.x,v.coords.y,v.time]).collect();
+        let vertices:Vec<[f32;3]> = skeleton.vertices.iter().map(|v|[v.coords.x,v.coords.y,v.time]).collect();
+        // #[cfg(debug_assertions)]
+        for vertex in &vertices {
+            assert!(false);
+            assert!(!vertex[0].is_nan());
+            assert!(!vertex[1].is_nan());
+            assert!(!vertex[2].is_nan());
+        }
         let edges = skeleton.edges.iter().map(|e|[e.start,e.end]).collect();
         BlenderMesh{
             vertices,
