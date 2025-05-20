@@ -164,10 +164,8 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
     let theta = s.overhang_angle;
     let layer_h = s.layer_height;
 
-    let d_x1 = layer_h/theta.tan(); // <- one intermediate layer & constant thicness in vertical direction
-    let d_x2 = (theta*0.5).tan()*layer_h; // <- no intermediate layers & constant thicness perpendicular to layer
-    // let d_x = d_x1+d_x2;
-    let d_x = d_x2;
+    let d_x1 = layer_h/theta.sin(); // offset for partial layers
+    let d_x2 = (theta*0.5).tan()*layer_h; // offset for full layers
 
 
     for (i,layer) in layers.iter().enumerate(){
@@ -180,7 +178,7 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
     let mut layers = layers.into_iter();
     let mut prev_support:Vec<Polygon> = layers.next().unwrap().clone();
-    blender.solid_polygon(&prev_support, layer_h, "000-layer1", "result");
+    blender.solid_polygon(&prev_support, layer_h, "000-000-layer1", "result");
 
     for (i, layer) in layers.enumerate(){
         let layer_nr = i + 1;
@@ -204,17 +202,14 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
             );
 
         if let Some( (vertices,faces) ) = generate_full_layer(support.clone(), tags, z_height, theta){
-            blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-layer1"));
+            blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-000-layer"));
+        } else {
+            println!("Error: failed to generate layer {layer_nr:03}-000-layer");
         }
 
+        let min_support_ratio = if layer_nr == last_layer {0.99} else {0.5};
         let mut i = 0;
-        println!("last_layer{last_layer}");
-        let min_support_ratio = if layer_nr == last_layer {0.95} else {0.5};
-        println!("perimeter_a: {perimeter_a}");
-        while { support_a / perimeter_a } < min_support_ratio {
-            // if i > 3 {break}
-        // if make_half_layer {
-            println!("support_a: {support_a}");
+        while ( support_a / perimeter_a ) < min_support_ratio {
             i += 1;
             let offset_sup = ss_offset(support.clone(),-d_x1);
 
@@ -222,15 +217,13 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
             support_a = support2.iter().map(|polygon|polygon.area()).sum();
             support = support2;
             if let Some( (vertices,faces) ) = generate_partial_layer(support.clone(), tags, z_height, theta){
-            blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-layer2"));
-            }else{println!("fail");break};
+                blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-{i:03}-layer"));
+            }else{
+                println!("Error: failed to generate partial layer {layer_nr:03}-{i:03}-layer");
+                break
+            };
 
-            support.iter().for_each(|polygon|blender.display2d(
-                    polygon,
-                    z_height,
-                    "support_polygon",
-                    "debug2")
-                );
+            support.iter().for_each(|polygon| blender.display2d(polygon, z_height, "support_polygon", "debug2") );
         };
         prev_support = support;
 
