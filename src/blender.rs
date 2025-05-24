@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{Write,Read};
 use std::net::TcpStream;
 use std::time::Duration;
 use std::process::Command;
@@ -27,6 +27,11 @@ pub enum BlenderMsg{
     CreateMesh(BlenderObj),
     LoadSTL(String,String),
     ExportLayers(String),
+    Ping(String),
+}
+#[derive(Serialize, Deserialize)]
+pub enum BlenderResponse{
+    Ping(String)
 }
 #[derive(Serialize, Deserialize)]
 pub struct BlenderObj{
@@ -116,6 +121,17 @@ impl Blender {
         };
         self.tcp.write_all(&json).unwrap();
         self.tcp.flush().unwrap();
+    }
+    pub fn ping(&mut self) -> BlenderResponse{
+        self.send(BlenderMsg::Ping("halla".into()));
+        let mut msg_len:[u8;4] = [0;4];
+        self.tcp.read_exact(&mut msg_len).unwrap();
+        let len = u32::from_be_bytes(msg_len);
+
+        let mut buf =  vec![0u8; len as usize];
+        self.tcp.read_exact(&mut buf).unwrap();
+        let response: BlenderResponse = serde_json::from_slice(&buf).unwrap();
+        return response
     }
     /// export layers form blender to disk at the spesified path
     pub fn export_layers(&mut self, path:&str){

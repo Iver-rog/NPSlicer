@@ -7,8 +7,11 @@ import os
 import bmesh
 
 message_queue = queue.Queue()
+client_conn = None
 
 def handle_client(conn):
+    global client_conn
+    client_conn = conn
     try:
         while True:
             length = int.from_bytes(conn.recv(4), 'big')
@@ -24,6 +27,7 @@ def handle_client(conn):
         print(f"Error: {e}")
     finally:
         conn.close()
+        client_conn = None
 
 def server_loop():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -61,10 +65,25 @@ def process_messages():
                     if export_dir[-1] != "/" or export_dir[-1] != "\\":
                         export_dir += "/"
                     batch_export("result",export_dir)
+                    
+                case "Ping":
+                    send_to_rust({"Ping":"Halla ping from blender"})
+                    print("Halla ping from blender")
                 case _:
                     print("Did not recognice the command")
 
     return 0.1  # Run this function again in 0.1s
+
+def send_to_rust(response: dict):
+    global client_conn
+    if client_conn:
+        try:
+            msg_bytes = json.dumps(response).encode('utf-8')
+            length_bytes = len(msg_bytes).to_bytes(4, 'big')
+            client_conn.sendall(length_bytes + msg_bytes)
+        except Exception as e:
+            print(f"Failed to send response: {e}")
+
 
 def import_stl(filepath, name, color=(1.0,0.2,0.2,1.0)):
     if not os.path.exists(filepath):

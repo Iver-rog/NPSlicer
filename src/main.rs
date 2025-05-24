@@ -69,7 +69,9 @@ fn main(){
     get_user_confimation();
     crate_or_clear_dir(TEMP_DIR);
     blender.export_layers(TEMP_DIR);
-    get_user_confimation();
+    blender.ping(); //make sure blender has processed all messages
+    // get_user_confimation();
+    // thread::sleep(Duration::from_millis(5000));
 
     gcode::main(&mut blender,TEMP_DIR,&settings);
 }
@@ -213,6 +215,7 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
         let mut i = 0;
         while ( support_a / perimeter_a ) < min_support_ratio {
             i += 1;
+            if i > 3 {break}
             let offset_sup = ss_offset(support.clone(),-d_x1);
 
             let (support,tags) = tagged_boolean(layer.clone() ,offset_sup, OverlayRule::Intersect);
