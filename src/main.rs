@@ -194,11 +194,13 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
         let support_ratio = support_a / perimeter_a;
         let make_half_layer = support_ratio < 0.5;
 
-        support.iter().for_each(|polygon|blender.display2d(
+        support.iter().for_each(|polygon| 
+            blender.display2d(
                 polygon,
                 z_height,
-                "support_polygon",
-                "debug")
+                format!("planar region {layer_nr:03}-000"),
+                "debug".into()
+                )
             );
 
         if let Some( (vertices,faces) ) = generate_full_layer(support.clone(), tags, z_height, theta){
@@ -213,9 +215,9 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
             i += 1;
             let offset_sup = ss_offset(support.clone(),-d_x1);
 
-            let (support2,tags) = tagged_boolean(layer.clone(),offset_sup,OverlayRule::Intersect);
-            support_a = support2.iter().map(|polygon|polygon.area()).sum();
-            support = support2;
+            let (support,tags) = tagged_boolean(layer.clone() ,offset_sup, OverlayRule::Intersect);
+            support_a = support.iter().map(|polygon| polygon.area() ).sum();
+
             if let Some( (vertices,faces) ) = generate_partial_layer(support.clone(), tags, z_height, theta){
                 blender.n_gon_result(vertices,vec![],faces,format!("{layer_nr:03}-{i:03}-layer"));
             }else{
@@ -223,7 +225,14 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
                 break
             };
 
-            support.iter().for_each(|polygon| blender.display2d(polygon, z_height, "support_polygon", "debug2") );
+            support.iter().for_each(|polygon| 
+                blender.display2d(
+                    polygon,
+                    z_height,
+                    format!("planar region {layer_nr:03}-{i:03}"),
+                    "partial layers".into()
+                    ) 
+                );
         };
         prev_support = support;
 
