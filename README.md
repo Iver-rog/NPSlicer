@@ -1,5 +1,5 @@
 # A mesh based Non Planar Slicing algorithm
-This is a work in progress slicing program for doing suport free 3D printing through non planar slicing. 
+A non-planar slicer for ordinary 3-axis 3d printers
 
 ![all layers](https://github.com/user-attachments/assets/915c0d88-418c-471f-b9cf-0dfd3c7f9381)
 
