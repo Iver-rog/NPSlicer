@@ -202,7 +202,37 @@ def flip_normals(obj):
     # Switch back to Object mode
     bpy.ops.object.mode_set(mode='OBJECT')
 
+def merge_by_distance(collection_name, merge_distance=0.0001):
+    collection = bpy.data.collections.get(collection_name)
+    if not collection:
+        print(f"Collection '{collection_name}' not found.")
+        return
+
+    for obj in collection.objects:
+        if obj.type != 'MESH':
+            continue
+
+        # Make the object active and selected
+        bpy.context.view_layer.objects.active = obj
+        obj.select_set(True)
+
+        # Apply all modifiers
+        for modifier in obj.modifiers:
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
+
+        # Enter Edit Mode to merge vertices
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.remove_doubles(threshold=merge_distance)
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # Deselect after operation
+        obj.select_set(False)
+
+
 def batch_export(collection_name, export_directory):
+
+    merge_by_distance(collection_name)
 
     # Ensure the export directory exists
     if not os.path.exists(export_directory):
