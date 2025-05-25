@@ -202,36 +202,59 @@ def flip_normals(obj):
     # Switch back to Object mode
     bpy.ops.object.mode_set(mode='OBJECT')
 
-def merge_by_distance(collection_name, merge_distance=0.0001):
+def apply_all_modifiers(collection_name):
     collection = bpy.data.collections.get(collection_name)
     if not collection:
         print(f"Collection '{collection_name}' not found.")
         return
 
-    for obj in collection.objects:
-        if obj.type != 'MESH':
-            continue
+    bpy.ops.object.select_all(action='DESELECT')
 
-        # Make the object active and selected
-        bpy.context.view_layer.objects.active = obj
+    mesh_objs = [obj for obj in collection.objects if obj.type == 'MESH']
+    if not mesh_objs:
+        print("No mesh objects to convert.")
+        return
+
+    for obj in mesh_objs:
         obj.select_set(True)
+    bpy.context.view_layer.objects.active = mesh_objs[0]
 
-        # Apply all modifiers
-        for modifier in obj.modifiers:
-            bpy.ops.object.modifier_apply(modifier=modifier.name)
+    bpy.ops.object.convert(target='MESH')
 
-        # Enter Edit Mode to merge vertices
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.remove_doubles(threshold=merge_distance)
-        bpy.ops.object.mode_set(mode='OBJECT')
+def merge_by_distance(collection_name, threshold=0.0001):
 
-        # Deselect after operation
+    collection = bpy.data.collections.get(collection_name)
+    if not collection:
+        print(f"Collection '{collection_name}' not found.")
+        return
+
+    # Filter mesh objects
+    mesh_objs = [obj for obj in collection.objects if obj.type == 'MESH']
+    if not mesh_objs:
+        print("No mesh objects to merge.")
+        return
+
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in mesh_objs:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = mesh_objs[0]
+
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.remove_doubles(threshold=threshold)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    # Deselect all again
+    for obj in mesh_objs:
         obj.select_set(False)
+
+    print(f"Merged vertices by distance ({threshold}) for {len(mesh_objs)} objects.")
+
 
 
 def batch_export(collection_name, export_directory):
 
+    apply_all_modifiers(collection_name)
     merge_by_distance(collection_name)
 
     # Ensure the export directory exists
