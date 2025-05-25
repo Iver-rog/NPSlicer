@@ -23,12 +23,14 @@ use settings::Feedrates;
 use std::io::{Write, BufReader};
 use std::fs::{self,File};
 use std::io;
+use std::time::Instant;
 
 
 /// WARNING: all content in the TMP_DIR is deleted each time the project is run
 const TEMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
 
 fn main(){
+    let start_time = Instant::now();
     // let mut args = env::args();
     // let path = args.next().expect("first arg should be the path");
     // let mesh_layer_dir = args.next().expect("missing argument: stl-layers directory");
@@ -70,10 +72,13 @@ fn main(){
     crate_or_clear_dir(TEMP_DIR);
     blender.export_layers(TEMP_DIR);
     blender.ping(); //make sure blender has processed all messages
-    // get_user_confimation();
-    // thread::sleep(Duration::from_millis(5000));
+    let mesh_gen_time = start_time.elapsed();
 
+    let start_time = Instant::now();
     gcode::main(&mut blender,TEMP_DIR,&settings);
+    let gcode_gen_time = start_time.elapsed();
+    println!("mesh generation time {} sec",mesh_gen_time.as_secs_f64());
+    println!("gcode generation time {} sec",gcode_gen_time.as_secs_f64());
 }
 
 fn crate_or_clear_dir<T:AsRef<std::path::Path>>(tmp:T){
@@ -218,7 +223,8 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
             if i > 3 {break}
             let offset_sup = ss_offset(support.clone(),-d_x1);
 
-            let (support,tags) = tagged_boolean(layer.clone() ,offset_sup, OverlayRule::Intersect);
+            let (support2,tags) = tagged_boolean(layer.clone() ,offset_sup, OverlayRule::Intersect);
+            support = support2;
             support_a = support.iter().map(|polygon| polygon.area() ).sum();
 
             if let Some( (vertices,faces) ) = generate_partial_layer(support.clone(), tags, z_height, theta){
@@ -237,7 +243,8 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
                     ) 
                 );
         };
-        prev_support = support;
+        prev_support = support.into_iter().filter_map(|polygon|polygon.simplify(0.01)).collect();
+        // prev_support = support;
 
     }
 }
