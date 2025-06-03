@@ -91,11 +91,9 @@ def import_stl(filepath, name, color=(1.0,0.2,0.2,1.0)):
         return False
         
     try:
-        # Import the STL file
         bpy.ops.wm.stl_import(filepath=filepath)
         print("STL imported successfully")
         
-        # Select the imported object
         imported_object = bpy.context.selected_objects[0]
         imported_object.name = name
         imported_object.color = color
@@ -108,9 +106,7 @@ def import_stl(filepath, name, color=(1.0,0.2,0.2,1.0)):
 
 def clear_scene():
     """Remove all objects from the scene"""
-    # Select all objects
     bpy.ops.object.select_all(action='SELECT')
-    # Delete selected objects
     bpy.ops.object.delete()
 
 def import_edge_loops(collection_name,name,points,edges,faces):
@@ -125,14 +121,11 @@ def import_edge_loops(collection_name,name,points,edges,faces):
     me = bpy.data.meshes.new(name + "Mesh")
     ob = bpy.data.objects.new(name, me)
 
-    # Make a mesh from a list of vertices/edges/faces
     me.from_pydata(points, edges, faces)
 
-    # Display name and update the mesh
     ob.show_name = True
     me.update()
 
-    # Link object to the active collection
     new_collection.objects.link(ob)
     return ob
 
@@ -142,25 +135,19 @@ def apply_boolean(target_obj):
     boolean_modifier = target_obj.modifiers.new(name="Boolean", type='BOOLEAN')
     boolean_modifier.operation = 'INTERSECT'
     
-    # Set the target object for the Boolean modifier
     boolean_modifier.object = boolean_obj
     
-    # Deselect the object (optional)
     boolean_obj.select_set(False)
 
 def apply_boolean_slow(target_obj):
 
     boolean_obj = bpy.data.objects["input mesh"]
     
-    # print("target obj",target_obj.name," bool_obj",boolean_obj.name)
-
     boolean_modifier = target_obj.modifiers.new(name="Boolean", type='BOOLEAN')
     boolean_modifier.operation = 'INTERSECT'
     
-    # Set the target object for the Boolean modifier
     boolean_modifier.object = boolean_obj
     
-    # Deselect the object
     boolean_obj.select_set(False)
 
     face_n_after_mod = face_count_after_modifier(target_obj)
@@ -187,19 +174,14 @@ def flip_normals(obj):
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
 
-    # Switch to Edit mode
     bpy.ops.object.mode_set(mode='EDIT')
 
-    # Create a bmesh from the object's data
     bm = bmesh.from_edit_mesh(obj.data)
 
-    # Flip normals
     bmesh.ops.reverse_faces(bm, faces=bm.faces)
 
-    # Update the mesh
     bmesh.update_edit_mesh(obj.data, loop_triangles=True)
 
-    # Switch back to Object mode
     bpy.ops.object.mode_set(mode='OBJECT')
 
 def apply_all_modifiers(collection_name):
@@ -228,7 +210,6 @@ def merge_by_distance(collection_name, threshold=0.0001):
         print(f"Collection '{collection_name}' not found.")
         return
 
-    # Filter mesh objects
     mesh_objs = [obj for obj in collection.objects if obj.type == 'MESH']
     if not mesh_objs:
         print("No mesh objects to merge.")
@@ -244,7 +225,6 @@ def merge_by_distance(collection_name, threshold=0.0001):
     bpy.ops.mesh.remove_doubles(threshold=threshold)
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    # Deselect all again
     for obj in mesh_objs:
         obj.select_set(False)
 
@@ -257,31 +237,24 @@ def batch_export(collection_name, export_directory):
     apply_all_modifiers(collection_name)
     merge_by_distance(collection_name)
 
-    # Ensure the export directory exists
-    if not os.path.exists(export_directory):
-        os.makedirs(export_directory)
-
-    # Check that collection exists
     collection = bpy.data.collections.get(collection_name)
 
+    if collection == None:
+        return
     if len(collection.objects) == 0: 
         return
 
     if collection:
         print(f"Exporting all objects from collection: {collection_name}")
 
-        # Deselect all objects first
         bpy.ops.object.select_all(action='DESELECT')
 
-        # Select only objects from the target collection
         for obj in collection.objects:
             if obj.type == 'MESH':
                 obj.select_set(True)
 
-        # Set an active object (required for some operators, though not strictly necessary here)
         bpy.context.view_layer.objects.active = collection.objects[0]
 
-        # Perform batch export
         bpy.ops.wm.stl_export(
             filepath=export_directory,
             use_batch=True,
