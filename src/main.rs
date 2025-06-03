@@ -55,20 +55,19 @@ fn main(){
     };
     dbg!(&settings);
 
-    let stl_path = "../mesh/pipe.stl";
-    // let stl_path = "../mesh/3dbenchy.stl";
-    // let stl_path = "../mesh/bunny2.stl";
-    // let stl_path = "../mesh/stanford-armadillo.stl";
+    let stl_path = "../mesh/simple_overhang.stl";
+    // let stl_path = "../mesh/internal_external.stl";
+    // let stl_path = "../mesh/bunny.stl";
+
+    // let stl_path = "../mesh/pipe.stl";
     // let stl_path = "../mesh/curved overhang.stl";
-    // let stl_path = "../mesh/simple_overhang.stl";
     // let stl_path = "../mesh/wine_glass3.stl";
-    // let stl_path = "../mesh/internal_external_simplified.stl";
 
     blender.load_mesh(stl_path,"input mesh");
     let layer_perimeters = extract_planar_layers_from_mesh(stl_path,&settings);
 
     mesh_gen(&mut blender,&layer_perimeters,&settings);
-    get_user_confimation();
+    // get_user_confimation();
     crate_or_clear_dir(TEMP_DIR);
     blender.export_layers(TEMP_DIR);
     blender.ping(); //make sure blender has processed all messages
@@ -113,8 +112,7 @@ fn extract_planar_layers_from_mesh<T:AsRef<std::path::Path>>(stl_path:T,s:&Setti
     }
     return layers
 }
-// fn generate_support_profile(){}
-// fn generate_partial_layer(i:usize,layer:Vec<Polygon>,face_mask:Vec<Vec<usize>>)->([]){
+
 fn generate_full_layer(
     layer:Vec<Polygon>,
     face_mask:Vec<Vec<Vec<bool>>>,
@@ -125,6 +123,7 @@ fn generate_full_layer(
     np_faces.append(&mut planar_faces);
     return Some((vertices,np_faces))
 }
+
 fn generate_partial_layer(
     layer:Vec<Polygon>,
     face_mask:Vec<Vec<Vec<bool>>>,
@@ -185,7 +184,7 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
     let mut layers = layers.into_iter();
     let mut prev_support:Vec<Polygon> = layers.next().unwrap().clone();
-    blender.solid_polygon(&prev_support, layer_h, "000-000-layer1", "result");
+    blender.solid_polygon(&prev_support, layer_h, "000-000-layer", "result");
 
     for (i, layer) in layers.enumerate(){
         let layer_nr = i + 1;
@@ -198,8 +197,6 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
         let mut support_a:f32 = support.iter().map(|polygon|polygon.area()).sum();
         let perimeter_a:f32 = layer.iter().map(|polygon|polygon.area()).sum();
-        let support_ratio = support_a / perimeter_a;
-        let make_half_layer = support_ratio < 0.5;
 
         support.iter().for_each(|polygon| 
             blender.display2d(
@@ -220,7 +217,7 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
         let mut i = 0;
         while ( support_a / perimeter_a ) < min_support_ratio {
             i += 1;
-            if i > 3 {break}
+            // if i > 3 {break}
             let offset_sup = ss_offset(support.clone(),-d_x1);
 
             let (support2,tags) = tagged_boolean(layer.clone() ,offset_sup, OverlayRule::Intersect);
