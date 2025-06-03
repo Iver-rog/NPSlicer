@@ -264,6 +264,9 @@ def batch_export(collection_name, export_directory):
     # Check that collection exists
     collection = bpy.data.collections.get(collection_name)
 
+    if len(collection.objects) == 0: 
+        return
+
     if collection:
         print(f"Exporting all objects from collection: {collection_name}")
 
