@@ -42,12 +42,21 @@ impl StraightSkeleton {
     pub fn mesh_input_polygon(&self) -> Vec<Vec<usize>>{
         let faces = self.input_polygons.iter()
             .map(|p|{
+                match p.holes.len() == 0 {
+                    false => {
                 iter::once(&p.outer_loop).chain(p.holes.iter())
                 .flat_map(|p| ((p.start)..(p.end)).into_iter() )
                 .collect::<Vec<usize>>()
+                    }
+                    true => {
+                        let c = &p.outer_loop;
+                        ((c.start)..(c.end)).rev().collect::<Vec<usize>>()
+                    }
+                }
             });
 
         let linking_faces = self.input_polygons.iter()
+            .filter(|p|p.holes.len() != 0)
             .map(|p|{
                 iter::once(&p.outer_loop).chain(p.holes.iter())
                 .flat_map(|p| [p.start,p.end-1].into_iter() )

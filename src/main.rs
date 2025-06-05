@@ -153,8 +153,7 @@ fn generate_layer(
                     return None;
                 }
             };
-            let planar_faces = skeleton.input_polygons_mesh_outer_loop();
-            // let mut input_polygon_mesh = skeleton.mesh_input_polygon();
+            let mut planar_faces = skeleton.mesh_input_polygon();
 
             let mut np_faces = skeleton.skeleton_mesh_with_mask(face_mask.clone());
             let edges = skeleton.edges;
