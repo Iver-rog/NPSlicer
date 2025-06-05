@@ -152,7 +152,7 @@ def apply_boolean_slow(target_obj):
 
     face_n_after_mod = face_count_after_modifier(target_obj)
     face_n_b_mod = face_count_without_modifier(target_obj)
-    if face_n_after_mod > 2*face_n_b_mod or face_n_after_mod < 3:
+    if face_n_after_mod > 1.1*face_n_b_mod or face_n_after_mod < 0.9*face_n_b_mod:
         flip_normals(target_obj)
         # print(f"Flipped normals for '{target_obj.name}'.")
 
