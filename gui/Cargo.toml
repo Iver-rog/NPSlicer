@@ -1,0 +1,11 @@
+[package]
+name = "NPSlicer"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "NPSlicer"
+path = "src/main.rs"
+
+[dependencies]
+core = { path = "../core"}

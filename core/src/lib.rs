@@ -31,7 +31,7 @@ const TEMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
 
 const t_min:f32 = 20.0;
 
-fn main(){
+pub fn main(){
     let start_time = Instant::now();
     // let mut args = env::args();
     // let path = args.next().expect("first arg should be the path");
