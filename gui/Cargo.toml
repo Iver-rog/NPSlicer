@@ -8,4 +8,12 @@ name = "NPSlicer"
 path = "src/main.rs"
 
 [dependencies]
-core = { path = "../core"}
+#core = { path = "../core"}
+
+iced = { version = "0.13", features = ["debug", "image", "advanced"] }
+iced_wgpu = "0.13"
+wgpu = "0.19"
+image = { version = "0.25", default-features = false }
+bytemuck = { version = "1.0", features = ["derive"] }
+glam = { version = "0.25", features = ["bytemuck"] }
+rand = "0.8.5"
