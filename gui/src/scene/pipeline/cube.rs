@@ -1,4 +1,3 @@
-use std::mem;
 
 use crate::scene::pipeline::Vertex;
 use crate::wgpu;
