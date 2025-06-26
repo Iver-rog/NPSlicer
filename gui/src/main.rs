@@ -8,15 +8,93 @@ use iced::widget::{center, checkbox, column, row, shader, slider, text};
 use iced::window;
 use iced::{Center, Color, Element, Fill, Subscription};
 
+// my inports
+use npslicer_core;
+
+use iced_aw::number_input;
+use iced::task::Task;
+
+use iced::alignment::Horizontal::{self, Right};
+use iced::widget::{button, container,  horizontal_space, pick_list };
+use rfd;
+
+use std::io;
+use std::path::PathBuf;
+
 fn main() -> iced::Result {
-    iced::application(IcedCubes::default, IcedCubes::update, IcedCubes::view)
-        .subscription(IcedCubes::subscription)
+    iced::application(Controls::default, Controls::update, Controls::view)
+        .subscription(Controls::subscription)
         .run()
 }
 
-struct IcedCubes {
+// my stuff
+async fn slice() -> () {
+    npslicer_core::main()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Printer{
+    PrusaMK3SPluss,
+    Other(String),
+}
+impl std::fmt::Display for Printer{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>)-> Result<(),std::fmt::Error>{
+        match self{
+            Self::PrusaMK3SPluss => write!(f,"PrusaMK3S+"),
+            Self::Other(printer_name) => write!(f,"{printer_name}"),
+        }
+    }
+}
+impl Default for Printer {
+    fn default() -> Self {
+        Self::PrusaMK3SPluss
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Filament{
+    PLA,
+    Other(String),
+}
+impl std::fmt::Display for Filament{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>)-> Result<(),std::fmt::Error>{
+        match self{
+            Self::PLA => write!(f,"PLA"),
+            Self::Other(filament_name) => write!(f,"{filament_name}"),
+        }
+    }
+}
+impl Default for Filament {
+    fn default() -> Self {
+        Self::PLA
+    }
+}
+pub struct Parameters {
+    overhang_angle: usize,
+    brim: usize,
+    nr_of_perimeters: usize,
+    layer_height: f32,
+    infill_percentage: usize,
+}
+impl Default for Parameters{
+    fn default() -> Self {
+        Self{
+            overhang_angle: 20,
+            brim: 0,
+            nr_of_perimeters: 2,
+            layer_height: 0.4,
+            infill_percentage: 20,
+        }
+    }
+}
+
+struct Controls {
     start: Instant,
     scene: Scene,
+
+    input: String,
+    printers: Option<Printer>,
+    filament: Option<Filament>,
+    parameters: Parameters,
 }
 
 #[derive(Debug, Clone)]
@@ -26,111 +104,247 @@ enum Message {
     Tick(Instant),
     ShowDepthBuffer(bool),
     LightColorChanged(Color),
+    // my stuff
+    PrinterChanged(Printer),
+    FilamentChanged(Filament),
+    OverhangAngleChanged(usize),
+    NrOfPermimetersChanged(usize),
+    LayerHeightChanged(f32),
+    BrimChanged(usize),
+    InfillPercentageChanged(usize),
+    SliceModel,
+    SlicingComplete(()),
+    PickFile,
+    OpenSTL(Result<PathBuf,Error>)
 }
 
-impl IcedCubes {
+impl Controls {
     fn new() -> Self {
         Self {
+            // ice cubes
             start: Instant::now(),
             scene: Scene::new(),
+            // my controls
+            input: String::default(),
+            printers: Some(Printer::default()),
+            filament: Some(Filament::default()),
+            parameters: Parameters::default(),
         }
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::CubeAmountChanged(amount) => {
                 self.scene.change_amount(amount);
+                Task::none()
             }
             Message::CubeSizeChanged(size) => {
                 self.scene.size = size;
+                Task::none()
             }
             Message::Tick(time) => {
                 self.scene.update(time - self.start);
+                Task::none()
             }
             Message::ShowDepthBuffer(show) => {
                 self.scene.show_depth_buffer = show;
+                Task::none()
             }
             Message::LightColorChanged(color) => {
                 self.scene.light_color = color;
+                Task::none()
+            }
+            Message::LayerHeightChanged(val)     => { self.parameters.layer_height = val; Task::none()}
+            Message::OverhangAngleChanged(val)   => { self.parameters.overhang_angle = val;Task::none() }
+            Message::NrOfPermimetersChanged(val) => { self.parameters.nr_of_perimeters = val; Task::none()}
+            Message::BrimChanged(val)            => { self.parameters.brim = val; Task::none()}
+            Message::PrinterChanged(printer)     => { self.printers = Some(printer); Task::none()}
+            Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
+            Message::InfillPercentageChanged(val)=> { self.parameters.infill_percentage = val; Task::none()}
+            Message::SliceModel                  => { Task::perform(slice(), Message::SlicingComplete)}
+            Message::SlicingComplete(result)     => { println!("yay"); Task::none() }
+            Message::OpenSTL(path)               => { println!("{:?}",path); Task::none() }
+            Message::PickFile => { 
+                println!("picing file"); 
+                Task::perform( pick_file(), |res| Message::OpenSTL(res) )
             }
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let top_controls = row![
-            control(
-                "Amount",
-                slider(
-                    1..=scene::MAX,
-                    self.scene.cubes.len() as u32,
-                    Message::CubeAmountChanged
-                )
-                .width(100)
-            ),
-            control(
-                "Size",
-                slider(0.1..=0.25, self.scene.size, Message::CubeSizeChanged)
-                    .step(0.01)
-                    .width(100),
-            ),
-            checkbox("Show Depth Buffer", self.scene.show_depth_buffer)
-                .on_toggle(Message::ShowDepthBuffer),
-        ]
-        .spacing(40);
 
-        let bottom_controls = row![
-            control(
-                "R",
-                slider(0.0..=1.0, self.scene.light_color.r, move |r| {
-                    Message::LightColorChanged(Color {
-                        r,
-                        ..self.scene.light_color
-                    })
-                })
-                .step(0.01)
-                .width(100)
-            ),
-            control(
-                "G",
-                slider(0.0..=1.0, self.scene.light_color.g, move |g| {
-                    Message::LightColorChanged(Color {
-                        g,
-                        ..self.scene.light_color
-                    })
-                })
-                .step(0.01)
-                .width(100)
-            ),
-            control(
-                "B",
-                slider(0.0..=1.0, self.scene.light_color.b, move |b| {
-                    Message::LightColorChanged(Color {
-                        b,
-                        ..self.scene.light_color
-                    })
-                })
-                .step(0.01)
-                .width(100)
-            )
-        ]
-        .spacing(40);
 
-        let controls = column![top_controls, bottom_controls,]
-            .spacing(10)
-            .padding(20)
-            .align_x(Center);
+        let printers = [
+            Printer::PrusaMK3SPluss,
+            Printer::Other("halla".into()),
+            Printer::Other("yeah dude".into()),
+        ];
+
+        let filaments = [
+            Filament::PLA,
+            Filament::Other("halla mr kis".into()),
+            Filament::Other("jalal ".into()),
+        ];
+
+        let task_bar = container(row![
+            button("file").on_press(Message::PickFile),
+            button("settings"),
+            horizontal_space(),
+            button("slice").on_press(Message::SliceModel),
+            button("export G-code file"),
+        ]
+        .spacing(10)
+        )
+        .style(container::bordered_box);
+
+        // let printers = row![text(" Printer"), horizontal_rule(30)];
+        let printer = container(row![
+            text("Printer"),
+            horizontal_space(),
+            button("edit").padding(0),
+        ]).style(container::bordered_box);
+
+        let filament = container(row![
+            text("Filament"),
+            horizontal_space(),
+            button("edit").padding(0),
+        ]).style(container::bordered_box);
+
+        let process = container(row![
+            text("Process"),
+            horizontal_space(),
+            button("edit").padding(0),
+        ]).style(container::bordered_box);
+
+        let side_menu = container(column![
+            printer,
+            pick_list(printers,self.printers.clone(),Message::PrinterChanged),
+            filament,
+            pick_list(filaments,self.filament.clone(),Message::FilamentChanged),
+            process,
+            // row![text("overhang angle").color(Color::WHITE),
+            // number_input(&self.parameters.overhang_angle, 0..=90 ,Message::OverhangAngleChanged)
+            //     .style(number_input::number_input::primary)
+            //     .step(5)
+            // ].align_y(Center).spacing(5),
+            // row![text("perimeters").color(Color::WHITE),
+            // number_input(&self.parameters.nr_of_perimeters, 0..=50 ,Message::NrOfPermimetersChanged)
+            //     .style(number_input::number_input::primary)
+            //     .step(1)
+            // ].align_y(Center).spacing(5),
+            // row![text("infill percentage").color(Color::WHITE),
+            // number_input(&self.parameters.infill_percentage, 0..=100 ,Message::InfillPercentageChanged)
+            //     .style(number_input::number_input::primary)
+            //     .step(5)
+            // ].align_y(Center).spacing(5),
+            // row![text("layer height").color(Color::WHITE),
+            // number_input(&self.parameters.layer_height, 0.05..=1.0 ,Message::LayerHeightChanged)
+            //     .style(number_input::number_input::primary)
+            //     .step(0.1)
+            // ].align_y(Center).spacing(5),
+            // row![text("brims").color(Color::WHITE),
+            // number_input(&self.parameters.brim, 0..=100 ,Message::BrimChanged)
+            //     .style(number_input::number_input::primary)
+            //     .step(1)
+            // ].align_y(Center).spacing(5),
+        ].spacing(5)
+        .align_x(Right))
+        .width(280)
+        .padding(5)
+        // .style(container::rounded_box);
+        .style(container::bordered_box);
 
         let shader = shader(&self.scene).width(Fill).height(Fill);
 
-        center(column![shader, controls].align_x(Center)).into()
+        container(
+            column![
+                task_bar.width(Fill),
+                row![
+                    side_menu.height(Fill),
+                    shader,
+                ],
+            ].padding(0),
+        ).padding(0)
+        .align_top(Fill)
+        // .align_bottom(Fill)
+        .into()
     }
 
+    // fn view(&self) -> Element<'_, Message> {
+    //     let top_controls = row![
+    //         control(
+    //             "Amount",
+    //             slider(
+    //                 1..=scene::MAX,
+    //                 self.scene.cubes.len() as u32,
+    //                 Message::CubeAmountChanged
+    //             )
+    //             .width(100)
+    //         ),
+    //         control(
+    //             "Size",
+    //             slider(0.1..=0.25, self.scene.size, Message::CubeSizeChanged)
+    //                 .step(0.01)
+    //                 .width(100),
+    //         ),
+    //         checkbox("Show Depth Buffer", self.scene.show_depth_buffer)
+    //             .on_toggle(Message::ShowDepthBuffer),
+    //     ]
+    //     .spacing(40);
+    //
+    //     let bottom_controls = row![
+    //         control(
+    //             "R",
+    //             slider(0.0..=1.0, self.scene.light_color.r, move |r| {
+    //                 Message::LightColorChanged(Color {
+    //                     r,
+    //                     ..self.scene.light_color
+    //                 })
+    //             })
+    //             .step(0.01)
+    //             .width(100)
+    //         ),
+    //         control(
+    //             "G",
+    //             slider(0.0..=1.0, self.scene.light_color.g, move |g| {
+    //                 Message::LightColorChanged(Color {
+    //                     g,
+    //                     ..self.scene.light_color
+    //                 })
+    //             })
+    //             .step(0.01)
+    //             .width(100)
+    //         ),
+    //         control(
+    //             "B",
+    //             slider(0.0..=1.0, self.scene.light_color.b, move |b| {
+    //                 Message::LightColorChanged(Color {
+    //                     b,
+    //                     ..self.scene.light_color
+    //                 })
+    //             })
+    //             .step(0.01)
+    //             .width(100)
+    //         )
+    //     ]
+    //     .spacing(40);
+    //
+    //     let controls = column![top_controls, bottom_controls,]
+    //         .spacing(10)
+    //         .padding(20)
+    //         .align_x(Center);
+    //
+    //     let shader = shader(&self.scene).width(Fill).height(Fill);
+    //
+    //     center(column![shader, controls].align_x(Center)).into()
+    // }
+    //
     fn subscription(&self) -> Subscription<Message> {
         window::frames().map(Message::Tick)
     }
 }
 
-impl Default for IcedCubes {
+impl Default for Controls {
     fn default() -> Self {
         Self::new()
     }
@@ -141,4 +355,21 @@ fn control<'a>(
     control: impl Into<Element<'a, Message>>,
 ) -> Element<'a, Message> {
     row![text(label), control.into()].spacing(10).into()
+}
+
+async fn pick_file() -> Result<PathBuf,Error>{
+    rfd::AsyncFileDialog::new()
+        .set_title("Choose a STL file for slicing")
+        .add_filter("stl", &["stl"])
+        .add_filter("g-code", &["gcode"])
+        .pick_file()
+        .await
+        .map(|file_handle|PathBuf::from(file_handle))
+        .ok_or(Error::DialogClosed)
+}
+
+#[derive(Debug, Clone)]
+enum Error {
+    DialogClosed,
+    IO(io::ErrorKind),
 }
