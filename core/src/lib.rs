@@ -13,15 +13,15 @@ mod tests;
 mod data;
 
 use geo::{Polygon,Enclosed};
-use settings::Settings;
+pub use settings::{Settings,Feedrates};
 use boolean::{ss_offset, tagged_boolean};
 use i_overlay::core::overlay_rule::OverlayRule;
 use blender::Blender;
 
 use log::Level;
-use settings::Feedrates;
 use std::io::{Write, BufReader};
 use std::fs::{self,File};
+use std::path::PathBuf;
 use std::io;
 use std::time::Instant;
 
@@ -32,13 +32,22 @@ const TEMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
 const t_min:f32 = 20.0;
 
 pub fn main(){
-    let start_time = Instant::now();
     // let mut args = env::args();
     // let path = args.next().expect("first arg should be the path");
     // let mesh_layer_dir = args.next().expect("missing argument: stl-layers directory");
- 
-    init_logger();
-    let mut blender = Blender::new();
+
+
+    // let stl_path = "../mesh/simple_overhang.stl";
+    let stl_path = "../mesh/bunny.stl";
+
+    // let stl_path = "../mesh/internal_external.stl";
+    // let stl_path = "../mesh/circular overhang.stl";
+    // let stl_path = "../mesh/2.stl";
+    // let stl_path = "../mesh/rapport demo.stl";
+    // let stl_path = "../mesh/curved overhang.stl";
+    // let stl_path = "../mesh/pipe.stl";
+    // let stl_path = "../mesh/curved overhang.stl";
+    // let stl_path = "../mesh/wine_glass3.stl";
 
     let settings = Settings{
         layer_height:0.4,
@@ -56,21 +65,24 @@ pub fn main(){
         // },
         ..Default::default()
     };
+
+    slice(PathBuf::from(stl_path),settings);
+
+}
+pub async fn async_slice(stl_path:PathBuf,settings:Settings) -> () {
+    slice(stl_path,settings)
+}
+
+pub fn slice(stl_path:PathBuf,settings:Settings){
+    let start_time = Instant::now();
+ 
+    init_logger();
+    let mut blender = Blender::new();
+
     dbg!(&settings);
 
-    let stl_path = "../mesh/simple_overhang.stl";
-    // let stl_path = "../mesh/bunny.stl";
 
-    // let stl_path = "../mesh/internal_external.stl";
-    // let stl_path = "../mesh/circular overhang.stl";
-    // let stl_path = "../mesh/2.stl";
-    // let stl_path = "../mesh/rapport demo.stl";
-    // let stl_path = "../mesh/curved overhang.stl";
-    // let stl_path = "../mesh/pipe.stl";
-    // let stl_path = "../mesh/curved overhang.stl";
-    // let stl_path = "../mesh/wine_glass3.stl";
-
-    blender.load_mesh(stl_path,"input mesh");
+    blender.load_mesh(&stl_path,"input mesh");
     let layer_perimeters = extract_planar_layers_from_mesh(stl_path,&settings);
     // let d_x2 = (settings.overhang_angle*0.5).tan()*settings.layer_height;
     // let p0_offset = ss_offset(layer_perimeters[0].clone(),-0.5*d_x2);

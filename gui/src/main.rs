@@ -9,13 +9,12 @@ use iced::window;
 use iced::{Center, Color, Element, Fill, Subscription};
 
 // my inports
-use npslicer_core;
+use npslicer_core::{self,async_slice};
 
-use iced_aw::number_input;
 use iced::task::Task;
 
 use iced::alignment::Horizontal::{self, Right};
-use iced::widget::{button, container,  horizontal_space, pick_list };
+use iced::widget::{button, container,  horizontal_space, pick_list, text_input};
 use rfd;
 
 use std::io;
@@ -25,11 +24,6 @@ fn main() -> iced::Result {
     iced::application(Controls::default, Controls::update, Controls::view)
         .subscription(Controls::subscription)
         .run()
-}
-
-// my stuff
-async fn slice() -> () {
-    npslicer_core::main()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,7 +85,7 @@ struct Controls {
     start: Instant,
     scene: Scene,
 
-    input: String,
+    inputstl: Option<PathBuf>,
     printers: Option<Printer>,
     filament: Option<Filament>,
     parameters: Parameters,
@@ -125,10 +119,10 @@ impl Controls {
             start: Instant::now(),
             scene: Scene::new(),
             // my controls
-            input: String::default(),
             printers: Some(Printer::default()),
             filament: Some(Filament::default()),
             parameters: Parameters::default(),
+            inputstl: None,
         }
     }
 
@@ -161,12 +155,17 @@ impl Controls {
             Message::PrinterChanged(printer)     => { self.printers = Some(printer); Task::none()}
             Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
             Message::InfillPercentageChanged(val)=> { self.parameters.infill_percentage = val; Task::none()}
-            Message::SliceModel                  => { Task::perform(slice(), Message::SlicingComplete)}
             Message::SlicingComplete(result)     => { println!("yay"); Task::none() }
-            Message::OpenSTL(path)               => { println!("{:?}",path); Task::none() }
-            Message::PickFile => { 
-                println!("picing file"); 
-                Task::perform( pick_file(), |res| Message::OpenSTL(res) )
+            Message::OpenSTL(path)               => { self.inputstl = path.ok(); Task::none() }
+            Message::PickFile                    => { Task::perform( pick_file(), Message::OpenSTL ) }
+            Message::SliceModel => { 
+                match &self.inputstl {
+                    Some(path) => {
+                        let settings = npslicer_core::Settings::default();
+                        Task::perform( async_slice(path.clone(),settings), Message::SlicingComplete )
+                    },
+                    None => Task::none()
+                }
             }
         }
     }
@@ -222,31 +221,10 @@ impl Controls {
             filament,
             pick_list(filaments,self.filament.clone(),Message::FilamentChanged),
             process,
-            // row![text("overhang angle").color(Color::WHITE),
-            // number_input(&self.parameters.overhang_angle, 0..=90 ,Message::OverhangAngleChanged)
-            //     .style(number_input::number_input::primary)
-            //     .step(5)
-            // ].align_y(Center).spacing(5),
-            // row![text("perimeters").color(Color::WHITE),
-            // number_input(&self.parameters.nr_of_perimeters, 0..=50 ,Message::NrOfPermimetersChanged)
-            //     .style(number_input::number_input::primary)
-            //     .step(1)
-            // ].align_y(Center).spacing(5),
-            // row![text("infill percentage").color(Color::WHITE),
-            // number_input(&self.parameters.infill_percentage, 0..=100 ,Message::InfillPercentageChanged)
-            //     .style(number_input::number_input::primary)
-            //     .step(5)
-            // ].align_y(Center).spacing(5),
-            // row![text("layer height").color(Color::WHITE),
-            // number_input(&self.parameters.layer_height, 0.05..=1.0 ,Message::LayerHeightChanged)
-            //     .style(number_input::number_input::primary)
-            //     .step(0.1)
-            // ].align_y(Center).spacing(5),
-            // row![text("brims").color(Color::WHITE),
-            // number_input(&self.parameters.brim, 0..=100 ,Message::BrimChanged)
-            //     .style(number_input::number_input::primary)
-            //     .step(1)
-            // ].align_y(Center).spacing(5),
+            control("overhang angle",
+                checkbox("", self.scene.show_depth_buffer)
+                    .on_toggle(Message::ShowDepthBuffer)
+            ),
         ].spacing(5)
         .align_x(Right))
         .width(280)
@@ -270,75 +248,6 @@ impl Controls {
         .into()
     }
 
-    // fn view(&self) -> Element<'_, Message> {
-    //     let top_controls = row![
-    //         control(
-    //             "Amount",
-    //             slider(
-    //                 1..=scene::MAX,
-    //                 self.scene.cubes.len() as u32,
-    //                 Message::CubeAmountChanged
-    //             )
-    //             .width(100)
-    //         ),
-    //         control(
-    //             "Size",
-    //             slider(0.1..=0.25, self.scene.size, Message::CubeSizeChanged)
-    //                 .step(0.01)
-    //                 .width(100),
-    //         ),
-    //         checkbox("Show Depth Buffer", self.scene.show_depth_buffer)
-    //             .on_toggle(Message::ShowDepthBuffer),
-    //     ]
-    //     .spacing(40);
-    //
-    //     let bottom_controls = row![
-    //         control(
-    //             "R",
-    //             slider(0.0..=1.0, self.scene.light_color.r, move |r| {
-    //                 Message::LightColorChanged(Color {
-    //                     r,
-    //                     ..self.scene.light_color
-    //                 })
-    //             })
-    //             .step(0.01)
-    //             .width(100)
-    //         ),
-    //         control(
-    //             "G",
-    //             slider(0.0..=1.0, self.scene.light_color.g, move |g| {
-    //                 Message::LightColorChanged(Color {
-    //                     g,
-    //                     ..self.scene.light_color
-    //                 })
-    //             })
-    //             .step(0.01)
-    //             .width(100)
-    //         ),
-    //         control(
-    //             "B",
-    //             slider(0.0..=1.0, self.scene.light_color.b, move |b| {
-    //                 Message::LightColorChanged(Color {
-    //                     b,
-    //                     ..self.scene.light_color
-    //                 })
-    //             })
-    //             .step(0.01)
-    //             .width(100)
-    //         )
-    //     ]
-    //     .spacing(40);
-    //
-    //     let controls = column![top_controls, bottom_controls,]
-    //         .spacing(10)
-    //         .padding(20)
-    //         .align_x(Center);
-    //
-    //     let shader = shader(&self.scene).width(Fill).height(Fill);
-    //
-    //     center(column![shader, controls].align_x(Center)).into()
-    // }
-    //
     fn subscription(&self) -> Subscription<Message> {
         window::frames().map(Message::Tick)
     }

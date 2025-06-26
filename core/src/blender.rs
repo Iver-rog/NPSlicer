@@ -15,6 +15,7 @@ use stl_io::Vector;
 use crate::geo::*;
 use crate::gcode;
 
+const PYTHON_SERVER_PATH: &str = "/home/iver/Documents/NTNU/Master/layer-gen-rs/core/py/server.py";
 const BLENDER_HOST: &str = "localhost";
 const BLENDER_PORT: u16 = 9000;
 
@@ -94,11 +95,10 @@ fn connect_or_launch_blender() -> Blender {
 }
 fn launch_blender() -> std::io::Result<()> {
     println!("launching blender");
-    let python_server_path = Path::new("../py/server.py");
     Command::new("blender")
         // .arg("--background")
         .arg("--python")
-        .arg(python_server_path)
+        .arg(PYTHON_SERVER_PATH)
         .spawn()?;
     Ok(())
 }
