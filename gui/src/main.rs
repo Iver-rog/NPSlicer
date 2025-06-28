@@ -1,23 +1,24 @@
 mod scene;
+mod io;
+use io::{pick_file,load_stl};
+
+use std::io::ErrorKind;
 
 use scene::Scene;
 
 use iced::time::Instant;
 use wgpu;
-use iced::widget::{center, checkbox, column, row, shader, slider, text};
+use iced::widget::{checkbox, column, row, shader, text};
 use iced::window;
-use iced::{Center, Color, Element, Fill, Subscription};
+use iced::{Color, Element, Fill, Subscription};
 
 // my inports
 use npslicer_core::{self,async_slice};
 
 use iced::task::Task;
 
-use iced::alignment::Horizontal::{self, Right};
-use iced::widget::{button, container,  horizontal_space, pick_list, text_input};
-use rfd;
-
-use std::io;
+use iced::alignment::Horizontal::Right;
+use iced::widget::{button, container,  horizontal_space, pick_list};
 use std::path::PathBuf;
 
 fn main() -> iced::Result {
@@ -93,6 +94,7 @@ struct Controls {
 
 #[derive(Debug, Clone)]
 enum Message {
+    Err(Error),
     CubeAmountChanged(u32),
     CubeSizeChanged(f32),
     Tick(Instant),
@@ -109,7 +111,7 @@ enum Message {
     SliceModel,
     SlicingComplete(()),
     PickFile,
-    OpenSTL(Result<PathBuf,Error>)
+    STLFilePicked(PathBuf),
 }
 
 impl Controls {
@@ -128,6 +130,7 @@ impl Controls {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::Err(error) => { println!("{error:?}"); Task::none() },
             Message::CubeAmountChanged(amount) => {
                 self.scene.change_amount(amount);
                 Task::none()
@@ -156,8 +159,25 @@ impl Controls {
             Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
             Message::InfillPercentageChanged(val)=> { self.parameters.infill_percentage = val; Task::none()}
             Message::SlicingComplete(result)     => { println!("yay"); Task::none() }
-            Message::OpenSTL(path)               => { self.inputstl = path.ok(); Task::none() }
-            Message::PickFile                    => { Task::perform( pick_file(), Message::OpenSTL ) }
+            Message::STLFilePicked(path)               => { self.inputstl = Some(path); Task::none() }
+            Message::PickFile => { 
+                Task::perform( pick_file(),
+                    |result| match result {
+                        Ok(path) => {
+                            match path.extension()
+                                .and_then(|ext| ext.to_str())
+                                .map(|ext| ext.to_lowercase())
+                                .as_deref()
+                            {
+                                Some("stl") => Message::STLFilePicked(path),
+                                Some(ext) => panic!("Unsupported file extension: {ext:?}"),
+                                None => panic!("No file extension found: {path:?}"),
+                            }
+                        }
+                        Err(error) => Message::Err(error),
+                    }
+                )
+            },
             Message::SliceModel => { 
                 match &self.inputstl {
                     Some(path) => {
@@ -244,7 +264,6 @@ impl Controls {
             ].padding(0),
         ).padding(0)
         .align_top(Fill)
-        // .align_bottom(Fill)
         .into()
     }
 
@@ -266,19 +285,9 @@ fn control<'a>(
     row![text(label), control.into()].spacing(10).into()
 }
 
-async fn pick_file() -> Result<PathBuf,Error>{
-    rfd::AsyncFileDialog::new()
-        .set_title("Choose a STL file for slicing")
-        .add_filter("stl", &["stl"])
-        .add_filter("g-code", &["gcode"])
-        .pick_file()
-        .await
-        .map(|file_handle|PathBuf::from(file_handle))
-        .ok_or(Error::DialogClosed)
-}
 
 #[derive(Debug, Clone)]
 enum Error {
     DialogClosed,
-    IO(io::ErrorKind),
+    IO(ErrorKind),
 }

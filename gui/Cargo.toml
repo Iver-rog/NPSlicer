@@ -10,7 +10,7 @@ path = "src/main.rs"
 [dependencies]
 npslicer_core = { path = "../core"}
 
-iced = { git = "https://github.com/iced-rs/iced", features = ["debug", "image", "advanced"] }
+iced = { git = "https://github.com/iced-rs/iced", features = ["debug", "image", "advanced", "wgpu"] }
 wgpu = "24.0"
 image = { version = "0.25", default-features = false }
 bytemuck = { version = "1.0", features = ["derive"] }
@@ -19,4 +19,5 @@ rand = "0.8.5"
 
 
 rfd = "0.15.3"
-iced_aw = "0.12.2"
+tokio = { version = "1.45.1", features = ["fs"] }
+stl_io = "0.8.2"

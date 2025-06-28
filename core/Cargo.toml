@@ -15,7 +15,7 @@ edition = "2021"
 [dependencies]
 nalgebra-glm = "0.18.0"
 stl_io = "0.8.2"
-# 
+
 nalgebra = "0.32"
 ordered-float = "3.7"
 priority-queue = "1.3"
