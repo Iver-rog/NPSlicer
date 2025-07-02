@@ -1,25 +1,23 @@
+
+use npslicer_core::{self,async_slice};
+
 mod scene;
+use scene::Scene;
+
 mod io;
 use io::{pick_file,load_stl};
 
 use std::io::ErrorKind;
+use std::path::PathBuf;
 
-use scene::Scene;
-
-use iced::time::Instant;
 use wgpu;
-use iced::widget::{checkbox, column, row, shader, text};
+use iced::time::Instant;
+use iced::widget::{checkbox, column, row, shader, text, button, container,  horizontal_space, pick_list};
 use iced::window;
 use iced::{Color, Element, Fill, Subscription};
-
-// my inports
-use npslicer_core::{self,async_slice};
-
 use iced::task::Task;
-
 use iced::alignment::Horizontal::Right;
-use iced::widget::{button, container,  horizontal_space, pick_list};
-use std::path::PathBuf;
+
 
 fn main() -> iced::Result {
     iced::application(Controls::default, Controls::update, Controls::view)
@@ -95,6 +93,7 @@ struct Controls {
 #[derive(Debug, Clone)]
 enum Message {
     Err(Error),
+    Camera(scene::camera::CameraEvent),
     CubeAmountChanged(u32),
     CubeSizeChanged(f32),
     Tick(Instant),
@@ -103,11 +102,6 @@ enum Message {
     // my stuff
     PrinterChanged(Printer),
     FilamentChanged(Filament),
-    OverhangAngleChanged(usize),
-    NrOfPermimetersChanged(usize),
-    LayerHeightChanged(f32),
-    BrimChanged(usize),
-    InfillPercentageChanged(usize),
     SliceModel,
     SlicingComplete(()),
     PickFile,
@@ -151,15 +145,16 @@ impl Controls {
                 self.scene.light_color = color;
                 Task::none()
             }
-            Message::LayerHeightChanged(val)     => { self.parameters.layer_height = val; Task::none()}
-            Message::OverhangAngleChanged(val)   => { self.parameters.overhang_angle = val;Task::none() }
-            Message::NrOfPermimetersChanged(val) => { self.parameters.nr_of_perimeters = val; Task::none()}
-            Message::BrimChanged(val)            => { self.parameters.brim = val; Task::none()}
             Message::PrinterChanged(printer)     => { self.printers = Some(printer); Task::none()}
             Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
-            Message::InfillPercentageChanged(val)=> { self.parameters.infill_percentage = val; Task::none()}
             Message::SlicingComplete(result)     => { println!("yay"); Task::none() }
-            Message::STLFilePicked(path)               => { self.inputstl = Some(path); Task::none() }
+            Message::STLFilePicked(path) => { 
+                let file = std::fs::File::open(&path).unwrap();
+                let mut reader = std::io::BufReader::new(file);
+                self.inputstl = Some(path); 
+                self.scene.printbed = stl_io::read_stl(&mut reader).unwrap();
+                Task::none() 
+            }
             Message::PickFile => { 
                 Task::perform( pick_file(),
                     |result| match result {
@@ -186,6 +181,10 @@ impl Controls {
                     },
                     None => Task::none()
                 }
+            }
+            Message::Camera(camera_event) => {
+                self.scene.camera.handle_event(camera_event);
+                Task::none()
             }
         }
     }

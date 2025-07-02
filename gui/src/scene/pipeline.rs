@@ -2,8 +2,9 @@ pub mod cube;
 
 mod buffer;
 mod uniforms;
-mod vertex;
+pub mod vertex;
 
+use glam::u32;
 pub use uniforms::Uniforms;
 
 use buffer::Buffer;
@@ -19,6 +20,7 @@ const SKY_TEXTURE_SIZE: u32 = 128;
 pub struct Pipeline {
     pipeline: wgpu::RenderPipeline,
     vertices: wgpu::Buffer,
+    nr_vertices: u32,
     cubes: Buffer,
     uniforms: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
@@ -33,13 +35,31 @@ impl Pipeline {
         queue: &wgpu::Queue,
         format: wgpu::TextureFormat,
         target_size: Size<u32>,
+        printbed: &[Vertex],
     ) -> Self {
         //vertices of one cube
+        // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mk3.5_bed.stl").unwrap();
+        // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/2-test.stl").unwrap();
+        // let mut reader = std::io::BufReader::new(file);
+        // let mesh = stl_io::read_stl(&mut reader).unwrap();
+        //
+        // let raw_vert = crate::io::IntoVertexBuffer::into_vertex_buffer(mesh);
+        // let nr_vertices = raw_vert.len() as u32;
+        //
+        // let vertices =
+        //     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        //         label: Some("stl vertex buffer"),
+        //         contents: bytemuck::cast_slice(&raw_vert),
+        //         usage: wgpu::BufferUsages::VERTEX,
+        //     });
+
+        let nr_vertices = printbed.len() as u32;
         let vertices =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("cubes vertex buffer"),
-                contents: bytemuck::cast_slice(&cube::Raw::vertices()),
-                usage: wgpu::BufferUsages::VERTEX,
+                label: Some("stl vertex buffer"),
+                contents: bytemuck::cast_slice(printbed),
+                // usage: wgpu::BufferUsages::VERTEX,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
         //cube instance data
@@ -297,6 +317,7 @@ impl Pipeline {
             uniforms,
             uniform_bind_group,
             vertices,
+            nr_vertices,
             depth_texture_size: target_size,
             depth_view,
             depth_pipeline,
@@ -339,12 +360,18 @@ impl Pipeline {
         uniforms: &Uniforms,
         num_cubes: usize,
         cubes: &[cube::Raw],
+        printbed: &[Vertex],
     ) {
         //recreate depth texture if surface texture size has changed
         self.update_depth_texture(device, target_size);
 
         // update uniforms
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(uniforms));
+
+        // update vertices 
+        self.nr_vertices = printbed.len() as u32;
+        // self.vertices.resize(device, (std::mem::size_of::<Vertex> * printbed.len()) as u64);
+        queue.write_buffer(&self.vertices, 0, bytemuck::cast_slice(printbed));
 
         //resize cubes vertex buffer if cubes amount changed
         let new_size = num_cubes * std::mem::size_of::<cube::Raw>();
@@ -400,7 +427,8 @@ impl Pipeline {
             pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             pass.set_vertex_buffer(0, self.vertices.slice(..));
             pass.set_vertex_buffer(1, self.cubes.raw.slice(..));
-            pass.draw(0..36, 0..num_cubes);
+            // pass.draw(0..36, 0..num_cubes);
+            pass.draw(0..self.nr_vertices, 0..num_cubes);
         }
 
         if show_depth {

@@ -137,7 +137,14 @@ const FOG_COLOR: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
 
 @fragment
 fn fs_main(in: Output) -> @location(0) vec4<f32> {
+    let to_camera = in.tangent_camera_pos - in.tangent_pos;
+    let dir_to_camera = normalize(to_camera);
+    let lightness = dir_to_camera.z * 0.8 + 0.2;
+
     var color = vec4<f32>(CUBE_BASE_COLOR.xyz, CUBE_BASE_COLOR.w);
-    color.w = color.w * 0.5;
+    color.x = color.x * lightness;
+    color.y = color.y * lightness;
+    color.z = color.z * lightness;
+    color.w = color.w; 
     return color;
 }

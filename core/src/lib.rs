@@ -32,6 +32,7 @@ const TEMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
 const t_min:f32 = 20.0;
 
 pub fn main(){
+    init_logger();
     // let mut args = env::args();
     // let path = args.next().expect("first arg should be the path");
     // let mesh_layer_dir = args.next().expect("missing argument: stl-layers directory");
@@ -76,7 +77,6 @@ pub async fn async_slice(stl_path:PathBuf,settings:Settings) -> () {
 pub fn slice(stl_path:PathBuf,settings:Settings){
     let start_time = Instant::now();
  
-    init_logger();
     let mut blender = Blender::new();
 
     dbg!(&settings);

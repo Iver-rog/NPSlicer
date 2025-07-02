@@ -1,14 +1,15 @@
 
-use rfd;
-use std::path::PathBuf;
 use super::Error;
-use tokio::fs::File;
-use tokio::io::BufReader;
+use crate::scene::pipeline::vertex::Vertex;
+
+// use tokio::fs::File;
+// use tokio::io::BufReader;
 use tokio::io;
-
 use stl_io;
+use rfd;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
 
 pub async fn pick_file() -> Result<PathBuf,Error>{
     rfd::AsyncFileDialog::new()
@@ -28,36 +29,36 @@ pub async fn load_stl<T:AsRef<Path>>(path:T) -> Result<(),io::Error> {
     let mesh = stl_io::read_stl(&mut reader)?;
     Ok(())
 }
-pub struct VertexBuffer { 
-        data:Vec<Vertex>,
-    }
 pub trait IntoVertexBuffer {
-    fn into_vertex_buffer(data:Self) -> VertexBuffer;
+    fn into_vertex_buffer(data:Self) -> Vec<Vertex>;
 }
-impl IntoVertexBuffer for stl_io::IndexedMesh {
-    fn into_vertex_buffer(data:Self) -> VertexBuffer {
-        let vertices:Vec<glam::Vec3> = data.vertices.into_iter()
+impl IntoVertexBuffer for &stl_io::IndexedMesh {
+    fn into_vertex_buffer(data:Self) -> Vec<Vertex> {
+        let vertices:Vec<glam::Vec3> = data.vertices.iter()
             .map(|v|glam::Vec3{x:v.0[0], y:v.0[1], z:v.0[2]})
             .collect();
-        let buffer = data.faces.into_iter()
+
+        data.faces.iter()
             .flat_map(|f| f.vertices.into_iter().map(move |v| (v,f.normal)))
             .map(|(v,n)| {
                 let normal = glam::vec3(n[0], n[1], n[2]);
                 Vertex{
                     pos: vertices[v].clone(),
                     normal,
-                    color: glam::vec4(0.5, 0.5, 0.5, 1.0),
+                    tangent: glam::vec3(0.5, 0.5, 0.5),
+                    uv: glam::vec2(0.5, 0.5),
                 }
             })
-            .collect();
-        return VertexBuffer{ data:buffer }
+            .collect()
     }
 }
-pub struct Vertex {
-    pos: glam::Vec3,
-    normal: glam::Vec3,
-    color: glam::Vec4
-}
+// #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+// #[repr(C)]
+// pub struct Vertex {
+//     pos: glam::Vec3,
+//     normal: glam::Vec3,
+//     color: glam::Vec3
+// }
 
 pub struct IndexedMesh {
     vertices: Vec<glam::Vec3>,

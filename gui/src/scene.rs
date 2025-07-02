@@ -1,13 +1,13 @@
-mod camera;
-mod pipeline;
+pub mod camera;
+pub mod pipeline;
 
-use camera::Camera;
+use camera::{Camera, CameraEvent};
 use pipeline::Pipeline;
 
 use crate::wgpu;
 use pipeline::cube::{self, Cube};
 
-use iced::mouse;
+use iced::{mouse, Point};
 use iced::time::Duration;
 use iced::widget::shader::{self, Viewport};
 use iced::{Color, Rectangle};
@@ -23,6 +23,7 @@ pub const MAX: u32 = 500;
 pub struct Scene {
     pub size: f32,
     pub cubes: Vec<Cube>,
+    pub printbed: stl_io::IndexedMesh,
     pub camera: Camera,
     pub show_depth_buffer: bool,
     pub light_color: Color,
@@ -30,23 +31,32 @@ pub struct Scene {
 
 impl Scene {
     pub fn new() -> Self {
+
+        // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/2-test.stl").unwrap();
+        let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/bunny.stl").unwrap();
+        let mut reader = std::io::BufReader::new(file);
+        let mesh = stl_io::read_stl(&mut reader).unwrap();
+
         let mut scene = Self {
             size: 0.2,
-            cubes: vec![],
+            cubes: vec![Cube::new(0.2, Vec3::new(0.0,0.0,0.0))],
+            printbed: mesh,
             camera: Camera::default(),
             show_depth_buffer: false,
             light_color: Color::WHITE,
         };
 
-        scene.change_amount(MAX);
+
+        // scene.change_amount(MAX);
 
         scene
     }
 
     pub fn update(&mut self, time: Duration) {
-        for cube in self.cubes.iter_mut() {
-            cube.update(self.size, time.as_secs_f32());
-        }
+        // self.camera.eye[0] += 1.;
+        // for cube in self.cubes.iter_mut() {
+        //     cube.update(self.size, time.as_secs_f32());
+        // }
     }
 
     pub fn change_amount(&mut self, amount: u32) {
@@ -78,9 +88,76 @@ impl Scene {
     }
 }
 
-impl<Message> shader::Program<Message> for Scene {
-    type State = ();
+#[derive(Default,Debug)]
+pub struct InternalState {
+    orbiting: bool,
+    shift: bool,
+    paning: bool,
+    prev_cursor_pos: Point,
+}
+
+use crate::Message;
+// impl<Message> shader::Program<Message> for Scene {
+impl shader::Program<Message> for Scene {
+    // type State = ();
+    type State = InternalState;
     type Primitive = Primitive;
+
+    fn update(
+            &self,
+            state: &mut Self::State,
+            event: &iced::Event,
+            _bounds: Rectangle,
+            cursor: iced::advanced::mouse::Cursor,
+        ) -> Option<shader::Action<Message>> {
+        use iced::mouse::Cursor;
+
+        let mut camera_event = camera::CameraEvent::default();
+
+        match cursor {
+            Cursor::Available(point) => {
+                if state.paning{
+                    camera_event.pan = point - state.prev_cursor_pos;
+                };
+                if state.orbiting{
+                    camera_event.orbit = point - state.prev_cursor_pos;
+                }
+                state.prev_cursor_pos = point;
+            },
+            _ => {},
+        };
+
+        match event{
+            iced::Event::Keyboard(iced::keyboard::Event::ModifiersChanged(modifiers)) => {
+                state.shift = modifiers.shift();
+            }
+            iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Middle)) => {
+                if state.shift {
+                    state.orbiting = true;
+                } else {
+                state.paning = true;
+                }
+            },
+            iced::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Middle)) => {
+                if state.shift {
+                    state.orbiting = false;
+                } else {
+                state.paning = false;
+                }
+            },
+            iced::Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
+                use iced::mouse::ScrollDelta;
+                match delta {
+                    ScrollDelta::Lines{x:_,y} => { camera_event.zoom = *y; },
+                    ScrollDelta::Pixels{x:_,y} => { camera_event.zoom = *y; },
+                }
+            }
+            _ => {},
+        };
+        if camera_event != CameraEvent::default(){
+            Some( shader::Action::publish(Message::Camera(camera_event)) )
+        } else { None }
+    }
 
     fn draw(
         &self,
@@ -90,6 +167,7 @@ impl<Message> shader::Program<Message> for Scene {
     ) -> Self::Primitive {
         Primitive::new(
             &self.cubes,
+            &self.printbed,
             &self.camera,
             bounds,
             self.show_depth_buffer,
@@ -101,6 +179,7 @@ impl<Message> shader::Program<Message> for Scene {
 /// A collection of `Cube`s that can be rendered.
 #[derive(Debug)]
 pub struct Primitive {
+    printbed: Vec<crate::scene::pipeline::vertex::Vertex>,
     cubes: Vec<cube::Raw>,
     uniforms: pipeline::Uniforms,
     show_depth_buffer: bool,
@@ -109,6 +188,7 @@ pub struct Primitive {
 impl Primitive {
     pub fn new(
         cubes: &[Cube],
+        printbed: &stl_io::IndexedMesh,
         camera: &Camera,
         bounds: Rectangle,
         show_depth_buffer: bool,
@@ -121,6 +201,7 @@ impl Primitive {
                 .iter()
                 .map(cube::Raw::from_cube)
                 .collect::<Vec<cube::Raw>>(),
+            printbed: crate::io::IntoVertexBuffer::into_vertex_buffer(printbed),
             uniforms,
             show_depth_buffer,
         }
@@ -143,6 +224,7 @@ impl shader::Primitive for Primitive {
                 queue,
                 format,
                 viewport.physical_size(),
+                &self.printbed,
             ));
         }
 
@@ -156,6 +238,7 @@ impl shader::Primitive for Primitive {
             &self.uniforms,
             self.cubes.len(),
             &self.cubes,
+            &self.printbed,
         );
     }
 

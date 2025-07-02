@@ -3,7 +3,7 @@ use iced::Rectangle;
 
 #[derive(Copy, Clone)]
 pub struct Camera {
-    eye: glam::Vec3,
+    pub eye: glam::Vec3,
     target: glam::Vec3,
     up: glam::Vec3,
     fov_y: f32,
@@ -14,12 +14,12 @@ pub struct Camera {
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            eye: vec3(0.0, 2.0, 3.0),
-            target: glam::Vec3::ZERO,
-            up: glam::Vec3::Y,
+            eye: vec3(-40.0, -40.0, 20.0),
+            target: vec3(0.0, 0.0, 2.0),
+            up: glam::Vec3::Z,
             fov_y: 45.0,
-            near: 0.1,
-            far: 100.0,
+            near: 1.0,
+            far: 1000.0,
         }
     }
 }
@@ -50,4 +50,26 @@ impl Camera {
     pub fn position(&self) -> glam::Vec4 {
         glam::Vec4::from((self.eye, 0.0))
     }
+    pub fn handle_event(&mut self, event:CameraEvent){
+        let camera_tangent = self.eye.cross(vec3(0.0,0.0,1.0)).normalize();
+        let camera_up = camera_tangent.cross(self.eye-self.target).normalize();
+
+        self.eye += event.pan.x*camera_tangent;
+        self.eye += event.pan.y*camera_up;
+        self.eye = self.eye.lerp(self.target, event.zoom*0.05);
+
+        let pan_sensitivity = 0.001 * (self.eye-self.target).length();
+        self.eye += event.orbit.x*pan_sensitivity*camera_tangent;
+        self.eye += event.orbit.y*pan_sensitivity*camera_up;
+        self.target += event.orbit.x*pan_sensitivity*camera_tangent;
+        self.target += event.orbit.y*pan_sensitivity*camera_up;
+
+    }
+}
+
+#[derive(Debug,Clone,Default,PartialEq)]
+pub struct CameraEvent{
+    pub pan: iced::Vector,
+    pub orbit: iced::Vector,
+    pub zoom: f32,
 }
