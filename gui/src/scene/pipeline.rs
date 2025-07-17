@@ -4,7 +4,7 @@ mod buffer;
 mod uniforms;
 pub mod vertex;
 
-use glam::u32;
+use glam::{u32, u64};
 pub use uniforms::Uniforms;
 
 use buffer::Buffer;
@@ -19,7 +19,8 @@ const SKY_TEXTURE_SIZE: u32 = 128;
 
 pub struct Pipeline {
     pipeline: wgpu::RenderPipeline,
-    vertices: wgpu::Buffer,
+    // vertices: wgpu::Buffer,
+    vertices: Buffer,
     nr_vertices: u32,
     cubes: Buffer,
     uniforms: wgpu::Buffer,
@@ -54,13 +55,20 @@ impl Pipeline {
         //     });
 
         let nr_vertices = printbed.len() as u32;
-        let vertices =
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("stl vertex buffer"),
-                contents: bytemuck::cast_slice(printbed),
-                // usage: wgpu::BufferUsages::VERTEX,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            });
+        // let vertices =
+        //     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        //         label: Some("stl vertex buffer"),
+        //         contents: bytemuck::cast_slice(printbed),
+        //         // usage: wgpu::BufferUsages::VERTEX,
+        //         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        //     });
+
+        let vertices = Buffer::new(
+            device,
+            "vertex buffer",
+            std::mem::size_of::<Vertex>() as u64,
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        );
 
         //cube instance data
         let cubes_buffer = Buffer::new(
@@ -369,9 +377,16 @@ impl Pipeline {
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(uniforms));
 
         // update vertices 
+        // if self.nr_vertices != printbed.len() as u32{
+        //     println!("refresh vertices");
+        //     self.nr_vertices = printbed.len() as u32;
+        //     // self.vertices.resize(device, (std::mem::size_of::<Vertex> * printbed.len()) as u64);
+        //     queue.write_buffer(&self.vertices, 0, bytemuck::cast_slice(printbed));
+        // }
         self.nr_vertices = printbed.len() as u32;
-        // self.vertices.resize(device, (std::mem::size_of::<Vertex> * printbed.len()) as u64);
-        queue.write_buffer(&self.vertices, 0, bytemuck::cast_slice(printbed));
+        let vertex_buf_size = printbed.len() * std::mem::size_of::<Vertex>();
+        self.vertices.resize(device, vertex_buf_size as u64);
+        queue.write_buffer(&self.vertices.raw, 0, bytemuck::cast_slice(printbed));
 
         //resize cubes vertex buffer if cubes amount changed
         let new_size = num_cubes * std::mem::size_of::<cube::Raw>();
@@ -425,7 +440,7 @@ impl Pipeline {
             );
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            pass.set_vertex_buffer(0, self.vertices.slice(..));
+            pass.set_vertex_buffer(0, self.vertices.raw.slice(..));
             pass.set_vertex_buffer(1, self.cubes.raw.slice(..));
             // pass.draw(0..36, 0..num_cubes);
             pass.draw(0..self.nr_vertices, 0..num_cubes);

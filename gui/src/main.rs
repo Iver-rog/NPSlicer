@@ -21,7 +21,7 @@ use iced::alignment::Horizontal::Right;
 
 fn main() -> iced::Result {
     iced::application(Controls::default, Controls::update, Controls::view)
-        .subscription(Controls::subscription)
+        // .subscription(Controls::subscription)
         .run()
 }
 
@@ -134,7 +134,7 @@ impl Controls {
                 Task::none()
             }
             Message::Tick(time) => {
-                self.scene.update(time - self.start);
+                // self.scene.update(time - self.start);
                 Task::none()
             }
             Message::ShowDepthBuffer(show) => {
@@ -152,7 +152,7 @@ impl Controls {
                 let file = std::fs::File::open(&path).unwrap();
                 let mut reader = std::io::BufReader::new(file);
                 self.inputstl = Some(path); 
-                self.scene.printbed = stl_io::read_stl(&mut reader).unwrap();
+                self.scene.printbed = io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap());
                 Task::none() 
             }
             Message::PickFile => { 
@@ -267,7 +267,13 @@ impl Controls {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        window::frames().map(Message::Tick)
+        window::events().map(|(_id,event)| 
+            if let window::Event::FileDropped(pathbuf) = event {
+                Message::STLFilePicked(pathbuf)
+            }else{
+                Message::Err(Error::DialogClosed)
+            }
+        )
     }
 }
 

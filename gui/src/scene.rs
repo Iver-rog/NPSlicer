@@ -3,6 +3,7 @@ pub mod pipeline;
 
 use camera::{Camera, CameraEvent};
 use pipeline::Pipeline;
+use pipeline::vertex::Vertex;
 
 use crate::wgpu;
 use pipeline::cube::{self, Cube};
@@ -23,7 +24,8 @@ pub const MAX: u32 = 500;
 pub struct Scene {
     pub size: f32,
     pub cubes: Vec<Cube>,
-    pub printbed: stl_io::IndexedMesh,
+    // pub printbed: stl_io::IndexedMesh,
+    pub printbed: Vec<Vertex>,
     pub camera: Camera,
     pub show_depth_buffer: bool,
     pub light_color: Color,
@@ -33,23 +35,21 @@ impl Scene {
     pub fn new() -> Self {
 
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/2-test.stl").unwrap();
-        let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/bunny.stl").unwrap();
+        let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/world axis.stl").unwrap();
+        // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/bunny.stl").unwrap();
+        // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/stanford-armadillo.stl").unwrap();
         let mut reader = std::io::BufReader::new(file);
         let mesh = stl_io::read_stl(&mut reader).unwrap();
+        let vertex_buffer = crate::io::IntoVertexBuffer::into_vertex_buffer(&mesh);
 
-        let mut scene = Self {
+        Self {
             size: 0.2,
-            cubes: vec![Cube::new(0.2, Vec3::new(0.0,0.0,0.0))],
-            printbed: mesh,
+            cubes: vec![Cube::new(1.0, Vec3::new(0.0,0.0,0.0))],
+            printbed: vertex_buffer,
             camera: Camera::default(),
             show_depth_buffer: false,
             light_color: Color::WHITE,
-        };
-
-
-        // scene.change_amount(MAX);
-
-        scene
+        }
     }
 
     pub fn update(&mut self, time: Duration) {
@@ -131,6 +131,17 @@ impl shader::Program<Message> for Scene {
             iced::Event::Keyboard(iced::keyboard::Event::ModifiersChanged(modifiers)) => {
                 state.shift = modifiers.shift();
             }
+            iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                if state.shift {
+                    state.orbiting = true;
+                } else {
+                state.paning = true;
+                }
+            },
+            iced::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                state.orbiting = false;
+                state.paning = false;
+            },
             iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Middle)) => {
                 if state.shift {
                     state.orbiting = true;
@@ -139,11 +150,8 @@ impl shader::Program<Message> for Scene {
                 }
             },
             iced::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Middle)) => {
-                if state.shift {
-                    state.orbiting = false;
-                } else {
+                state.orbiting = false;
                 state.paning = false;
-                }
             },
             iced::Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
                 use iced::mouse::ScrollDelta;
@@ -151,7 +159,7 @@ impl shader::Program<Message> for Scene {
                     ScrollDelta::Lines{x:_,y} => { camera_event.zoom = *y; },
                     ScrollDelta::Pixels{x:_,y} => { camera_event.zoom = *y; },
                 }
-            }
+            },
             _ => {},
         };
         if camera_event != CameraEvent::default(){
@@ -179,6 +187,7 @@ impl shader::Program<Message> for Scene {
 /// A collection of `Cube`s that can be rendered.
 #[derive(Debug)]
 pub struct Primitive {
+    // printbed: Vec<crate::scene::pipeline::vertex::Vertex>,
     printbed: Vec<crate::scene::pipeline::vertex::Vertex>,
     cubes: Vec<cube::Raw>,
     uniforms: pipeline::Uniforms,
@@ -188,7 +197,8 @@ pub struct Primitive {
 impl Primitive {
     pub fn new(
         cubes: &[Cube],
-        printbed: &stl_io::IndexedMesh,
+        // printbed: &stl_io::IndexedMesh,
+        printbed: &Vec<Vertex>,
         camera: &Camera,
         bounds: Rectangle,
         show_depth_buffer: bool,
@@ -201,7 +211,8 @@ impl Primitive {
                 .iter()
                 .map(cube::Raw::from_cube)
                 .collect::<Vec<cube::Raw>>(),
-            printbed: crate::io::IntoVertexBuffer::into_vertex_buffer(printbed),
+            // printbed: crate::io::IntoVertexBuffer::into_vertex_buffer(printbed),
+            printbed:printbed.clone(),
             uniforms,
             show_depth_buffer,
         }
