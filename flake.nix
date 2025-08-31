@@ -59,7 +59,7 @@
             valgrind
             renderdoc
 
-
+            cargo-flamegraph
           ];
 
           shellHook = ''
