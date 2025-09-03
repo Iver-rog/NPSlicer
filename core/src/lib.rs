@@ -29,7 +29,7 @@ use std::time::Instant;
 /// WARNING: all content in the TMP_DIR is deleted each time the project is run
 const TEMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
 
-const t_min:f32 = 20.0;
+const T_MIN:f32 = 20.0;
 
 pub fn main(){
     init_logger();
@@ -178,7 +178,7 @@ fn generate_layer(
                 .map(|p|{let mut p = p.clone(); p.invert(); p})
                 .collect();
 
-            let skeleton = match skeleton::skeleton_from_polygons_with_limit(polygons.clone(),t_min){
+            let skeleton = match skeleton::skeleton_from_polygons_with_limit(polygons.clone(),T_MIN){
                 Ok(skeleton) => skeleton,
                 Err(err) => {
                     println!("\x1b[031m{err}\x1b[0m");
