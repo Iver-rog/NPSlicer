@@ -6,7 +6,7 @@ use pipeline::Pipeline;
 use pipeline::vertex::Vertex;
 
 use crate::wgpu;
-use pipeline::cube::{self, Cube};
+use pipeline::instance::{self, Instance};
 
 use iced::{mouse, Point};
 use iced::time::Duration;
@@ -23,7 +23,7 @@ pub const MAX: u32 = 500;
 #[derive(Clone)]
 pub struct Scene {
     pub size: f32,
-    pub cubes: Vec<Cube>,
+    pub instances: Vec<Instance>,
     // pub printbed: stl_io::IndexedMesh,
     pub printbed: Vec<Vertex>,
     pub camera: Camera,
@@ -35,7 +35,7 @@ impl Scene {
     pub fn new() -> Self {
 
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/2-test.stl").unwrap();
-        let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/world axis.stl").unwrap();
+        let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/world axis.stl").unwrap();
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/bunny.stl").unwrap();
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/stanford-armadillo.stl").unwrap();
         let mut reader = std::io::BufReader::new(file);
@@ -44,7 +44,7 @@ impl Scene {
 
         Self {
             size: 0.2,
-            cubes: vec![Cube::new(1.0, Vec3::new(0.0,0.0,0.0))],
+            instances: vec![Instance::new(1.0, Vec3::new(0.0,0.0,0.0))],
             printbed: vertex_buffer,
             camera: Camera::default(),
             show_depth_buffer: false,
@@ -60,7 +60,7 @@ impl Scene {
     }
 
     pub fn change_amount(&mut self, amount: u32) {
-        let curr_cubes = self.cubes.len() as u32;
+        let curr_cubes = self.instances.len() as u32;
 
         match amount.cmp(&curr_cubes) {
             Ordering::Greater => {
@@ -68,10 +68,10 @@ impl Scene {
                 let cubes_2_spawn = (amount - curr_cubes) as usize;
 
                 let mut cubes = 0;
-                self.cubes.extend(iter::from_fn(|| {
+                self.instances.extend(iter::from_fn(|| {
                     if cubes < cubes_2_spawn {
                         cubes += 1;
-                        Some(Cube::new(self.size, rnd_origin()))
+                        Some(Instance::new(self.size, rnd_origin()))
                     } else {
                         None
                     }
@@ -80,8 +80,8 @@ impl Scene {
             Ordering::Less => {
                 // chop
                 let cubes_2_cut = curr_cubes - amount;
-                let new_len = self.cubes.len() - cubes_2_cut as usize;
-                self.cubes.truncate(new_len);
+                let new_len = self.instances.len() - cubes_2_cut as usize;
+                self.instances.truncate(new_len);
             }
             Ordering::Equal => {}
         }
@@ -174,7 +174,7 @@ impl shader::Program<Message> for Scene {
         bounds: Rectangle,
     ) -> Self::Primitive {
         Primitive::new(
-            &self.cubes,
+            &self.instances,
             &self.printbed,
             &self.camera,
             bounds,
@@ -189,14 +189,14 @@ impl shader::Program<Message> for Scene {
 pub struct Primitive {
     // printbed: Vec<crate::scene::pipeline::vertex::Vertex>,
     printbed: Vec<crate::scene::pipeline::vertex::Vertex>,
-    cubes: Vec<cube::Raw>,
+    cubes: Vec<instance::Raw>,
     uniforms: pipeline::Uniforms,
     show_depth_buffer: bool,
 }
 
 impl Primitive {
     pub fn new(
-        cubes: &[Cube],
+        cubes: &[Instance],
         // printbed: &stl_io::IndexedMesh,
         printbed: &Vec<Vertex>,
         camera: &Camera,
@@ -209,8 +209,8 @@ impl Primitive {
         Self {
             cubes: cubes
                 .iter()
-                .map(cube::Raw::from_cube)
-                .collect::<Vec<cube::Raw>>(),
+                .map(instance::Raw::from_cube)
+                .collect::<Vec<instance::Raw>>(),
             // printbed: crate::io::IntoVertexBuffer::into_vertex_buffer(printbed),
             printbed:printbed.clone(),
             uniforms,

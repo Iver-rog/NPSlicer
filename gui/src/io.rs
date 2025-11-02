@@ -21,13 +21,13 @@ pub async fn pick_file() -> Result<PathBuf,Error>{
         .map(|file_handle|PathBuf::from(file_handle))
         .ok_or(Error::DialogClosed)
 }
-pub async fn load_stl<T:AsRef<Path>>(path:T) -> Result<(),io::Error> {
+pub async fn load_stl<T:AsRef<Path>>(path:T) -> Result<stl_io::IndexedMesh,io::Error> {
     // let mut file = File::open(path).await?;
     // let mut reader = BufReader::new(file);
     let file = std::fs::File::open(path)?;
     let mut reader = std::io::BufReader::new(file);
     let mesh = stl_io::read_stl(&mut reader)?;
-    Ok(())
+    Ok(mesh)
 }
 pub trait IntoVertexBuffer {
     fn into_vertex_buffer(data:Self) -> Vec<Vertex>;

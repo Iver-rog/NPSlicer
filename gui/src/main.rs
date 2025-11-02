@@ -5,7 +5,7 @@ mod scene;
 use scene::Scene;
 
 mod io;
-use io::{pick_file,load_stl};
+use io::pick_file;
 
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -25,22 +25,58 @@ fn main() -> iced::Result {
         .run()
 }
 
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// pub enum Printer{
+//     PrusaMK3SPluss,
+//     Other(String),
+// }
+// impl std::fmt::Display for Printer{
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>)-> Result<(),std::fmt::Error>{
+//         match self{
+//             Self::PrusaMK3SPluss => write!(f,"PrusaMK3S+"),
+//             Self::Other(printer_name) => write!(f,"{printer_name}"),
+//         }
+//     }
+// }
+// impl Default for Printer {
+//     fn default() -> Self {
+//         Self::PrusaMK3SPluss
+//     }
+// }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Printer{
-    PrusaMK3SPluss,
-    Other(String),
+pub struct Printer{
+    name: &'static str,
+    print_bed_path: &'static str,
+}
+impl Printer {
+    fn get_printers() -> [Printer;3] {
+        [
+            Printer{
+                name: "PrusaMK3S+",
+                print_bed_path: "/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/mk3_bed.stl",
+            },
+            Printer{
+                name: "Prusa MINI",
+                print_bed_path: "/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/mini_bed.stl",
+            },
+            Printer{
+                name: "Prusa XL",
+                print_bed_path: "/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/Prusa XL_bed.stl",
+            }
+        ]
+    }
 }
 impl std::fmt::Display for Printer{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>)-> Result<(),std::fmt::Error>{
-        match self{
-            Self::PrusaMK3SPluss => write!(f,"PrusaMK3S+"),
-            Self::Other(printer_name) => write!(f,"{printer_name}"),
-        }
+        write!(f,"{}",self.name)
     }
 }
 impl Default for Printer {
     fn default() -> Self {
-        Self::PrusaMK3SPluss
+        Self{
+            name: "PrusaMK3S+",
+            print_bed_path: "/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/mk3_bed.stl",
+        }
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,7 +181,15 @@ impl Controls {
                 self.scene.light_color = color;
                 Task::none()
             }
-            Message::PrinterChanged(printer)     => { self.printers = Some(printer); Task::none()}
+            // Message::PrinterChanged(printer)     => { self.printers = Some(printer); Task::none()}
+            Message::PrinterChanged(printer)     => {
+                self.printers = Some(printer.clone());
+                let file = std::fs::File::open(&printer.print_bed_path).unwrap();
+                let mut reader = std::io::BufReader::new(file);
+                // self.inputstl = Some(PathBuf::new(printer.print_bed_path));
+                self.scene.printbed = io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap());
+                Task::none() 
+            }
             Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
             Message::SlicingComplete(result)     => { println!("yay"); Task::none() }
             Message::STLFilePicked(path) => { 
@@ -192,11 +236,7 @@ impl Controls {
     fn view(&self) -> Element<'_, Message> {
 
 
-        let printers = [
-            Printer::PrusaMK3SPluss,
-            Printer::Other("halla".into()),
-            Printer::Other("yeah dude".into()),
-        ];
+        let printers = Printer::get_printers();
 
         let filaments = [
             Filament::PLA,

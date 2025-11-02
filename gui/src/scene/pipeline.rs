@@ -1,4 +1,4 @@
-pub mod cube;
+pub mod instance;
 
 mod buffer;
 mod uniforms;
@@ -38,30 +38,7 @@ impl Pipeline {
         target_size: Size<u32>,
         printbed: &[Vertex],
     ) -> Self {
-        //vertices of one cube
-        // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mk3.5_bed.stl").unwrap();
-        // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/2-test.stl").unwrap();
-        // let mut reader = std::io::BufReader::new(file);
-        // let mesh = stl_io::read_stl(&mut reader).unwrap();
-        //
-        // let raw_vert = crate::io::IntoVertexBuffer::into_vertex_buffer(mesh);
-        // let nr_vertices = raw_vert.len() as u32;
-        //
-        // let vertices =
-        //     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        //         label: Some("stl vertex buffer"),
-        //         contents: bytemuck::cast_slice(&raw_vert),
-        //         usage: wgpu::BufferUsages::VERTEX,
-        //     });
-
         let nr_vertices = printbed.len() as u32;
-        // let vertices =
-        //     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        //         label: Some("stl vertex buffer"),
-        //         contents: bytemuck::cast_slice(printbed),
-        //         // usage: wgpu::BufferUsages::VERTEX,
-        //         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        //     });
 
         let vertices = Buffer::new(
             device,
@@ -70,11 +47,10 @@ impl Pipeline {
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
 
-        //cube instance data
-        let cubes_buffer = Buffer::new(
+        let instance_buffer = Buffer::new(
             device,
             "cubes instance buffer",
-            std::mem::size_of::<cube::Raw>() as u64,
+            std::mem::size_of::<instance::Raw>() as u64,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
 
@@ -270,7 +246,7 @@ impl Pipeline {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: Some("vs_main"),
-                    buffers: &[Vertex::desc(), cube::Raw::desc()],
+                    buffers: &[Vertex::desc(), instance::Raw::desc()],
                     compilation_options:
                         wgpu::PipelineCompilationOptions::default(),
                 },
@@ -321,7 +297,7 @@ impl Pipeline {
 
         Self {
             pipeline,
-            cubes: cubes_buffer,
+            cubes: instance_buffer,
             uniforms,
             uniform_bind_group,
             vertices,
@@ -367,7 +343,7 @@ impl Pipeline {
         target_size: Size<u32>,
         uniforms: &Uniforms,
         num_cubes: usize,
-        cubes: &[cube::Raw],
+        cubes: &[instance::Raw],
         printbed: &[Vertex],
     ) {
         //recreate depth texture if surface texture size has changed
@@ -389,7 +365,7 @@ impl Pipeline {
         queue.write_buffer(&self.vertices.raw, 0, bytemuck::cast_slice(printbed));
 
         //resize cubes vertex buffer if cubes amount changed
-        let new_size = num_cubes * std::mem::size_of::<cube::Raw>();
+        let new_size = num_cubes * std::mem::size_of::<instance::Raw>();
         self.cubes.resize(device, new_size as u64);
 
         //always write new cube data since they are constantly rotating

@@ -8,7 +8,7 @@ use rand::{Rng, thread_rng};
 
 /// A single instance of a cube.
 #[derive(Debug, Clone)]
-pub struct Cube {
+pub struct Instance {
     pub rotation: glam::Quat,
     pub position: Vec3,
     pub size: f32,
@@ -16,7 +16,7 @@ pub struct Cube {
     rotation_axis: glam::Vec3,
 }
 
-impl Default for Cube {
+impl Default for Instance {
     fn default() -> Self {
         Self {
             rotation: glam::Quat::IDENTITY,
@@ -28,7 +28,7 @@ impl Default for Cube {
     }
 }
 
-impl Cube {
+impl Instance {
     pub fn new(size: f32, origin: Vec3) -> Self {
         let rnd = thread_rng().gen_range(0.0..=1.0f32);
 
@@ -87,7 +87,7 @@ impl Raw {
 }
 
 impl Raw {
-    pub fn from_cube(cube: &Cube) -> Raw {
+    pub fn from_cube(cube: &Instance) -> Raw {
         Raw {
             transformation: glam::Mat4::from_scale_rotation_translation(
                 glam::vec3(cube.size, cube.size, cube.size),

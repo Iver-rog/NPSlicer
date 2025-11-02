@@ -1,6 +1,5 @@
 use glam::{mat4, vec3, vec4, Quat};
 use iced::Rectangle;
-use tokio::net::unix::pid_t;
 
 #[derive(Copy, Clone)]
 pub struct Camera {
@@ -19,8 +18,8 @@ impl Default for Camera {
             target: vec3(-10.0, 0.0, 2.0),
             up: glam::Vec3::Z,
             fov_y: 45.0,
-            near: 1.0,
-            far: 1000.0,
+            near: 10.0,
+            far: 10000.0,
         }
     }
 }
