@@ -31,11 +31,19 @@ impl Default for Instance {
 impl Instance {
     pub fn new(size: f32, origin: Vec3) -> Self {
         let rnd = thread_rng().gen_range(0.0..=1.0f32);
+        let r = match size{
+            0_f32 => glam::Quat::IDENTITY,
+            1_f32 => glam::Quat::from_rotation_x(3.12/2.),
+            2_f32 => glam::Quat::from_rotation_y(3.12/2.),
+            _ => panic!()
+        };
 
         Self {
-            rotation: glam::Quat::IDENTITY,
+            // rotation: glam::Quat::IDENTITY,
+            rotation: r,
             position: origin + Vec3::new(0.1, 0.1, 0.1),
-            size,
+            size: 1.,
+            // size,
             rotation_dir: if rnd <= 0.5 { -1.0 } else { 1.0 },
             rotation_axis: if rnd <= 0.33 {
                 glam::Vec3::Y

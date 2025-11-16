@@ -26,16 +26,19 @@ struct Instance {
     @location(8) normal_matrix_0: vec3<f32>,
     @location(9) normal_matrix_1: vec3<f32>,
     @location(10) normal_matrix_2: vec3<f32>,
+    @builtin(instance_index) i: u32,
 }
 
 struct Output {
     @builtin(position) clip_pos: vec4<f32>,
     @location(0) world_pos: vec3<f32>,
     @location(1) world_normal: vec3<f32>,
+    @location(2) color: vec4<f32>,
 }
 
 @vertex
-fn vs_main(vertex: Vertex, cube: Instance) -> Output {
+//fn vs_main(vertex: Vertex, cube: Instance, @builtin(instance_index)) -> Output {
+fn vs_main(vertex: Vertex, cube: Instance  ) -> Output {
     let cube_matrix = mat4x4<f32>(
         cube.matrix_0, cube.matrix_1, cube.matrix_2, cube.matrix_3
     );
@@ -51,6 +54,10 @@ fn vs_main(vertex: Vertex, cube: Instance) -> Output {
     out.clip_pos = uniforms.projection * world_pos;
     out.world_pos = world_pos.xyz;
     out.world_normal = world_normal;
+    out.color.x = f32(cube.i%2);
+    out.color.y = f32(cube.i/2);
+    out.color.z = f32(1 - cube.i/2 - cube.i%2);
+    out.color.a = 1;
     return out;
 }
 
@@ -61,7 +68,8 @@ fn fs_main(in: Output) -> @location(0) vec4<f32> {
 
     let brightness = pow(facing, 0.5) * 0.8 + 0.2;
 
-    var color = CUBE_BASE_COLOR * brightness;
+    //var color = CUBE_BASE_COLOR * brightness;
+    var color = in.color * brightness;
     color.a = 1.0;
     return color;
 }

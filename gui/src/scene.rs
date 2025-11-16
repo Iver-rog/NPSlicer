@@ -35,7 +35,8 @@ impl Scene {
     pub fn new() -> Self {
 
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/2-test.stl").unwrap();
-        let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/world axis.stl").unwrap();
+        // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/world axis.stl").unwrap();
+        let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/arrow.stl").unwrap();
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/bunny.stl").unwrap();
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/stanford-armadillo.stl").unwrap();
         let mut reader = std::io::BufReader::new(file);
@@ -44,7 +45,11 @@ impl Scene {
 
         Self {
             size: 0.2,
-            instances: vec![Instance::new(1.0, Vec3::new(0.0,0.0,0.0))],
+            instances: vec![
+                Instance::new(0.0, Vec3::new(0.0,0.0,0.0)),
+                Instance::new(1.0, Vec3::new(0.0,0.0,0.0)),
+                Instance::new(2.0, Vec3::new(0.0,0.0,0.0))
+            ],
             printbed: vertex_buffer,
             camera: Camera::default(),
             show_depth_buffer: false,
