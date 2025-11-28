@@ -9,7 +9,6 @@ use crate::wgpu;
 use pipeline::instance::{self, Instance};
 
 use iced::{mouse, Point};
-use iced::time::Duration;
 use iced::widget::shader::{self, Viewport};
 use iced::{Color, Rectangle};
 
@@ -17,8 +16,6 @@ use glam::Vec3;
 use rand::Rng;
 use std::cmp::Ordering;
 use std::iter;
-
-pub const MAX: u32 = 500;
 
 #[derive(Clone)]
 pub struct Scene {
@@ -55,13 +52,6 @@ impl Scene {
             show_depth_buffer: false,
             light_color: Color::WHITE,
         }
-    }
-
-    pub fn update(&mut self, time: Duration) {
-        // self.camera.eye[0] += 1.;
-        // for cube in self.cubes.iter_mut() {
-        //     cube.update(self.size, time.as_secs_f32());
-        // }
     }
 
     pub fn change_amount(&mut self, amount: u32) {
@@ -104,7 +94,6 @@ pub struct InternalState {
 use crate::Message;
 // impl<Message> shader::Program<Message> for Scene {
 impl shader::Program<Message> for Scene {
-    // type State = ();
     type State = InternalState;
     type Primitive = Primitive;
 

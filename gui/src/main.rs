@@ -25,24 +25,6 @@ fn main() -> iced::Result {
         .run()
 }
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub enum Printer{
-//     PrusaMK3SPluss,
-//     Other(String),
-// }
-// impl std::fmt::Display for Printer{
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>)-> Result<(),std::fmt::Error>{
-//         match self{
-//             Self::PrusaMK3SPluss => write!(f,"PrusaMK3S+"),
-//             Self::Other(printer_name) => write!(f,"{printer_name}"),
-//         }
-//     }
-// }
-// impl Default for Printer {
-//     fn default() -> Self {
-//         Self::PrusaMK3SPluss
-//     }
-// }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Printer{
     name: &'static str,
@@ -234,7 +216,6 @@ impl Controls {
     }
 
     fn view(&self) -> Element<'_, Message> {
-
 
         let printers = Printer::get_printers();
 
