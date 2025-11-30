@@ -7,7 +7,7 @@ use iced::{Color, Rectangle};
 pub struct Uniforms {
     camera_proj: glam::Mat4,
     camera_pos: glam::Vec4,
-    light_color: glam::Vec4,
+    model_color: glam::Vec4,
 }
 
 impl Uniforms {
@@ -17,7 +17,7 @@ impl Uniforms {
         Self {
             camera_proj,
             camera_pos: camera.position(),
-            light_color: glam::Vec4::from(light_color.into_linear()),
+            model_color: glam::Vec4::from(light_color.into_linear()),
         }
     }
 }

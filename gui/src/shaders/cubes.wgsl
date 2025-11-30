@@ -1,7 +1,7 @@
 struct Uniforms {
     projection: mat4x4<f32>,
     camera_pos: vec4<f32>,
-    light_color: vec4<f32>,
+    model_color: vec4<f32>,
 }
 
 const CUBE_BASE_COLOR: vec4<f32> = vec4<f32>(0.24, 1.0, 0.8, 1.0);
@@ -38,7 +38,7 @@ struct Output {
 
 @vertex
 //fn vs_main(vertex: Vertex, cube: Instance, @builtin(instance_index)) -> Output {
-fn vs_main(vertex: Vertex, cube: Instance  ) -> Output {
+fn vs_main(vertex: Vertex, cube: Instance) -> Output {
     let cube_matrix = mat4x4<f32>(
         cube.matrix_0, cube.matrix_1, cube.matrix_2, cube.matrix_3
     );
@@ -54,10 +54,11 @@ fn vs_main(vertex: Vertex, cube: Instance  ) -> Output {
     out.clip_pos = uniforms.projection * world_pos;
     out.world_pos = world_pos.xyz;
     out.world_normal = world_normal;
-    out.color.x = f32(cube.i%2);
-    out.color.y = f32(cube.i/2);
-    out.color.z = f32(1 - cube.i/2 - cube.i%2);
-    out.color.a = 1;
+//    out.color.x = f32(cube.i%2);
+//    out.color.y = f32(cube.i/2);
+//    out.color.z = f32(1 - cube.i/2 - cube.i%2);
+//    out.color.a = 1;
+    out.color = uniforms.model_color;
     return out;
 }
 

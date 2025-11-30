@@ -25,7 +25,7 @@ pub struct Scene {
     pub printbed: Vec<Vertex>,
     pub camera: Camera,
     pub show_depth_buffer: bool,
-    pub light_color: Color,
+    pub model_color: Color,
 }
 
 impl Scene {
@@ -50,7 +50,7 @@ impl Scene {
             printbed: vertex_buffer,
             camera: Camera::default(),
             show_depth_buffer: false,
-            light_color: Color::WHITE,
+            model_color: Color::WHITE,
         }
     }
 
@@ -101,7 +101,7 @@ impl shader::Program<Message> for Scene {
             &self,
             state: &mut Self::State,
             event: &iced::Event,
-            _bounds: Rectangle,
+            bounds: Rectangle,
             cursor: iced::advanced::mouse::Cursor,
         ) -> Option<shader::Action<Message>> {
         use iced::mouse::Cursor;
@@ -110,6 +110,10 @@ impl shader::Program<Message> for Scene {
 
         match cursor {
             Cursor::Available(point) => {
+                // Exit and do nothing if cursor is outside the widget
+                if !( (bounds.x<point.x) && (point.x<(bounds.x+bounds.width)) && (bounds.y<point.y) && (point.y<(bounds.y+bounds.height)) ){
+                    return None;
+                }
                 if state.paning{
                     camera_event.pan = point - state.prev_cursor_pos;
                 };
@@ -129,7 +133,7 @@ impl shader::Program<Message> for Scene {
                 if state.shift {
                     state.orbiting = true;
                 } else {
-                state.paning = true;
+                    state.paning = true;
                 }
             },
             iced::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
@@ -140,7 +144,7 @@ impl shader::Program<Message> for Scene {
                 if state.shift {
                     state.orbiting = true;
                 } else {
-                state.paning = true;
+                    state.paning = true;
                 }
             },
             iced::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Middle)) => {
@@ -151,12 +155,19 @@ impl shader::Program<Message> for Scene {
                 use iced::mouse::ScrollDelta;
                 match delta {
                     ScrollDelta::Lines{x:_,y} => { camera_event.zoom = *y; },
-                    ScrollDelta::Pixels{x:_,y} => { camera_event.zoom = *y; },
+                    // ScrollDelta::Pixels{x:_,y} => { camera_event.zoom = *y; },
+                    ScrollDelta::Pixels{x,y} => { 
+                        if state.shift{ camera_event.zoom = *y; }
+                        else if state.paning{ camera_event.orbit = iced::Vector::new(*x, *y); }
+                        else { camera_event.pan = iced::Vector::new(*x, *y); }
+                    },
                 }
             },
             _ => {},
         };
+
         if camera_event != CameraEvent::default(){
+            println!("new camera event");
             Some( shader::Action::publish(Message::Camera(camera_event)) )
         } else { None }
     }
@@ -173,17 +184,16 @@ impl shader::Program<Message> for Scene {
             &self.camera,
             bounds,
             self.show_depth_buffer,
-            self.light_color,
+            self.model_color,
         )
     }
 }
 
-/// A collection of `Cube`s that can be rendered.
+/// A collection of `Instance`s that can be rendered.
 #[derive(Debug)]
 pub struct Primitive {
-    // printbed: Vec<crate::scene::pipeline::vertex::Vertex>,
     printbed: Vec<crate::scene::pipeline::vertex::Vertex>,
-    cubes: Vec<instance::Raw>,
+    instance: Vec<instance::Raw>,
     uniforms: pipeline::Uniforms,
     show_depth_buffer: bool,
 }
@@ -196,14 +206,14 @@ impl Primitive {
         camera: &Camera,
         bounds: Rectangle,
         show_depth_buffer: bool,
-        light_color: Color,
+        model_color: Color,
     ) -> Self {
-        let uniforms = pipeline::Uniforms::new(camera, bounds, light_color);
+        let uniforms = pipeline::Uniforms::new(camera, bounds, model_color);
 
         Self {
-            cubes: cubes
+            instance: cubes
                 .iter()
-                .map(instance::Raw::from_cube)
+                .map(instance::Raw::from_instance)
                 .collect::<Vec<instance::Raw>>(),
             // printbed: crate::io::IntoVertexBuffer::into_vertex_buffer(printbed),
             printbed:printbed.clone(),
@@ -241,8 +251,8 @@ impl shader::Primitive for Primitive {
             queue,
             viewport.physical_size(),
             &self.uniforms,
-            self.cubes.len(),
-            &self.cubes,
+            self.instance.len(),
+            &self.instance,
             &self.printbed,
         );
     }
@@ -262,7 +272,7 @@ impl shader::Primitive for Primitive {
             target,
             encoder,
             *clip_bounds,
-            self.cubes.len() as u32,
+            self.instance.len() as u32,
             self.show_depth_buffer,
         );
     }

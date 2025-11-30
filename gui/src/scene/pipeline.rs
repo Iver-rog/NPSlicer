@@ -19,10 +19,9 @@ const SKY_TEXTURE_SIZE: u32 = 128;
 
 pub struct Pipeline {
     pipeline: wgpu::RenderPipeline,
-    // vertices: wgpu::Buffer,
-    vertices: Buffer,
+    vertex_buffer: Buffer,
     nr_vertices: u32,
-    cubes: Buffer,
+    instance_buffer: Buffer,
     uniforms: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
     depth_texture_size: Size<u32>,
@@ -40,7 +39,7 @@ impl Pipeline {
     ) -> Self {
         let nr_vertices = printbed.len() as u32;
 
-        let vertices = Buffer::new(
+        let vertex_buffer = Buffer::new(
             device,
             "vertex buffer",
             std::mem::size_of::<Vertex>() as u64,
@@ -297,10 +296,10 @@ impl Pipeline {
 
         Self {
             pipeline,
-            cubes: instance_buffer,
+            instance_buffer,
             uniforms,
             uniform_bind_group,
-            vertices,
+            vertex_buffer,
             nr_vertices,
             depth_texture_size: target_size,
             depth_view,
@@ -361,15 +360,15 @@ impl Pipeline {
         // }
         self.nr_vertices = printbed.len() as u32;
         let vertex_buf_size = printbed.len() * std::mem::size_of::<Vertex>();
-        self.vertices.resize(device, vertex_buf_size as u64);
-        queue.write_buffer(&self.vertices.raw, 0, bytemuck::cast_slice(printbed));
+        self.vertex_buffer.resize(device, vertex_buf_size as u64);
+        queue.write_buffer(&self.vertex_buffer.raw, 0, bytemuck::cast_slice(printbed));
 
         //resize cubes vertex buffer if cubes amount changed
         let new_size = num_cubes * std::mem::size_of::<instance::Raw>();
-        self.cubes.resize(device, new_size as u64);
+        self.instance_buffer.resize(device, new_size as u64);
 
         //always write new cube data since they are constantly rotating
-        queue.write_buffer(&self.cubes.raw, 0, bytemuck::cast_slice(cubes));
+        queue.write_buffer(&self.instance_buffer.raw, 0, bytemuck::cast_slice(cubes));
     }
 
     pub fn render(
@@ -416,8 +415,8 @@ impl Pipeline {
             );
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            pass.set_vertex_buffer(0, self.vertices.raw.slice(..));
-            pass.set_vertex_buffer(1, self.cubes.raw.slice(..));
+            pass.set_vertex_buffer(0, self.vertex_buffer.raw.slice(..));
+            pass.set_vertex_buffer(1, self.instance_buffer.raw.slice(..));
             // pass.draw(0..36, 0..num_cubes);
             pass.draw(0..self.nr_vertices, 0..num_cubes);
         }

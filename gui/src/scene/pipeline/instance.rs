@@ -21,7 +21,7 @@ impl Default for Instance {
         Self {
             rotation: glam::Quat::IDENTITY,
             position: glam::Vec3::ZERO,
-            size: 0.1,
+            size: 1.0,
             rotation_dir: 1.0,
             rotation_axis: glam::Vec3::Y,
         }
@@ -29,6 +29,10 @@ impl Default for Instance {
 }
 
 impl Instance {
+    pub fn size(mut self,size:f32) -> Self{
+        self.size = size;
+        return self
+    }
     pub fn new(size: f32, origin: Vec3) -> Self {
         let rnd = thread_rng().gen_range(0.0..=1.0f32);
         let r = match size{
@@ -95,7 +99,7 @@ impl Raw {
 }
 
 impl Raw {
-    pub fn from_cube(cube: &Instance) -> Raw {
+    pub fn from_instance(cube: &Instance) -> Raw {
         Raw {
             transformation: glam::Mat4::from_scale_rotation_translation(
                 glam::vec3(cube.size, cube.size, cube.size),

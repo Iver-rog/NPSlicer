@@ -1,4 +1,5 @@
 
+use iced::overlay::menu::{default, Catalog};
 use npslicer_core::{self,async_slice};
 
 mod scene;
@@ -21,7 +22,7 @@ use iced::alignment::Horizontal::Right;
 
 fn main() -> iced::Result {
     iced::application(Controls::default, Controls::update, Controls::view)
-        // .subscription(Controls::subscription)
+        .title("layer-gen-rs")
         .run()
 }
 
@@ -114,9 +115,8 @@ enum Message {
     Camera(scene::camera::CameraEvent),
     CubeAmountChanged(u32),
     CubeSizeChanged(f32),
-    Tick(Instant),
     ShowDepthBuffer(bool),
-    LightColorChanged(Color),
+    ModelColorChanged(Color),
     // my stuff
     PrinterChanged(Printer),
     FilamentChanged(Filament),
@@ -151,16 +151,12 @@ impl Controls {
                 self.scene.size = size;
                 Task::none()
             }
-            Message::Tick(time) => {
-                // self.scene.update(time - self.start);
-                Task::none()
-            }
             Message::ShowDepthBuffer(show) => {
                 self.scene.show_depth_buffer = show;
                 Task::none()
             }
-            Message::LightColorChanged(color) => {
-                self.scene.light_color = color;
+            Message::ModelColorChanged(color) => {
+                self.scene.model_color = color;
                 Task::none()
             }
             // Message::PrinterChanged(printer)     => { self.printers = Some(printer); Task::none()}
@@ -265,6 +261,9 @@ impl Controls {
                 checkbox("", self.scene.show_depth_buffer)
                     .on_toggle(Message::ShowDepthBuffer)
             ),
+            // iced::widget::slider(0..250,"halla",Message::ModelColorChanged(|c|Color::new(f32::from(c),1.0,1.0,1.0,1.0)))
+            // iced::widget::slider(0..250,"halla",Message::ModelColorChanged(Color::new(1.0,1.0,1.0,1.0,1.0)))
+            iced::widget::slider(0.0..=5.0,self.scene.model_color.r,|c|Message::ModelColorChanged(Color{r:c,g:1.0,b:1.0,a:1.0})),
         ].spacing(5)
         .align_x(Right))
         .width(280)
