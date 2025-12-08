@@ -36,9 +36,15 @@ impl Scene {
         let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/printbeds/arrow.stl").unwrap();
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/bunny.stl").unwrap();
         // let file = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/stanford-armadillo.stl").unwrap();
+
         let mut reader = std::io::BufReader::new(file);
         let mesh = stl_io::read_stl(&mut reader).unwrap();
-        let vertex_buffer = crate::io::IntoVertexBuffer::into_vertex_buffer(&mesh);
+        let mut vertex_buffer = crate::io::IntoVertexBuffer::into_vertex_buffer(&mesh);
+
+        let file2 = std::fs::File::open("/home/iver/Documents/NTNU/Master/layer-gen-rs/mesh/bunny.stl").unwrap();
+        let mut reader2 = std::io::BufReader::new(file2);
+        let mesh2 = stl_io::read_stl(&mut reader2).unwrap();
+        crate::io::IntoVertexBuffer::append_to_vertex_buffer(&mesh2,&mut vertex_buffer);
 
         Self {
             size: 0.2,
@@ -167,7 +173,6 @@ impl shader::Program<Message> for Scene {
         };
 
         if camera_event != CameraEvent::default(){
-            println!("new camera event");
             Some( shader::Action::publish(Message::Camera(camera_event)) )
         } else { None }
     }

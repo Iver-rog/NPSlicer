@@ -11,8 +11,7 @@ use rand::{Rng, thread_rng};
 pub struct Instance {
     pub rotation: glam::Quat,
     pub position: Vec3,
-    pub size: f32,
-    rotation_dir: f32,
+    pub scale: f32,
     rotation_axis: glam::Vec3,
 }
 
@@ -21,16 +20,15 @@ impl Default for Instance {
         Self {
             rotation: glam::Quat::IDENTITY,
             position: glam::Vec3::ZERO,
-            size: 1.0,
-            rotation_dir: 1.0,
+            scale: 1.0,
             rotation_axis: glam::Vec3::Y,
         }
     }
 }
 
 impl Instance {
-    pub fn size(mut self,size:f32) -> Self{
-        self.size = size;
+    pub fn scale(mut self,size:f32) -> Self{
+        self.scale = size;
         return self
     }
     pub fn new(size: f32, origin: Vec3) -> Self {
@@ -46,9 +44,7 @@ impl Instance {
             // rotation: glam::Quat::IDENTITY,
             rotation: r,
             position: origin + Vec3::new(0.1, 0.1, 0.1),
-            size: 1.,
-            // size,
-            rotation_dir: if rnd <= 0.5 { -1.0 } else { 1.0 },
+            scale: 1.,
             rotation_axis: if rnd <= 0.33 {
                 glam::Vec3::Y
             } else if rnd <= 0.66 {
@@ -60,11 +56,6 @@ impl Instance {
     }
 
     pub fn update(&mut self, size: f32, time: f32) {
-        self.rotation = glam::Quat::from_axis_angle(
-            self.rotation_axis,
-            time / 2.0 * self.rotation_dir,
-        );
-        self.size = size;
     }
 }
 
@@ -102,7 +93,7 @@ impl Raw {
     pub fn from_instance(cube: &Instance) -> Raw {
         Raw {
             transformation: glam::Mat4::from_scale_rotation_translation(
-                glam::vec3(cube.size, cube.size, cube.size),
+                glam::vec3(cube.scale, cube.scale, cube.scale),
                 cube.rotation,
                 cube.position,
             ),
