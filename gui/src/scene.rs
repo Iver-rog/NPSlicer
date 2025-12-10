@@ -6,6 +6,7 @@ use pipeline::Pipeline;
 use pipeline::vertex::Vertex;
 
 use crate::wgpu;
+use crate::Message;
 use pipeline::instance::{self, Instance};
 
 use iced::{mouse, Point};
@@ -97,8 +98,6 @@ pub struct InternalState {
     prev_cursor_pos: Point,
 }
 
-use crate::Message;
-// impl<Message> shader::Program<Message> for Scene {
 impl shader::Program<Message> for Scene {
     type State = InternalState;
     type Primitive = Primitive;
@@ -206,7 +205,6 @@ pub struct Primitive {
 impl Primitive {
     pub fn new(
         cubes: &[Instance],
-        // printbed: &stl_io::IndexedMesh,
         printbed: &Vec<Vertex>,
         camera: &Camera,
         bounds: Rectangle,
@@ -229,27 +227,16 @@ impl Primitive {
 }
 
 impl shader::Primitive for Primitive {
+    type Pipeline = pipeline::Pipeline;
+
     fn prepare(
         &self,
+        pipeline: &mut Self::Pipeline,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        format: wgpu::TextureFormat,
-        storage: &mut shader::Storage,
         _bounds: &Rectangle,
         viewport: &Viewport,
     ) {
-        if !storage.has::<Pipeline>() {
-            storage.store(Pipeline::new(
-                device,
-                queue,
-                format,
-                viewport.physical_size(),
-                &self.printbed,
-            ));
-        }
-
-        let pipeline = storage.get_mut::<Pipeline>().unwrap();
-
         // Upload data to GPU
         pipeline.update(
             device,
@@ -264,15 +251,11 @@ impl shader::Primitive for Primitive {
 
     fn render(
         &self,
-        encoder: &mut wgpu::CommandEncoder,
-        storage: &shader::Storage,
+        pipeline: &Pipeline,
+        encoder: &mut iced::wgpu::CommandEncoder,
         target: &wgpu::TextureView,
         clip_bounds: &Rectangle<u32>,
     ) {
-        // At this point our pipeline should always be initialized
-        let pipeline = storage.get::<Pipeline>().unwrap();
-
-        // Render primitive
         pipeline.render(
             target,
             encoder,

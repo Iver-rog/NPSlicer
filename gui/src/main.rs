@@ -1,5 +1,4 @@
 
-use iced::overlay::menu::{default, Catalog};
 use npslicer_core::{self,async_slice};
 
 mod scene;
@@ -13,11 +12,11 @@ use std::path::PathBuf;
 
 use wgpu;
 use iced::time::Instant;
-use iced::widget::{checkbox, column, row, shader, text, button, container,  horizontal_space, pick_list};
+use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space};
+use iced::{Length, Right};
 use iced::window;
 use iced::{Color, Element, Fill, Subscription};
 use iced::task::Task;
-use iced::alignment::Horizontal::Right;
 
 
 fn main() -> iced::Result {
@@ -224,7 +223,7 @@ impl Controls {
         let task_bar = container(row![
             button("file").on_press(Message::PickFile),
             button("settings"),
-            horizontal_space(),
+            space().width(Length::Fill),
             button("slice").on_press(Message::SliceModel),
             button("export G-code file"),
         ]
@@ -235,19 +234,19 @@ impl Controls {
         // let printers = row![text(" Printer"), horizontal_rule(30)];
         let printer = container(row![
             text("Printer"),
-            horizontal_space(),
+            space().width(Length::Fill),
             button("edit").padding(0),
         ]).style(container::bordered_box);
 
         let filament = container(row![
             text("Filament"),
-            horizontal_space(),
+            space().width(Length::Fill),
             button("edit").padding(0),
         ]).style(container::bordered_box);
 
         let process = container(row![
             text("Process"),
-            horizontal_space(),
+            space().width(Length::Fill),
             button("edit").padding(0),
         ]).style(container::bordered_box);
 
@@ -258,7 +257,7 @@ impl Controls {
             pick_list(filaments,self.filament.clone(),Message::FilamentChanged),
             process,
             control("overhang angle",
-                checkbox("", self.scene.show_depth_buffer)
+                checkbox(self.scene.show_depth_buffer)
                     .on_toggle(Message::ShowDepthBuffer)
             ),
             // iced::widget::slider(0..250,"halla",Message::ModelColorChanged(|c|Color::new(f32::from(c),1.0,1.0,1.0,1.0)))
