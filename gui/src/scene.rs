@@ -14,9 +14,6 @@ use iced::widget::shader::{self, Viewport};
 use iced::{Color, Rectangle};
 
 use glam::Vec3;
-use rand::Rng;
-use std::cmp::Ordering;
-use std::iter;
 
 #[derive(Clone)]
 pub struct Scene {
@@ -61,33 +58,6 @@ impl Scene {
         }
     }
 
-    pub fn change_amount(&mut self, amount: u32) {
-        let curr_cubes = self.instances.len() as u32;
-
-        match amount.cmp(&curr_cubes) {
-            Ordering::Greater => {
-                // spawn
-                let cubes_2_spawn = (amount - curr_cubes) as usize;
-
-                let mut cubes = 0;
-                self.instances.extend(iter::from_fn(|| {
-                    if cubes < cubes_2_spawn {
-                        cubes += 1;
-                        Some(Instance::default())
-                    } else {
-                        None
-                    }
-                }));
-            }
-            Ordering::Less => {
-                // chop
-                let cubes_2_cut = curr_cubes - amount;
-                let new_len = self.instances.len() - cubes_2_cut as usize;
-                self.instances.truncate(new_len);
-            }
-            Ordering::Equal => {}
-        }
-    }
 }
 
 #[derive(Default,Debug)]
@@ -196,7 +166,8 @@ impl shader::Program<Message> for Scene {
 /// A collection of `Instance`s that can be rendered.
 #[derive(Debug)]
 pub struct Primitive {
-    printbed: Vec<crate::scene::pipeline::vertex::Vertex>,
+    // vertex_buffer: Vec<crate::scene::pipeline::vertex::Vertex>,
+    vertex_buffer: Vec<crate::scene::pipeline::vertex::Vertex>,
     instance: Vec<instance::Raw>,
     uniforms: pipeline::Uniforms,
     show_depth_buffer: bool,
@@ -205,7 +176,7 @@ pub struct Primitive {
 impl Primitive {
     pub fn new(
         cubes: &[Instance],
-        printbed: &Vec<Vertex>,
+        printbed: &[Vertex],
         camera: &Camera,
         bounds: Rectangle,
         show_depth_buffer: bool,
@@ -219,7 +190,7 @@ impl Primitive {
                 .map(instance::Raw::from_instance)
                 .collect::<Vec<instance::Raw>>(),
             // printbed: crate::io::IntoVertexBuffer::into_vertex_buffer(printbed),
-            printbed:printbed.clone(),
+            vertex_buffer:printbed.to_vec(),
             uniforms,
             show_depth_buffer,
         }
@@ -245,7 +216,7 @@ impl shader::Primitive for Primitive {
             &self.uniforms,
             self.instance.len(),
             &self.instance,
-            &self.printbed,
+            &self.vertex_buffer,
         );
     }
 
@@ -266,10 +237,3 @@ impl shader::Primitive for Primitive {
     }
 }
 
-fn rnd_origin() -> Vec3 {
-    Vec3::new(
-        rand::thread_rng().gen_range(-4.0..4.0),
-        rand::thread_rng().gen_range(-4.0..4.0),
-        rand::thread_rng().gen_range(-4.0..2.0),
-    )
-}

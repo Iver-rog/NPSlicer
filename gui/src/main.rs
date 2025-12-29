@@ -7,15 +7,12 @@ use scene::Scene;
 mod io;
 use io::pick_file;
 
-use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use wgpu;
-use iced::time::Instant;
 use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space};
 use iced::{Length, Right};
-use iced::window;
-use iced::{Color, Element, Fill, Subscription};
+use iced::{Color, Element, Fill};
 use iced::task::Task;
 
 
@@ -99,7 +96,6 @@ impl Default for Parameters{
 }
 
 struct Controls {
-    start: Instant,
     scene: Scene,
 
     inputstl: Option<PathBuf>,
@@ -112,11 +108,8 @@ struct Controls {
 enum Message {
     Err(Error),
     Camera(scene::camera::CameraEvent),
-    CubeAmountChanged(u32),
-    CubeSizeChanged(f32),
     ShowDepthBuffer(bool),
     ModelColorChanged(Color),
-    // my stuff
     PrinterChanged(Printer),
     FilamentChanged(Filament),
     SliceModel,
@@ -129,7 +122,6 @@ impl Controls {
     fn new() -> Self {
         Self {
             // ice cubes
-            start: Instant::now(),
             scene: Scene::new(),
             // my controls
             printers: Some(Printer::default()),
@@ -142,14 +134,6 @@ impl Controls {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Err(error) => { println!("{error:?}"); Task::none() },
-            Message::CubeAmountChanged(amount) => {
-                self.scene.change_amount(amount);
-                Task::none()
-            }
-            Message::CubeSizeChanged(size) => {
-                self.scene.size = size;
-                Task::none()
-            }
             Message::ShowDepthBuffer(show) => {
                 self.scene.show_depth_buffer = show;
                 Task::none()
@@ -168,7 +152,7 @@ impl Controls {
                 Task::none() 
             }
             Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
-            Message::SlicingComplete(result)     => { println!("yay"); Task::none() }
+            Message::SlicingComplete(result)     => { println!("{result:?}"); Task::none() }
             Message::STLFilePicked(path) => { 
                 let file = std::fs::File::open(&path).unwrap();
                 let mut reader = std::io::BufReader::new(file);
@@ -285,15 +269,15 @@ impl Controls {
         .into()
     }
 
-    fn subscription(&self) -> Subscription<Message> {
-        window::events().map(|(_id,event)| 
-            if let window::Event::FileDropped(pathbuf) = event {
-                Message::STLFilePicked(pathbuf)
-            }else{
-                Message::Err(Error::DialogClosed)
-            }
-        )
-    }
+    // fn subscription(&self) -> Subscription<Message> {
+    //     window::events().map(|(_id,event)| 
+    //         if let window::Event::FileDropped(pathbuf) = event {
+    //             Message::STLFilePicked(pathbuf)
+    //         }else{
+    //             Message::Err(Error::DialogClosed)
+    //         }
+    //     )
+    // }
 }
 
 impl Default for Controls {
@@ -313,5 +297,5 @@ fn control<'a>(
 #[derive(Debug, Clone)]
 enum Error {
     DialogClosed,
-    IO(ErrorKind),
+    // IO(ErrorKind),
 }
