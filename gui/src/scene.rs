@@ -50,9 +50,9 @@ impl Scene {
         Self {
             size: 0.2,
             instances: vec![
-                Instance::new(0.0, Vec3::new(0.0,0.0,0.0)),
-                Instance::new(1.0, Vec3::new(0.0,0.0,0.0)),
-                Instance::new(2.0, Vec3::new(0.0,0.0,0.0))
+                Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::IDENTITY},
+                Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::from_rotation_x(3.12/2.)},
+                Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::from_rotation_y(3.12/2.)},
             ],
             printbed: vertex_buffer,
             camera: Camera::default(),
@@ -73,7 +73,7 @@ impl Scene {
                 self.instances.extend(iter::from_fn(|| {
                     if cubes < cubes_2_spawn {
                         cubes += 1;
-                        Some(Instance::new(self.size, rnd_origin()))
+                        Some(Instance::default())
                     } else {
                         None
                     }

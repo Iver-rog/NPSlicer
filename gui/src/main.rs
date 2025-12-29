@@ -262,7 +262,7 @@ impl Controls {
             ),
             // iced::widget::slider(0..250,"halla",Message::ModelColorChanged(|c|Color::new(f32::from(c),1.0,1.0,1.0,1.0)))
             // iced::widget::slider(0..250,"halla",Message::ModelColorChanged(Color::new(1.0,1.0,1.0,1.0,1.0)))
-            iced::widget::slider(0.0..=5.0,self.scene.model_color.r,|c|Message::ModelColorChanged(Color{r:c,g:1.0,b:1.0,a:1.0})),
+            iced::widget::slider(0.0..=10.0,self.scene.model_color.r,|c|Message::ModelColorChanged(Color{r:c/10.0,g:1.0,b:1.0,a:1.0})),
         ].spacing(5)
         .align_x(Right))
         .width(280)

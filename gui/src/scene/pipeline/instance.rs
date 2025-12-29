@@ -12,7 +12,6 @@ pub struct Instance {
     pub rotation: glam::Quat,
     pub position: Vec3,
     pub scale: f32,
-    rotation_axis: glam::Vec3,
 }
 
 impl Default for Instance {
@@ -21,41 +20,17 @@ impl Default for Instance {
             rotation: glam::Quat::IDENTITY,
             position: glam::Vec3::ZERO,
             scale: 1.0,
-            rotation_axis: glam::Vec3::Y,
         }
     }
 }
 
 impl Instance {
-    pub fn scale(mut self,size:f32) -> Self{
-        self.scale = size;
-        return self
-    }
-    pub fn new(size: f32, origin: Vec3) -> Self {
-        let rnd = thread_rng().gen_range(0.0..=1.0f32);
-        let r = match size{
-            0_f32 => glam::Quat::IDENTITY,
-            1_f32 => glam::Quat::from_rotation_x(3.12/2.),
-            2_f32 => glam::Quat::from_rotation_y(3.12/2.),
-            _ => panic!()
-        };
-
+    pub fn new(scale: f32, origin: Vec3, rotation:glam::Quat) -> Self {
         Self {
-            // rotation: glam::Quat::IDENTITY,
-            rotation: r,
+            rotation,
             position: origin + Vec3::new(0.1, 0.1, 0.1),
-            scale: 1.,
-            rotation_axis: if rnd <= 0.33 {
-                glam::Vec3::Y
-            } else if rnd <= 0.66 {
-                glam::Vec3::X
-            } else {
-                glam::Vec3::Z
-            },
+            scale,
         }
-    }
-
-    pub fn update(&mut self, size: f32, time: f32) {
     }
 }
 
