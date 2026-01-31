@@ -10,7 +10,7 @@ use io::pick_file;
 use std::path::PathBuf;
 
 use wgpu;
-use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space};
+use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, slider};
 use iced::{Length, Right};
 use iced::{Color, Element, Fill};
 use iced::task::Task;
@@ -77,7 +77,7 @@ impl Default for Filament {
     }
 }
 pub struct Parameters {
-    overhang_angle: usize,
+    overhang_angle: f32,
     brim: usize,
     nr_of_perimeters: usize,
     layer_height: f32,
@@ -86,7 +86,7 @@ pub struct Parameters {
 impl Default for Parameters{
     fn default() -> Self {
         Self{
-            overhang_angle: 20,
+            overhang_angle: 20.0,
             brim: 0,
             nr_of_perimeters: 2,
             layer_height: 0.4,
@@ -215,7 +215,6 @@ impl Controls {
         )
         .style(container::bordered_box);
 
-        // let printers = row![text(" Printer"), horizontal_rule(30)];
         let printer = container(row![
             text("Printer"),
             space().width(Length::Fill),
@@ -244,14 +243,15 @@ impl Controls {
                 checkbox(self.scene.show_depth_buffer)
                     .on_toggle(Message::ShowDepthBuffer)
             ),
-            // iced::widget::slider(0..250,"halla",Message::ModelColorChanged(|c|Color::new(f32::from(c),1.0,1.0,1.0,1.0)))
-            // iced::widget::slider(0..250,"halla",Message::ModelColorChanged(Color::new(1.0,1.0,1.0,1.0,1.0)))
-            iced::widget::slider(0.0..=10.0,self.scene.model_color.r,|c|Message::ModelColorChanged(Color{r:c/10.0,g:1.0,b:1.0,a:1.0})),
+            slider(
+                0.0..=10.0,
+                self.scene.model_color.r,
+                |c| Message::ModelColorChanged(Color{r:c/10.0,g:1.0,b:1.0,a:1.0})
+            ),
         ].spacing(5)
         .align_x(Right))
         .width(280)
         .padding(5)
-        // .style(container::rounded_box);
         .style(container::bordered_box);
 
         let shader = shader(&self.scene).width(Fill).height(Fill);
