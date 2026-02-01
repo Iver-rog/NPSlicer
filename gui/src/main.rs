@@ -1,5 +1,5 @@
 
-use npslicer_core::{self,async_slice};
+use npslicer_core::{self,slice};
 
 mod scene;
 use scene::Scene;
@@ -182,7 +182,13 @@ impl Controls {
                 match &self.inputstl {
                     Some(path) => {
                         let settings = npslicer_core::Settings::default();
-                        Task::perform( async_slice(path.clone(),settings), Message::SlicingComplete )
+                        let path = path.to_path_buf();
+                        Task::future(async{
+                            let _ = tokio::task::spawn_blocking(move || {
+                                slice(path,settings);
+                            }).await.unwrap();
+                            Message::SlicingComplete(())
+                        })
                     },
                     None => Task::none()
                 }
