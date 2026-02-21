@@ -8,6 +8,7 @@ mod io;
 use io::pick_file;
 
 use std::path::PathBuf;
+use std::fmt;
 
 use wgpu;
 use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, slider};
@@ -45,8 +46,8 @@ impl Printer {
         ]
     }
 }
-impl std::fmt::Display for Printer{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>)-> Result<(),std::fmt::Error>{
+impl fmt::Display for Printer{
+    fn fmt(&self, f: &mut fmt::Formatter)-> fmt::Result {
         write!(f,"{}",self.name)
     }
 }
@@ -63,8 +64,8 @@ pub enum Filament{
     PLA,
     Other(String),
 }
-impl std::fmt::Display for Filament{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>)-> Result<(),std::fmt::Error>{
+impl fmt::Display for Filament{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>)-> fmt::Result{
         match self{
             Self::PLA => write!(f,"PLA"),
             Self::Other(filament_name) => write!(f,"{filament_name}"),
