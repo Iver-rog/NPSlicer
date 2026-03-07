@@ -18,12 +18,23 @@ use glam::Vec3;
 #[derive(Clone)]
 pub struct Scene {
     pub size: f32,
-    pub instances: Vec<Instance>,
-    // pub printbed: stl_io::IndexedMesh,
-    pub printbed: Vec<Vertex>,
+    pub objects: Vec<Object>,
     pub camera: Camera,
     pub show_depth_buffer: bool,
     pub model_color: Color,
+}
+#[derive(Clone,Debug)]
+pub struct Object {
+    pub instances: Vec<Instance>,
+    pub printbed: Vec<Vertex>,
+}
+impl Object {
+    pub fn from_mesh<T:Into<Vec<Vertex>>>(mesh:T) -> Self{
+        Object{
+            instances: vec![Instance::default()],
+            printbed: mesh.into()
+        }
+    }
 }
 
 impl Scene {
@@ -46,18 +57,23 @@ impl Scene {
 
         Self {
             size: 0.2,
-            instances: vec![
-                Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::IDENTITY},
-                Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::from_rotation_x(3.12/2.)},
-                Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::from_rotation_y(3.12/2.)},
-            ],
-            printbed: vertex_buffer,
+            objects: vec![Object{
+                instances: vec![
+                    Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::IDENTITY},
+                    Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::from_rotation_x(3.12/2.)},
+                    Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::from_rotation_y(3.12/2.)},
+                ],
+                printbed: vertex_buffer,
+            }],
             camera: Camera::default(),
             show_depth_buffer: false,
             model_color: Color::WHITE,
         }
     }
-
+    pub fn new_object(&mut self, object:Object) {
+        // self.objects.push(object)
+        self.objects[0]=object;
+    }
 }
 
 #[derive(Default,Debug)]
@@ -153,8 +169,10 @@ impl shader::Program<Message> for Scene {
         bounds: Rectangle,
     ) -> Self::Primitive {
         Primitive::new(
-            &self.instances,
-            &self.printbed,
+            &self.objects[0].instances,
+            &self.objects[0].printbed,
+            // &self.instances,
+            // &self.printbed,
             &self.camera,
             bounds,
             self.show_depth_buffer,

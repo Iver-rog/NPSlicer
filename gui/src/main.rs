@@ -1,25 +1,27 @@
-
 use npslicer_core::{self,slice};
 
 mod scene;
-use scene::Scene;
+use scene::{Object, Scene};
 
 mod io;
 use io::pick_file;
+
+mod widgets;
+use widgets::{pill_button, text_button, card, number_input, NumberInput};
 
 use std::path::PathBuf;
 use std::fmt;
 
 use wgpu;
-use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, slider};
-use iced::{Length, Right};
-use iced::{Color, Element, Fill};
+use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, slider, stack};
+use iced::{Color, Element, Length, Bottom, Right, Fill };
 use iced::task::Task;
-
 
 fn main() -> iced::Result {
     iced::application(Controls::default, Controls::update, Controls::view)
         .title("layer-gen-rs")
+        // .executor::<iced::executor::Default>()
+        .theme(iced::Theme::Nord)
         .run()
 }
 
@@ -78,7 +80,7 @@ impl Default for Filament {
     }
 }
 pub struct Parameters {
-    overhang_angle: f32,
+    overhang_angle: NumberInput<f32>,
     brim: usize,
     nr_of_perimeters: usize,
     layer_height: f32,
@@ -87,7 +89,7 @@ pub struct Parameters {
 impl Default for Parameters{
     fn default() -> Self {
         Self{
-            overhang_angle: 20.0,
+            overhang_angle: NumberInput::new(20.0),
             brim: 0,
             nr_of_perimeters: 2,
             layer_height: 0.4,
@@ -98,25 +100,50 @@ impl Default for Parameters{
 
 struct Controls {
     scene: Scene,
-
     inputstl: Option<PathBuf>,
     printers: Option<Printer>,
     filament: Option<Filament>,
     parameters: Parameters,
+    notifications: Vec<Notification>,
+}
+struct Notification {
+    kind: NotificationType,
+    message: String,
+}
+enum NotificationType{
+    Error,
+    Warning,
+    Info
+}
+impl From<Error> for Notification{
+    fn from(error:Error) -> Self {
+        Self{
+            kind: NotificationType::Error,
+            message: format!("{error}")
+        }
+    }
+}
+impl fmt::Display for Notification{
+    fn fmt(&self,b: &mut fmt::Formatter)-> fmt::Result{
+        write!(b,"{}",self.message)
+    }
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     Err(Error),
+    DismissErr,
     Camera(scene::camera::CameraEvent),
     ShowDepthBuffer(bool),
     ModelColorChanged(Color),
     PrinterChanged(Printer),
     FilamentChanged(Filament),
+    NewModel((Object,PathBuf)),
     SliceModel,
     SlicingComplete(()),
     PickFile,
-    STLFilePicked(PathBuf),
+    OverhangAngleChanged(String),
+    OverhangAngleUpdated,
 }
 
 impl Controls {
@@ -129,12 +156,14 @@ impl Controls {
             filament: Some(Filament::default()),
             parameters: Parameters::default(),
             inputstl: None,
+            notifications: Vec::new(),
         }
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Err(error) => { println!("{error:?}"); Task::none() },
+            Message::Err(error) => { self.notifications.push(error.into()); Task::none() },
+            Message::DismissErr => { self.notifications = Vec::new(); Task::none() }
             Message::ShowDepthBuffer(show) => {
                 self.scene.show_depth_buffer = show;
                 Task::none()
@@ -143,41 +172,78 @@ impl Controls {
                 self.scene.model_color = color;
                 Task::none()
             }
-            // Message::PrinterChanged(printer)     => { self.printers = Some(printer); Task::none()}
             Message::PrinterChanged(printer)     => {
                 self.printers = Some(printer.clone());
                 let file = std::fs::File::open(&printer.print_bed_path).unwrap();
                 let mut reader = std::io::BufReader::new(file);
-                // self.inputstl = Some(PathBuf::new(printer.print_bed_path));
-                self.scene.printbed = io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap());
+                self.scene.objects[0].printbed = io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap());
                 Task::none() 
             }
+            Message::OverhangAngleChanged(value) => {self.parameters.overhang_angle.text = value; Task::none()},
+            Message::OverhangAngleUpdated => {self.parameters.overhang_angle.commit(); Task::none()},
             Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
             Message::SlicingComplete(result)     => { println!("{result:?}"); Task::none() }
-            Message::STLFilePicked(path) => { 
-                let file = std::fs::File::open(&path).unwrap();
-                let mut reader = std::io::BufReader::new(file);
-                self.inputstl = Some(path); 
-                self.scene.printbed = io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap());
-                Task::none() 
-            }
+            Message::NewModel((object,path)) => {
+                self.scene.new_object(object);
+                if let Some(file_name) = path.file_stem(){
+                    let str:&str = file_name.to_str().unwrap_or("");
+                    self.notifications.push(Notification{
+                        kind: NotificationType::Info,
+                        message:format!("{}",str)
+                    })
+                };
+                self.inputstl = Some(path);
+                Task::none()
+            },
+            // Message::PickFile => { 
+            //     Task::perform(pick_file(),
+            //         |result| match result {
+            //             Ok(path) => {
+            //                 match path.extension()
+            //                     .and_then(|ext| ext.to_str())
+            //                     .map(|ext| ext.to_lowercase())
+            //                     .as_deref()
+            //                 {
+            //                     Some("stl") => {
+            //                         let file = std::fs::File::open(&path).unwrap();
+            //                         let mut reader = std::io::BufReader::new(file);
+            //                         let o = Object::from_mesh(io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap()));
+            //                         Message::NewModel(o)
+            //                     },
+            //                     Some(ext) => panic!("Unsupported file extension: {ext:?}"),
+            //                     None => panic!("No file extension found: {path:?}"),
+            //                 }
+            //             }
+            //             Err(error) => Message::Err(error),
+            //         }
+            //     )
+            // },
             Message::PickFile => { 
-                Task::perform( pick_file(),
-                    |result| match result {
+                Task::future(async{ 
+                    match pick_file().await {
                         Ok(path) => {
                             match path.extension()
                                 .and_then(|ext| ext.to_str())
                                 .map(|ext| ext.to_lowercase())
                                 .as_deref()
                             {
-                                Some("stl") => Message::STLFilePicked(path),
+                                Some("stl") => {
+                                    let (object, path) = tokio::task::spawn_blocking(move || {
+                                        let file = std::fs::File::open(&path).unwrap();
+                                        let mut reader = std::io::BufReader::new(file);
+                                        let object = Object::from_mesh(io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap()));
+                                        (object, path)
+                                    }).await.unwrap();
+
+                                    Message::NewModel((object,path))
+                                },
                                 Some(ext) => panic!("Unsupported file extension: {ext:?}"),
                                 None => panic!("No file extension found: {path:?}"),
                             }
                         }
                         Err(error) => Message::Err(error),
                     }
-                )
+                })
             },
             Message::SliceModel => { 
                 match &self.inputstl {
@@ -212,79 +278,112 @@ impl Controls {
         ];
 
         let task_bar = container(row![
-            button("file").on_press(Message::PickFile),
-            button("settings"),
+            text_button("file").on_press(Message::PickFile),
+            text_button("settings"),
             space().width(Length::Fill),
-            button("slice").on_press(Message::SliceModel),
-            button("export G-code file"),
+            pill_button("Slice").on_press(Message::SliceModel),
+            pill_button("Export G-code file"),
         ]
+        .padding(2)
         .spacing(10)
         )
-        .style(container::bordered_box);
+        .style(container::dark);
 
-        let printer = container(row![
-            text("Printer"),
-            space().width(Length::Fill),
-            button("edit").padding(0),
-        ]).style(container::bordered_box);
+        let printer = card(
+            row![
+                text("Printer"),
+                space().width(Length::Fill),
+                button("edit").padding(0)
+            ],
+            column![
+                pick_list(printers,self.printers.clone(),Message::PrinterChanged).width(Fill),
+            ].spacing(4)
+        );
 
-        let filament = container(row![
-            text("Filament"),
-            space().width(Length::Fill),
-            button("edit").padding(0),
-        ]).style(container::bordered_box);
+        let filament = card(
+            row![
+                text("Filament"),
+                space().width(Length::Fill),
+                button("edit").padding(0),
+            ],
+            column![
+                pick_list(filaments,self.filament.clone(),Message::FilamentChanged).width(Fill),
+            ].spacing(4)
+        );
 
-        let process = container(row![
-            text("Process"),
-            space().width(Length::Fill),
-            button("edit").padding(0),
-        ]).style(container::bordered_box);
+        let process = card(
+            row![
+                text("Process"),
+                space().width(Length::Fill),
+                button("edit").padding(0),
+            ],
+            column![
+                control("show depth buffer",
+                    checkbox(self.scene.show_depth_buffer)
+                        .on_toggle(Message::ShowDepthBuffer)
+                ),
+                control("overhang angle",
+                    number_input(&self.parameters.overhang_angle,Message::OverhangAngleChanged,Message::OverhangAngleUpdated)
+                    // .on_input(Message::SlicingComplete)
+                ),
+                slider(
+                    0.0..=10.0,
+                    self.scene.model_color.r,
+                    |c| Message::ModelColorChanged(Color{r:c/10.0,g:1.0,b:1.0,a:1.0})
+                )
+            ].spacing(5).height(Fill)
+        );
 
-        let side_menu = container(column![
+        let side_menu = column![
             printer,
-            pick_list(printers,self.printers.clone(),Message::PrinterChanged),
             filament,
-            pick_list(filaments,self.filament.clone(),Message::FilamentChanged),
-            process,
-            control("overhang angle",
-                checkbox(self.scene.show_depth_buffer)
-                    .on_toggle(Message::ShowDepthBuffer)
-            ),
-            slider(
-                0.0..=10.0,
-                self.scene.model_color.r,
-                |c| Message::ModelColorChanged(Color{r:c/10.0,g:1.0,b:1.0,a:1.0})
-            ),
-        ].spacing(5)
-        .align_x(Right))
-        .width(280)
-        .padding(5)
-        .style(container::bordered_box);
+            process.height(Fill),
+        ].spacing(4)
+        .align_x(Right)
+        .width(280);
 
         let shader = shader(&self.scene).width(Fill).height(Fill);
+        let overlay = container(
+                iced::widget::Column::with_children(
+                    self.notifications.iter()
+                        .map(|notification|
+                            button(container( row![text(&notification.message), button("X").on_press(Message::Err(Error::DialogClosed))] )
+                                .style(match notification.kind {
+                                    NotificationType::Error => container::danger,
+                                    NotificationType::Warning => container::warning,
+                                    NotificationType::Info => container::primary,
+                                    }
+                                )
+                                .padding(10)
+                                .width(200)
+                                // .into()
+                            ).on_press(Message::DismissErr).into()
+                            // .style(iced::widget::Button{})
+                        )
+                ).spacing(3)
+            )
+            .align_x(Right)
+            .align_y(Bottom)
+            .width(Fill)
+            .height(Fill)
+            .padding(20);
 
         container(
             column![
                 task_bar.width(Fill),
                 row![
                     side_menu.height(Fill),
-                    shader,
-                ],
-            ].padding(0),
-        ).padding(0)
+                    stack![
+                        container(shader).style(container::bordered_box),
+                        overlay,
+                    ]
+                ].spacing(4),
+            ],
+        ).padding(4)
+        .style(container::dark)
         .align_top(Fill)
         .into()
     }
-
-    // fn subscription(&self) -> Subscription<Message> {
-    //     window::events().map(|(_id,event)| 
-    //         if let window::Event::FileDropped(pathbuf) = event {
-    //             Message::STLFilePicked(pathbuf)
-    //         }else{
-    //             Message::Err(Error::DialogClosed)
-    //         }
-    //     )
-    // }
 }
 
 impl Default for Controls {
@@ -306,3 +405,11 @@ enum Error {
     DialogClosed,
     // IO(ErrorKind),
 }
+impl fmt::Display for Error{
+    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {
+        match &self{
+            Error::DialogClosed => write!(f,"File Dialog Closed")
+        }
+    }
+}
+
