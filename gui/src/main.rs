@@ -12,7 +12,7 @@ use widgets::{pill_button, text_button, card, number_input, NumberInput};
 use std::path::PathBuf;
 use std::fmt;
 
-use wgpu;
+use iced::wgpu;
 use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, slider, stack};
 use iced::{Color, Element, Length, Bottom, Right, Fill };
 use iced::task::Task;
