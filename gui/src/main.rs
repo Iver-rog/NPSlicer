@@ -296,7 +296,7 @@ impl Controls {
                 button("edit").padding(0)
             ],
             column![
-                pick_list(printers,self.printers.clone(),Message::PrinterChanged).width(Fill),
+                pick_list(printers,self.printers.as_ref(),Message::PrinterChanged).width(Fill),
             ].spacing(4)
         );
 
@@ -307,7 +307,7 @@ impl Controls {
                 button("edit").padding(0),
             ],
             column![
-                pick_list(filaments,self.filament.clone(),Message::FilamentChanged).width(Fill),
+                pick_list(filaments,self.filament.as_ref(),Message::FilamentChanged).width(Fill),
             ].spacing(4)
         );
 
