@@ -1,81 +1,98 @@
 {
-  description = "A devShell example";
-
   inputs = {
-    nixpkgs.url      = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    flake-utils.url  = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
-      in
-      {
-        devShells.default = with pkgs; mkShell rec{
-          buildInputs = [
+  outputs = inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" ];
+      perSystem = { config, self', pkgs, lib, system, ... }:
+        let
+          runtimeDeps = with pkgs; [ alsa-lib speechd
             freetype
             expat
             fontconfig
-            openssl
-            pkg-config
-            eza
-            fd
-            rust-bin.beta.latest.default
 
             # necessary for building wgpu in 3rd party packages (in most cases)
             libxkbcommon
-            wayland xorg.libX11 xorg.libXcursor xorg.libXrandr xorg.libXi
+            wayland libX11 libXcursor libXrandr libXi
             alsa-lib
             fontconfig freetype
-            shaderc directx-shader-compiler
-            pkg-config cmake
-            mold # could use any linker, needed for rustix (but mold is fast)
+            directx-shader-compiler
 
             libGL
             vulkan-headers vulkan-loader
-            vulkan-tools vulkan-tools-lunarg
-            vulkan-extension-layer
-            vulkan-validation-layers # don't need them *strictly* but immensely helpful
+          ];
+          buildDeps = with pkgs; [ pkg-config rustPlatform.bindgenHook 
+            # openssl
+            pkg-config
+
+            # necessary for building wgpu in 3rd party packages (in most cases)
+            pkg-config cmake
 
             # necessary for developing (all of) wgpu itself
             cargo-nextest cargo-fuzz
+          ];
+          devDeps = with pkgs; [ 
+            mold
+            gdb renderdoc cargo-flamegraph 
 
-            # nice for developing wgpu itself
-            typos
-
-            # if you don't already have rust installed through other means,
-            # this shell.nix can do that for you with this below
-            yq # for tomlq below
-            rustup
-
-            # nice tools
-            gdb rr
-            evcxr
-            valgrind
-            renderdoc
-
-            cargo-flamegraph
+            shaderc directx-shader-compiler
+            vulkan-tools vulkan-tools-lunarg
+            vulkan-extension-layer
+            vulkan-validation-layers # don't need them *strictly* but immensely helpful
           ];
 
-          shellHook = ''
-            alias ls=eza
-            alias find=fd
+          cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+          msrv = cargoToml.package.rust-version;
 
-            export RUSTC_VERSION="$(tomlq -r .toolchain.channel rust-toolchain.toml)"
-            export PATH="$PATH:''${CARGO_HOME:-~/.cargo}/bin"
-            export PATH="$PATH:''${RUSTUP_HOME:-~/.rustup/toolchains/$RUSTC_VERSION-x86_64-unknown-linux/bin}"
-            export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${builtins.toString (pkgs.lib.makeLibraryPath buildInputs)}";
+          rustPackage = features:
+            (pkgs.makeRustPlatform {
+              cargo = pkgs.rust-bin.stable.latest.minimal;
+              rustc = pkgs.rust-bin.stable.latest.minimal;
+            }).buildRustPackage {
+              # inherit (cargoToml.package) name version;
+              name = "NPSlicer";
+              version = "0.1";
+              src = ./.;
+              cargoLock.lockFile = ./Cargo.lock;
+              buildFeatures = features;
+              buildInputs = runtimeDeps;
+              nativeBuildInputs = buildDeps;
+              # Uncomment if your cargo tests require networking or otherwise
+              # don't play nicely with the Nix build sandbox:
+              # doCheck = false;
+            };
 
-            rustup default $RUSTC_VERSION
-            rustup component add rust-src rust-analyzer
-          '';
+          mkDevShell = rustc:
+            pkgs.mkShell {
+              shellHook = ''
+                export RUST_SRC_PATH=${pkgs.rustPlatform.rustLibSrc}
+                export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${builtins.toString (pkgs.lib.makeLibraryPath runtimeDeps)}";
+                export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+              '';
+              buildInputs = runtimeDeps;
+              nativeBuildInputs = buildDeps ++ devDeps ++ [ rustc ];
+            };
+        in {
+          _module.args.pkgs = import inputs.nixpkgs {
+            inherit system;
+            overlays = [ (import inputs.rust-overlay) ];
+          };
+
+
+          packages.default = self'.packages.example-base;
+          devShells.default = self'.devShells.nightly;
+
+          packages.example = (rustPackage "foobar");
+          packages.example-base = (rustPackage "");
+
+          devShells.nightly = (mkDevShell (pkgs.rust-bin.selectLatestNightlyWith
+            (toolchain: toolchain.default)));
+          devShells.stable = (mkDevShell pkgs.rust-bin.stable.latest.default);
+          devShells.msrv = (mkDevShell pkgs.rust-bin.stable.${msrv}.default);
         };
-      }
-    );
+    };
 }
-
