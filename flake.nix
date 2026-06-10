@@ -14,6 +14,7 @@
             freetype
             expat
             fontconfig
+            openssl
 
             # necessary for building wgpu in 3rd party packages (in most cases)
             libxkbcommon
