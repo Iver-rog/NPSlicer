@@ -2,3 +2,10 @@
 resolver = "3"
 members = ["core", "gui"]
 
+[profile.production]
+inherits = "release"
+debug-assertions = false
+lto = true
+strip = true
+codegen-units = 1
+# panic = "abort"
