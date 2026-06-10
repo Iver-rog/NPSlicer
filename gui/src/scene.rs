@@ -17,7 +17,6 @@ use glam::Vec3;
 
 #[derive(Clone)]
 pub struct Scene {
-    pub size: f32,
     pub objects: Vec<Object>,
     pub camera: Camera,
     pub show_depth_buffer: bool,
@@ -56,7 +55,6 @@ impl Scene {
         crate::io::IntoVertexBuffer::append_to_vertex_buffer(&mesh2,&mut vertex_buffer);
 
         Self {
-            size: 0.2,
             objects: vec![Object{
                 instances: vec![
                     Instance{scale:1.0, position:Vec3::new(0.0,0.0,0.0), rotation:glam::Quat::IDENTITY},
@@ -232,7 +230,6 @@ impl shader::Primitive for Primitive {
             queue,
             viewport.physical_size(),
             &self.uniforms,
-            self.instance.len(),
             &self.instance,
             &self.vertex_buffer,
         );

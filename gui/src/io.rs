@@ -8,12 +8,20 @@ use rfd;
 use std::path::PathBuf;
 
 
-pub async fn pick_file() -> Result<PathBuf,Error>{
+pub async fn pick_input_file() -> Result<PathBuf,Error>{
     rfd::AsyncFileDialog::new()
         .set_title("Choose a STL file for slicing")
         .add_filter("stl", &["stl"])
         .add_filter("g-code", &["gcode"])
         .pick_file()
+        .await
+        .map(|file_handle|PathBuf::from(file_handle))
+        .ok_or(Error::DialogClosed)
+}
+pub async fn pick_output_file() -> Result<PathBuf,Error>{
+    rfd::AsyncFileDialog::new()
+        .set_title("Choose a STL file for slicing")
+        .save_file()
         .await
         .map(|file_handle|PathBuf::from(file_handle))
         .ok_or(Error::DialogClosed)

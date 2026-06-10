@@ -1,23 +1,33 @@
+use iced::widget::text::Highlighter;
 use npslicer_core::{self,slice};
 
 mod scene;
 use scene::{Object, Scene};
 
 mod io;
-use io::pick_file;
+use io::{pick_input_file,pick_output_file};
 
 mod widgets;
-use widgets::{pill_button, text_button, card, number_input, NumberInput};
+use widgets::{pill_button, text_button, card, number_input, NumberInput, gcode_view, GcodeView};
 
+use std::collections::hash_map::Iter;
 use std::path::PathBuf;
 use std::fmt;
 
+mod test_gcode;
+use test_gcode::TEST_GCODE;
+
 use iced::wgpu;
-use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, slider, stack};
-use iced::{Color, Element, Length, Bottom, Right, Fill };
+use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, stack, slider, vertical_slider};
+use iced::widget::text::Span;
+use iced::{Background, Bottom, Color, Element, Fill, Length, Right, Top, Shrink};
 use iced::task::Task;
 
+use env_logger;
+
 fn main() -> iced::Result {
+    unsafe { std::env::set_var("WGPU_POWER_PREF", "low") };
+    env_logger::init();
     iced::application(Controls::default, Controls::update, Controls::view)
         .title("layer-gen-rs")
         // .executor::<iced::executor::Default>()
@@ -105,11 +115,16 @@ struct Controls {
     filament: Option<Filament>,
     parameters: Parameters,
     notifications: Vec<Notification>,
+    gcode: Option<GcodeView>,
+    gcode_layer_nr: u32,
+    gcode_line_nr: u32,
 }
+#[derive(Debug,Clone)]
 struct Notification {
     kind: NotificationType,
     message: String,
 }
+#[derive(Debug,Clone)]
 enum NotificationType{
     Error,
     Warning,
@@ -132,7 +147,8 @@ impl fmt::Display for Notification{
 #[derive(Debug, Clone)]
 enum Message {
     Err(Error),
-    DismissErr,
+    Nofify(Notification),
+    DismissNotification(usize),
     Camera(scene::camera::CameraEvent),
     ShowDepthBuffer(bool),
     ModelColorChanged(Color),
@@ -140,30 +156,36 @@ enum Message {
     FilamentChanged(Filament),
     NewModel((Object,PathBuf)),
     SliceModel,
-    SlicingComplete(()),
-    PickFile,
+    SlicingComplete(String),
+    PickInputFile,
+    PickOutputFile,
     OverhangAngleChanged(String),
     OverhangAngleUpdated,
+    GcodeLayerNrChanged(u32),
+    GcodeLineNrChanged(u32),
 }
 
 impl Controls {
     fn new() -> Self {
         Self {
-            // ice cubes
             scene: Scene::new(),
-            // my controls
             printers: Some(Printer::default()),
             filament: Some(Filament::default()),
             parameters: Parameters::default(),
             inputstl: None,
             notifications: Vec::new(),
+            // gcode: None,
+            gcode: Some(GcodeView::new(TEST_GCODE.into())),
+            gcode_layer_nr:0,
+            gcode_line_nr:0,
         }
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Err(error) => { self.notifications.push(error.into()); Task::none() },
-            Message::DismissErr => { self.notifications = Vec::new(); Task::none() }
+            Message::Nofify(notification) => { self.notifications.push(notification); Task::none() },
+            Message::DismissNotification(index) => { self.notifications.remove(index); Task::none() }
             Message::ShowDepthBuffer(show) => {
                 self.scene.show_depth_buffer = show;
                 Task::none()
@@ -182,7 +204,13 @@ impl Controls {
             Message::OverhangAngleChanged(value) => {self.parameters.overhang_angle.text = value; Task::none()},
             Message::OverhangAngleUpdated => {self.parameters.overhang_angle.commit(); Task::none()},
             Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
-            Message::SlicingComplete(result)     => { println!("{result:?}"); Task::none() }
+            Message::SlicingComplete(result)     => { self.gcode = Some(GcodeView::new(result)); Task::none() },
+            Message::GcodeLineNrChanged(line_nr) => { self.gcode_line_nr = line_nr; Task::none() },
+            Message::GcodeLayerNrChanged(layer_nr) => { 
+                self.gcode_layer_nr = layer_nr;
+                self.gcode_line_nr = self.gcode.as_ref().unwrap().nr_of_lines_in_layer(layer_nr as usize) as u32; 
+                Task::none() 
+            },
             Message::NewModel((object,path)) => {
                 self.scene.new_object(object);
                 if let Some(file_name) = path.file_stem(){
@@ -218,9 +246,9 @@ impl Controls {
             //         }
             //     )
             // },
-            Message::PickFile => { 
+            Message::PickInputFile => { 
                 Task::future(async{ 
-                    match pick_file().await {
+                    match pick_input_file().await {
                         Ok(path) => {
                             match path.extension()
                                 .and_then(|ext| ext.to_str())
@@ -245,19 +273,40 @@ impl Controls {
                     }
                 })
             },
+            Message::PickOutputFile => {
+                // let gcode = self.gcode.clone().unwrap();
+                let gcode = String::from(self.gcode.as_ref().unwrap().as_str());
+                Task::future(async move{ 
+                    match pick_output_file().await {
+                        Err(error) => Message::Err(error),
+                        Ok(mut path) => {
+                            path.set_extension("gcode");
+                            match tokio::fs::write(&path,gcode.as_bytes()).await{
+                                Ok(_) => {
+                                    Message::Nofify(Notification{
+                                        kind: NotificationType::Info,
+                                        message: format!("Saved file to {}", path.display())
+                                    })
+                                },
+                                Err(error) => Message::Err(Error::IO(error.kind()))
+                            }
+                        }
+                    }
+                })
+            },
             Message::SliceModel => { 
                 match &self.inputstl {
+                    None => Task::none(),
                     Some(path) => {
                         let settings = npslicer_core::Settings::default();
                         let path = path.to_path_buf();
                         Task::future(async{
-                            let _ = tokio::task::spawn_blocking(move || {
-                                slice(path,settings);
-                            }).await.unwrap();
-                            Message::SlicingComplete(())
+                            match tokio::task::spawn_blocking(move || { slice(path,settings) }).await{
+                                Ok(file) => {println!("{file}"); Message::SlicingComplete(file)},
+                                Err(error) => {eprintln!("{error}"); Message::Err(Error::SlicerCrashed)}
+                            }
                         })
-                    },
-                    None => Task::none()
+                    }
                 }
             }
             Message::Camera(camera_event) => {
@@ -278,11 +327,17 @@ impl Controls {
         ];
 
         let task_bar = container(row![
-            text_button("file").on_press(Message::PickFile),
+            text_button("file").on_press(Message::PickInputFile),
             text_button("settings"),
             space().width(Length::Fill),
-            pill_button("Slice").on_press(Message::SliceModel),
-            pill_button("Export G-code file"),
+            if self.inputstl.is_some(){
+                pill_button("Slice").on_press(Message::SliceModel)
+            } else { pill_button("Slice") },
+            if self.gcode.is_some(){
+                pill_button("Export G-code file").on_press(Message::PickOutputFile)
+            } else {
+                pill_button("Export G-code file")
+            },
         ]
         .padding(2)
         .spacing(10)
@@ -342,31 +397,48 @@ impl Controls {
         .align_x(Right)
         .width(280);
 
-        let shader = shader(&self.scene).width(Fill).height(Fill);
-        let overlay = container(
-                iced::widget::Column::with_children(
-                    self.notifications.iter()
-                        .map(|notification|
-                            button(container( row![text(&notification.message), button("X").on_press(Message::Err(Error::DialogClosed))] )
-                                .style(match notification.kind {
-                                    NotificationType::Error => container::danger,
-                                    NotificationType::Warning => container::warning,
-                                    NotificationType::Info => container::primary,
-                                    }
-                                )
-                                .padding(10)
-                                .width(200)
-                                // .into()
-                            ).on_press(Message::DismissErr).into()
-                            // .style(iced::widget::Button{})
-                        )
-                ).spacing(3)
-            )
+        // let gcode_view = if let Some(gcode) = &self.gcode{
+    //         Element::from(
+    //             container(
+    //                 iced::widget::scrollable(text::Rich::with_spans(highlight_gcode(gcode))).height(Shrink)
+    //             ).style(transparent_box)
+    //             .padding(10)
+    //         )
+    //     } else { space().into() };
+        let notifications = iced::widget::Column::with_children(
+                self.notifications.iter()
+                    .enumerate()
+                    .map(|(id,notification)|
+                        button(container( row![text(&notification.message), button("X").on_press(Message::Err(Error::DialogClosed))] )
+                            .style(match notification.kind {
+                                NotificationType::Error => container::danger,
+                                NotificationType::Warning => container::warning,
+                                NotificationType::Info => container::primary,
+                                }
+                            )
+                            .padding(0)
+                            .width(200)
+                            // .into()
+                        ).on_press(Message::DismissNotification(id)).into()
+                        // .style(iced::widget::Button{})
+                     )
+                ).spacing(3);
+
+        let gcode_view = if let Some(gcode) = &self.gcode{
+            // gcode_view(gcode, self.gcode_line_nr)
+            gcode.view(self.gcode_layer_nr,self.gcode_line_nr)
+        } else { space().into() };
+
+
+        let overlay = column![
+            gcode_view,
+            notifications
+            ]
             .align_x(Right)
-            .align_y(Bottom)
             .width(Fill)
             .height(Fill)
-            .padding(20);
+            .padding([20,0])
+            .spacing(20);
 
         container(
             column![
@@ -374,8 +446,31 @@ impl Controls {
                 row![
                     side_menu.height(Fill),
                     stack![
-                        container(shader).style(container::bordered_box),
-                        overlay,
+                        container(shader(&self.scene).width(Fill).height(Fill)).style(container::bordered_box),
+                        column![
+                            row![
+                                overlay,
+                                if let Some(gcode) = &self.gcode{
+                                    Element::from(
+                                        widgets::vertical_slider(
+                                            0..=u32::try_from(gcode.nr_of_layers()-1).unwrap(),
+                                            self.gcode_layer_nr,
+                                            |n| Message::GcodeLayerNrChanged(n.into())
+                                        ).padding([50,5])
+                                        .width(50)
+                                    )
+                                } else { Element::from(space().width(50)) }
+                            ],
+                            if let Some(gcode) = &self.gcode{
+                                Element::from(
+                                    widgets::slider(
+                                        0..=u32::try_from(gcode.nr_of_lines_in_layer(self.gcode_layer_nr as usize)).unwrap(),
+                                        self.gcode_line_nr,
+                                        |n| Message::GcodeLineNrChanged(n.into())
+                                    ).padding([5,100])
+                                )
+                            } else { Element::from(space()) }
+                        ]
                     ]
                 ].spacing(4),
             ],
@@ -403,12 +498,16 @@ fn control<'a>(
 #[derive(Debug, Clone)]
 enum Error {
     DialogClosed,
-    // IO(ErrorKind),
+    // SlicerCrashed(tokio::task::JoinError),
+    SlicerCrashed,
+    IO(std::io::ErrorKind),
 }
 impl fmt::Display for Error{
     fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {
         match &self{
-            Error::DialogClosed => write!(f,"File Dialog Closed")
+            Error::DialogClosed => write!(f,"File Dialog Closed"),
+            Error::SlicerCrashed => write!(f,"Slicer crashed"),
+            Error::IO(error) => write!(f,"{error}"),
         }
     }
 }

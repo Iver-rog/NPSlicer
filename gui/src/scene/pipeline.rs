@@ -4,7 +4,7 @@ mod buffer;
 mod uniforms;
 pub mod vertex;
 
-use glam::{u32, u64};
+// use glam::{u32, u64};
 pub use uniforms::Uniforms;
 
 use buffer::Buffer;
@@ -341,8 +341,7 @@ impl Pipeline {
         queue: &wgpu::Queue,
         target_size: Size<u32>,
         uniforms: &Uniforms,
-        num_cubes: usize,
-        cubes: &[instance::Raw],
+        instances: &[instance::Raw],
         printbed: &[Vertex],
     ) {
         //recreate depth texture if surface texture size has changed
@@ -359,16 +358,16 @@ impl Pipeline {
         //     queue.write_buffer(&self.vertices, 0, bytemuck::cast_slice(printbed));
         // }
         self.nr_vertices = printbed.len() as u32;
-        let vertex_buf_size = printbed.len() * std::mem::size_of::<Vertex>();
+        let vertex_buf_size = printbed.len().max(1) * std::mem::size_of::<Vertex>();
         self.vertex_buffer.resize(device, vertex_buf_size as u64);
         queue.write_buffer(&self.vertex_buffer.raw, 0, bytemuck::cast_slice(printbed));
 
         //resize cubes vertex buffer if cubes amount changed
-        let new_size = num_cubes * std::mem::size_of::<instance::Raw>();
-        self.instance_buffer.resize(device, new_size as u64);
+        let instance_buffer_size = instances.len().max(1) * std::mem::size_of::<instance::Raw>();
+        self.instance_buffer.resize(device, instance_buffer_size as u64);
 
         //always write new cube data since they are constantly rotating
-        queue.write_buffer(&self.instance_buffer.raw, 0, bytemuck::cast_slice(cubes));
+        queue.write_buffer(&self.instance_buffer.raw, 0, bytemuck::cast_slice(instances));
     }
 
     pub fn render(

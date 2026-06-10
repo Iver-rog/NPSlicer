@@ -1,9 +1,13 @@
 use super::Message;
 
-use iced::widget::{Button ,column, row, button, container, text_input, text};
-use iced::{Element, Background, Border, Color};
+use iced::widget::{self, Button ,column, row, button, container, text_input, text};
+use iced::{Element, Background, Border, Color, Right, Center};
 
 use std::fmt;
+
+mod gcode_view;
+pub use gcode_view::gcode_view;
+pub use gcode_view::GcodeView;
 
 pub fn pill_button<'a, Message>(content: impl Into<Element<'a, Message>>) -> Button<'a, Message>
 where 
@@ -40,6 +44,12 @@ where
                 button::Status::Pressed => button::Style {
                     background: Some(Background::Color(
                         palette.primary.weak.color
+                    )),
+                    ..base
+                },
+                button::Status::Disabled => button::Style {
+                    background: Some(Background::Color(
+                        palette.secondary.weak.color
                     )),
                     ..base
                 },
@@ -163,3 +173,67 @@ pub fn text_button<'a>(label: &'a str) -> Button<'a,Message> {
     })
 }
 
+pub fn transparent_box(theme: &iced::Theme) -> container::Style {
+    let palette = theme.extended_palette();
+    // let mut background = palette.background.weak.color;
+    // background.a = 0.9;
+    let mut background = Color::BLACK;
+    background.a = 0.7;
+
+    container::Style {
+        background: Some(background.into()),
+        text_color: Some(palette.background.weak.text),
+        border: Border{
+            width: 1.0,
+            radius: 10.into(),
+            color: palette.background.strongest.color.into(),
+        },
+        ..container::Style::default()
+    }
+}
+
+fn slider_container_style(theme: &iced::Theme) -> container::Style {
+    let palette = theme.extended_palette();
+    container::Style {
+        background: Some(palette.background.base.color.into()),
+        text_color: Some(palette.background.weakest.text),
+        border: Border {
+            width: 1.0,
+            radius: 10.0.into(),
+            color: palette.background.weak.color,
+        },
+        ..container::Style::default()
+    }
+}
+
+pub fn slider<'a, Message: Clone + 'a>(
+    range: std::ops::RangeInclusive<u32>,
+    value: u32,
+    on_change: impl Fn(u32) -> Message + 'a,
+) -> widget::Row<'a, Message, iced::Theme, widget::Renderer>{
+    row![
+        container( widget::slider(range,value,on_change) )
+            .style(slider_container_style)
+            .padding([1,2]),
+        container(text(value+1))
+            .style(slider_container_style)
+            .padding([0,5])
+            .width(30)
+            .align_x(Center)
+    ].spacing(5).align_y(Center)
+}
+
+pub fn vertical_slider<'a, Message: Clone + 'a>(
+    range: std::ops::RangeInclusive<u32>,
+    value: u32,
+    on_change: impl Fn(u32) -> Message + 'a,
+) -> widget::Column<'a, Message, iced::Theme, widget::Renderer>{
+    column![
+        container(text(value+1))
+            .style(slider_container_style)
+            .padding([0,5]),
+        container( widget::vertical_slider(range,value,on_change) )
+            .style(slider_container_style)
+            .padding([2,1]),
+    ].spacing(5).align_x(Right)
+}

@@ -36,6 +36,7 @@ impl Buffer {
                 usage: self.usage,
                 mapped_at_creation: false,
             });
+            self.size = new_size;
         }
     }
 }
