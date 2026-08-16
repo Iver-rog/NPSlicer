@@ -24,14 +24,14 @@ use std::fs::{self,File};
 use std::path::PathBuf;
 use std::io;
 use std::time::Instant;
+use std::env;
 
-
-/// WARNING: all content in the TMP_DIR is deleted each time the project is run
-const TEMP_DIR: &str = "/home/iver/Documents/NTNU/prosjekt/layer-gen-rs/tmp/";
 
 const T_MIN:f32 = 20.0;
 
 pub fn main(){
+
+
     init_logger();
     // let mut args = env::args();
     // let path = args.next().expect("first arg should be the path");
@@ -67,14 +67,12 @@ pub fn main(){
         ..Default::default()
     };
 
-    slice(PathBuf::from(stl_path),settings);
+    // slice(PathBuf::from(stl_path),settings);
 
 }
-pub async fn async_slice(stl_path:PathBuf,settings:Settings) -> () {
-    slice(stl_path,settings)
-}
 
-pub fn slice(stl_path:PathBuf,settings:Settings){
+pub fn slice(stl_path:PathBuf,settings:Settings,progress_reporter:tokio::sync::mpsc::Sender<f32>) -> String {
+
     let start_time = Instant::now();
  
     let mut blender = Blender::new();
@@ -84,6 +82,8 @@ pub fn slice(stl_path:PathBuf,settings:Settings){
 
     blender.load_mesh(&stl_path,"input mesh");
     let layer_perimeters = extract_planar_layers_from_mesh(stl_path,&settings);
+
+    let _ = progress_reporter.try_send(0.01);
     // let d_x2 = (settings.overhang_angle*0.5).tan()*settings.layer_height;
     // let p0_offset = ss_offset(layer_perimeters[0].clone(),-0.5*d_x2);
     // blender.display2d(&p0_offset[0], 0.0, "c0-offset2", "er jeg dum?");
@@ -95,27 +95,35 @@ pub fn slice(stl_path:PathBuf,settings:Settings){
 
     mesh_gen(&mut blender,&layer_perimeters,&settings);
     // get_user_confimation();
-    crate_or_clear_dir(TEMP_DIR);
-    let mesh_gen_time = start_time.elapsed();
 
-    blender.export_layers(TEMP_DIR);
+    let temp_dir = get_temp_dir();
+    assert_eq!(temp_dir,PathBuf::from("/home/iver/.cache/NPSlicer"));
+
+    crate_or_clear_dir(&temp_dir);
+    let mesh_gen_time = start_time.elapsed();
+    let _ = progress_reporter.try_send(0.03);
+
+
+    blender.export_layers(&temp_dir);
     blender.ping(); //make sure blender has processed all messages
+    let _ = progress_reporter.try_send(0.99);
     let boolean_time = start_time.elapsed();
 
-    // let start_time = Instant::now();
-    gcode::main(&mut blender,TEMP_DIR,&settings);
+    let gcode = gcode::main(&mut blender,&temp_dir,&settings);
     let gcode_gen_time = start_time.elapsed();
 
     
     println!("mesh generation time  {} sec",mesh_gen_time.as_secs_f64());
     println!("mesh booleon time     {} sec",(boolean_time-mesh_gen_time).as_secs_f64());
     println!("gcode generation time {} sec",(gcode_gen_time-boolean_time).as_secs_f64());
-    println!("\x1b[034mExported G-code file to {TEMP_DIR}gcode.gcode\x1b[0m");
+    println!("\x1b[034mExported G-code file to {}gcode.gcode\x1b[0m",(&temp_dir).to_str().unwrap());
+    let _ = progress_reporter.try_send(1.0);
+    return gcode
 }
 
-fn crate_or_clear_dir<T:AsRef<std::path::Path>>(tmp:T){
-    let _ = fs::remove_dir_all(&tmp); // <- dont care if dir does not exist
-    fs::create_dir(&tmp).unwrap();
+fn crate_or_clear_dir<T:AsRef<std::path::Path>>(tmp:&T){
+    let _ = fs::remove_dir_all(tmp); // <- dont care if dir does not exist
+    fs::create_dir(tmp).unwrap();
 }
 
 fn get_user_confimation(){
@@ -310,3 +318,14 @@ fn init_logger(){
     .init();
 }
 
+fn get_temp_dir() -> PathBuf {
+    if let Ok(mut cache_dir) = env::var("XDG_CACHE_HOME"){
+        cache_dir.push_str("/NPSlicer");
+        return PathBuf::from(cache_dir)
+    }
+    if let Ok(mut home_dir) = env::var("HOME"){
+        home_dir.push_str("/.cache/NPSlicer");
+        return PathBuf::from(home_dir)
+    }
+    panic!("could not get value of XDG_CACHE_HOME or HOME env variables");
+}

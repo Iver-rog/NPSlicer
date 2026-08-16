@@ -134,7 +134,7 @@ impl Blender {
         return response
     }
     /// export layers form blender to disk at the spesified path
-    pub fn export_layers(&mut self, path:&str){
+    pub fn export_layers<T:std::convert::AsRef<std::path::Path>>(&mut self, path:&T){
         let binding = std::path::absolute(path).unwrap();
         let abs_path = binding.to_string_lossy();
         self.send(BlenderMsg::ExportLayers(abs_path.into()))

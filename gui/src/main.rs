@@ -10,7 +10,6 @@ use io::{pick_input_file,pick_output_file};
 mod widgets;
 use widgets::{pill_button, text_button, card, number_input, NumberInput, gcode_view, GcodeView};
 
-use std::collections::hash_map::Iter;
 use std::path::PathBuf;
 use std::fmt;
 
@@ -18,12 +17,34 @@ mod test_gcode;
 use test_gcode::TEST_GCODE;
 
 use iced::wgpu;
-use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, stack, slider, vertical_slider};
+use iced::widget::{checkbox, column, row, shader, text, button, container, pick_list, space, stack, slider};
 use iced::widget::text::Span;
-use iced::{Background, Bottom, Color, Element, Fill, Length, Right, Top, Shrink};
+use iced::{Bottom, Color, Element, Fill, Length, Right, Center, Top, Shrink};
 use iced::task::Task;
 
 use env_logger;
+
+fn slice_w_progress(
+        path:PathBuf,
+        settings:npslicer_core::Settings,
+    ) -> impl iced::task::Sipper<Result<String,Error>, f32 >{
+    iced::task::sipper(async move |mut sender|{
+
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<f32>(1);
+        let handle = tokio::task::spawn_blocking(move ||{ 
+            let _ = tx.try_send(0.0);
+            npslicer_core::slice(path,settings,tx)
+        });
+        while let Some(pct) = rx.recv().await {
+            sender.send(pct).await;
+        }
+        handle.await.map_err(|tokio_error|{
+            eprintln!("{tokio_error}");
+            Error::SlicerCrashed
+        })
+
+    })
+}
 
 fn main() -> iced::Result {
     unsafe { std::env::set_var("WGPU_POWER_PREF", "low") };
@@ -114,6 +135,7 @@ struct Controls {
     printers: Option<Printer>,
     filament: Option<Filament>,
     parameters: Parameters,
+    slicing_progress: Option<f32>,
     notifications: Vec<Notification>,
     gcode: Option<GcodeView>,
     gcode_layer_nr: u32,
@@ -156,6 +178,7 @@ enum Message {
     FilamentChanged(Filament),
     NewModel((Object,PathBuf)),
     SliceModel,
+    SlicerProgress(f32),
     SlicingComplete(String),
     PickInputFile,
     PickOutputFile,
@@ -173,9 +196,10 @@ impl Controls {
             filament: Some(Filament::default()),
             parameters: Parameters::default(),
             inputstl: None,
+            slicing_progress: None,
             notifications: Vec::new(),
-            // gcode: None,
-            gcode: Some(GcodeView::new(TEST_GCODE.into())),
+            gcode: None,
+            // gcode: Some(GcodeView::new(TEST_GCODE.into())),
             gcode_layer_nr:0,
             gcode_line_nr:0,
         }
@@ -183,6 +207,10 @@ impl Controls {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::SlicerProgress(progress) => { 
+                self.slicing_progress = Some(progress); 
+                Task::none() 
+            },
             Message::Err(error) => { self.notifications.push(error.into()); Task::none() },
             Message::Nofify(notification) => { self.notifications.push(notification); Task::none() },
             Message::DismissNotification(index) => { self.notifications.remove(index); Task::none() }
@@ -204,7 +232,11 @@ impl Controls {
             Message::OverhangAngleChanged(value) => {self.parameters.overhang_angle.text = value; Task::none()},
             Message::OverhangAngleUpdated => {self.parameters.overhang_angle.commit(); Task::none()},
             Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
-            Message::SlicingComplete(result)     => { self.gcode = Some(GcodeView::new(result)); Task::none() },
+            Message::SlicingComplete(result)     => { 
+                self.gcode = Some(GcodeView::new(result));
+                self.slicing_progress = None;
+                Task::none() 
+            },
             Message::GcodeLineNrChanged(line_nr) => { self.gcode_line_nr = line_nr; Task::none() },
             Message::GcodeLayerNrChanged(layer_nr) => { 
                 self.gcode_layer_nr = layer_nr;
@@ -223,29 +255,6 @@ impl Controls {
                 self.inputstl = Some(path);
                 Task::none()
             },
-            // Message::PickFile => { 
-            //     Task::perform(pick_file(),
-            //         |result| match result {
-            //             Ok(path) => {
-            //                 match path.extension()
-            //                     .and_then(|ext| ext.to_str())
-            //                     .map(|ext| ext.to_lowercase())
-            //                     .as_deref()
-            //                 {
-            //                     Some("stl") => {
-            //                         let file = std::fs::File::open(&path).unwrap();
-            //                         let mut reader = std::io::BufReader::new(file);
-            //                         let o = Object::from_mesh(io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap()));
-            //                         Message::NewModel(o)
-            //                     },
-            //                     Some(ext) => panic!("Unsupported file extension: {ext:?}"),
-            //                     None => panic!("No file extension found: {path:?}"),
-            //                 }
-            //             }
-            //             Err(error) => Message::Err(error),
-            //         }
-            //     )
-            // },
             Message::PickInputFile => { 
                 Task::future(async{ 
                     match pick_input_file().await {
@@ -300,12 +309,13 @@ impl Controls {
                     Some(path) => {
                         let settings = npslicer_core::Settings::default();
                         let path = path.to_path_buf();
-                        Task::future(async{
-                            match tokio::task::spawn_blocking(move || { slice(path,settings) }).await{
-                                Ok(file) => {println!("{file}"); Message::SlicingComplete(file)},
-                                Err(error) => {eprintln!("{error}"); Message::Err(Error::SlicerCrashed)}
-                            }
-                        })
+                        Task::sip(
+                            slice_w_progress(path,settings),
+                            Message::SlicerProgress,
+                            |result| match result{
+                                Ok(gcode)=>Message::SlicingComplete(gcode),
+                                Err(error)=>Message::Err(error)
+                            })
                     }
                 }
             }
@@ -397,14 +407,7 @@ impl Controls {
         .align_x(Right)
         .width(280);
 
-        // let gcode_view = if let Some(gcode) = &self.gcode{
-    //         Element::from(
-    //             container(
-    //                 iced::widget::scrollable(text::Rich::with_spans(highlight_gcode(gcode))).height(Shrink)
-    //             ).style(transparent_box)
-    //             .padding(10)
-    //         )
-    //     } else { space().into() };
+
         let notifications = iced::widget::Column::with_children(
                 self.notifications.iter()
                     .enumerate()
@@ -417,22 +420,32 @@ impl Controls {
                                 }
                             )
                             .padding(0)
-                            .width(200)
-                            // .into()
+                            .width(Fill)
                         ).on_press(Message::DismissNotification(id)).into()
-                        // .style(iced::widget::Button{})
                      )
-                ).spacing(3);
+                ).spacing(5);
+
+        let notifications = if let Some(progress) = self.slicing_progress{
+            notifications.push(
+                container( column![
+                    text(format!("Slicing {}% complete",progress*100.0)),
+                    iced::widget::progress_bar(0.0..=1.0,progress)
+                ]).style(container::primary).padding(4)
+                )
+            } else {notifications};
+
 
         let gcode_view = if let Some(gcode) = &self.gcode{
-            // gcode_view(gcode, self.gcode_line_nr)
             gcode.view(self.gcode_layer_nr,self.gcode_line_nr)
         } else { space().into() };
 
 
         let overlay = column![
             gcode_view,
-            notifications
+            container(notifications)
+                .align_y(Bottom)
+                .height(Fill)
+                .max_width(250)
             ]
             .align_x(Right)
             .width(Fill)
@@ -459,7 +472,7 @@ impl Controls {
                                         ).padding([50,5])
                                         .width(50)
                                     )
-                                } else { Element::from(space().width(50)) }
+                                } else { Element::from(space().width(20)) }
                             ],
                             if let Some(gcode) = &self.gcode{
                                 Element::from(
@@ -491,7 +504,7 @@ fn control<'a>(
     label: &'static str,
     control: impl Into<Element<'a, Message>>,
 ) -> Element<'a, Message> {
-    row![text(label), control.into()].spacing(10).into()
+    row![text(label), control.into()].align_y(Center).spacing(10).into()
 }
 
 
