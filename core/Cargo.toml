@@ -13,6 +13,7 @@ edition = "2021"
 
 
 [dependencies]
+tokio = { workspace = true }
 nalgebra-glm = "0.18.0"
 stl_io = "0.8.2"
 

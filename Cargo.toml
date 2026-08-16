@@ -2,6 +2,9 @@
 resolver = "3"
 members = ["core", "gui"]
 
+[workspace.dependencies]
+tokio = { version = "1.45.1", features = ["fs","sync"] }
+
 [profile.production]
 inherits = "release"
 debug-assertions = false
