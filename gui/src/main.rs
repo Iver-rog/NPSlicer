@@ -229,9 +229,9 @@ impl Controls {
                 self.scene.objects[0].printbed = io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap());
                 Task::none() 
             }
-            Message::OverhangAngleChanged(value) => {self.parameters.overhang_angle.text = value; Task::none()},
-            Message::OverhangAngleUpdated => {self.parameters.overhang_angle.commit(); Task::none()},
-            Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none()}
+            Message::OverhangAngleChanged(value) => { self.parameters.overhang_angle.text = value; Task::none() },
+            Message::OverhangAngleUpdated        => { self.parameters.overhang_angle.commit(); Task::none() },
+            Message::FilamentChanged(filament)   => { self.filament = Some(filament); Task::none() },
             Message::SlicingComplete(result)     => { 
                 self.gcode = Some(GcodeView::new(result));
                 self.slicing_progress = None;
@@ -244,12 +244,14 @@ impl Controls {
                 Task::none() 
             },
             Message::NewModel((object,path)) => {
+                let vertex_count = object.printbed.len();
                 self.scene.new_object(object);
-                if let Some(file_name) = path.file_stem(){
+                // if let Some(file_name) = path.file_stem(){
+                if let Some(file_name) = path.file_name(){
                     let str:&str = file_name.to_str().unwrap_or("");
                     self.notifications.push(Notification{
                         kind: NotificationType::Info,
-                        message:format!("{}",str)
+                        message:format!("Object name: {str}\nVertex: {vertex_count}")
                     })
                 };
                 self.inputstl = Some(path);
@@ -268,7 +270,8 @@ impl Controls {
                                     let (object, path) = tokio::task::spawn_blocking(move || {
                                         let file = std::fs::File::open(&path).unwrap();
                                         let mut reader = std::io::BufReader::new(file);
-                                        let object = Object::from_mesh(io::IntoVertexBuffer::into_vertex_buffer(&stl_io::read_stl(&mut reader).unwrap()));
+                                        let mesh = stl_io::read_stl(&mut reader).unwrap();
+                                        let object = Object::from_mesh(io::IntoVertexBuffer::into_vertex_buffer(&mesh));
                                         (object, path)
                                     }).await.unwrap();
 
@@ -412,25 +415,54 @@ impl Controls {
                 self.notifications.iter()
                     .enumerate()
                     .map(|(id,notification)|
-                        button(container( row![text(&notification.message), button("X").on_press(Message::Err(Error::DialogClosed))] )
-                            .style(match notification.kind {
-                                NotificationType::Error => container::danger,
-                                NotificationType::Warning => container::warning,
-                                NotificationType::Info => container::primary,
-                                }
-                            )
-                            .padding(0)
+                        // button(container( row![text(&notification.message), space(), button("X").on_press(Message::Err(Error::DialogClosed))] )
+                        container(row![
+                            container(space())
+                                .height(Fill)
+                                .width(5)
+                                .style(match notification.kind {
+                                    NotificationType::Error => container::danger,
+                                    NotificationType::Warning => container::warning,
+                                    NotificationType::Info => container::primary,
+                                    }
+                                ),
+                            iced::widget::Space::new().width(5),
+                            text(&notification.message),
+                            iced::widget::space::horizontal(),
+                            // button("x").on_press(Message::DismissNotification(id)).padding([1,7]))
+                            button("x").on_press(Message::DismissNotification(id))
+                                .padding([1,7])
+                                // .style(iced::widget::button::secondary)
+                                .style(iced::widget::button::subtle)
+                            ])
+                            .style(container::rounded_box)
+                            .padding(3)
+                            .align_y(Top)
+                            .height(Shrink)
                             .width(Fill)
-                        ).on_press(Message::DismissNotification(id)).into()
+                            .into()
+                        // ).on_press(Message::DismissNotification(id)).into()
                      )
                 ).spacing(5);
 
         let notifications = if let Some(progress) = self.slicing_progress{
             notifications.push(
-                container( column![
-                    text(format!("Slicing {}% complete",progress*100.0)),
-                    iced::widget::progress_bar(0.0..=1.0,progress)
-                ]).style(container::primary).padding(4)
+                container( row![
+                    container(space())
+                        .height(Fill)
+                        .width(5)
+                        .style(container::primary),
+                    iced::widget::Space::new().width(5),
+                    column![
+                        text(format!("Slicing {}% complete",progress*100.0)),
+                        iced::widget::progress_bar(0.0..=1.0,progress).girth(5)
+                    ]
+                ])
+                .style(container::rounded_box)
+                .padding(3)
+                .align_y(Top)
+                .height(Shrink)
+                .width(Fill)
                 )
             } else {notifications};
 
