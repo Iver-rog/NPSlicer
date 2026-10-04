@@ -37,6 +37,8 @@
             cargo-nextest cargo-fuzz
           ];
           devDeps = with pkgs; [ 
+            rust-analyzer
+            wgsl-analyzer
             mold
             gdb renderdoc cargo-flamegraph 
 
