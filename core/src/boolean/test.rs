@@ -11,7 +11,7 @@ fn simplify_contour(){
 
     let len = c.points.len();
     println!("original len {len}");
-    c.simplify(0.05);
+    c.clone().simplify(0.05);
     println!("len after simplify {}",c.points.len());
 
     //blender.polygon(&Polygon::new(c.clone(),vec![]), 0.0);

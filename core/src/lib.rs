@@ -19,12 +19,15 @@ use i_overlay::core::overlay_rule::OverlayRule;
 use blender::Blender;
 
 use log::Level;
+use tokio::stream;
 use std::io::{Write, BufReader};
 use std::fs::{self,File};
 use std::path::PathBuf;
 use std::io;
 use std::time::Instant;
 use std::env;
+
+use crate::gcode::GcodeFile;
 
 
 const T_MIN:f32 = 20.0;
@@ -93,7 +96,7 @@ pub fn slice(stl_path:PathBuf,settings:Settings,progress_reporter:tokio::sync::m
         // .for_each(|(i,polygon)|blender.display2d(polygon, i as f32, "layer contour", "layer contours"));
     // panic!();
 
-    mesh_gen(&mut blender,&layer_perimeters,&settings);
+    mesh_gen(&mut blender,&layer_perimeters,&settings,&progress_reporter);
     // get_user_confimation();
 
     let temp_dir = get_temp_dir();
@@ -109,7 +112,17 @@ pub fn slice(stl_path:PathBuf,settings:Settings,progress_reporter:tokio::sync::m
     let _ = progress_reporter.try_send(0.99);
     let boolean_time = start_time.elapsed();
 
-    let gcode = gcode::main(&mut blender,&temp_dir,&settings);
+    let gcode_old = gcode::main(&mut blender,&temp_dir,&settings);
+    let mesh_layers = gcode::import_layers(&temp_dir);
+    let paths = gcode::generate_paths(mesh_layers, &settings);
+    let mut gcodefile = gcode::gcodefile::GcodeFile::new_in_mem_file(&settings);
+    gcodefile.stream(paths);
+    let gcode:String = gcodefile.file_as_str().to_owned();
+    std::fs::write("./new_gcode.txt",&gcode).unwrap();
+    std::fs::write("./old_gcode.txt",&gcode_old).unwrap();
+    println!("{gcode}");
+
+
     let gcode_gen_time = start_time.elapsed();
 
     
@@ -205,7 +218,8 @@ fn generate_layer(
          return   Some((points, np_faces, planar_faces))
 }
 
-fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
+// fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
+fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings, progress_reporter:&tokio::sync::mpsc::Sender<f32>){
     let mut avr_support_ratio = 1.;
 
     let theta = s.overhang_angle;
@@ -228,10 +242,13 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
     let mut prev_support:Vec<Polygon> = layers.next().unwrap().clone();
     blender.solid_polygon(&prev_support, layer_h, "000-000-layer", "result");
 
+    let nr_of_layers = layers.len() as f32;
     for (i, layer) in layers.enumerate(){
         let layer_nr = i + 1;
         let z_height = ((layer_nr+1) as f32)*layer_h;
-        println!("layer {layer_nr}");
+
+        let _ = progress_reporter.try_send(layer_nr as f32 / nr_of_layers);
+        // println!("layer {layer_nr}");
 
         let offset_sup = ss_offset(prev_support.clone(),-d_x2);
 
@@ -300,7 +317,6 @@ fn mesh_gen(blender:&mut Blender, layers:&Vec<Vec<Polygon>>, s:&Settings){
 
     }
 }
-
 
 
 fn init_logger(){

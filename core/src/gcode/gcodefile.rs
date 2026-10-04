@@ -10,15 +10,16 @@ use super::Path;
 
 use crate::settings::Settings;
 
-pub struct GcodeFile<'a>{
-    file: BufWriter<File>,
+pub struct GcodeFile<'a,T:Write>{
+    file: T,
     settings: &'a Settings,
     n_layer: usize,
     safe_z: f32,
+    end_of_previous_layer:Option<Point3<f32>>,
 }
 
-impl GcodeFile<'_> {
-    pub fn new<'a, T:AsRef<std::path::Path>>(dir:T, settings:&'a Settings) -> GcodeFile<'a> {
+impl GcodeFile<'_,BufWriter<File>> {
+    pub fn new<'a, F:AsRef<std::path::Path>>(dir:F, settings:&'a Settings) -> GcodeFile<'a,BufWriter<File>> {
         let mut path = PathBuf::new();
         path.push(dir);
         path.push("gcode.gcode");
@@ -29,9 +30,125 @@ impl GcodeFile<'_> {
         writeheader(&mut buffer, settings).unwrap();
         let safe_z = settings.layer_height;
 
-        return GcodeFile{ file:buffer, settings, n_layer:0, safe_z }
+        return GcodeFile{ file:buffer, settings, n_layer:0, safe_z, end_of_previous_layer:None}
     }
+}
 
+impl GcodeFile<'_,Vec<u8>> {
+    pub fn new_in_mem_file<'a>(settings:&'a Settings) -> GcodeFile<'a,Vec<u8>> {
+        let mut buffer: Vec<u8> = Vec::new();
+
+        writeheader(&mut buffer, settings).unwrap();
+        let safe_z = settings.layer_height;
+
+        return GcodeFile{ file:buffer, settings, n_layer:0, safe_z, end_of_previous_layer:None}
+    }
+    pub fn file_as_str<'a>(&self) -> &str {
+        str::from_utf8(&self.file).unwrap()
+    }
+}
+
+impl <T:Write> GcodeFile<'_,T> {
+    pub fn path(&mut self, path: Path) -> Result<(),io::Error>{
+        let f = &mut self.file;
+        let s = self.settings;
+        let [x_offset,y_offset] = s.translate_xy;
+
+        match path.path_type{
+            PathType::LayerChange => {
+
+                writeln!(f,";LAYER_CHANGE")?;
+                writeln!(f,"\n;Start layer {}",self.n_layer)?;
+                writeln!(f,"M117 Layer {}",self.n_layer)?;
+                writeln!(f,"G92 E0.0 ; Reset extruder distance")?;
+
+                if s.fan_start == self.n_layer { writeln!(f,"M106 ; Fan on")?; }
+                self.n_layer += 1;
+            },
+            _ =>{
+                let (outer_wall_feedrate, inner_wall_feedrate) = match self.n_layer == 0 {
+                    true  => (s.feedrates.initial_layer, s.feedrates.initial_layer),
+                    false => (s.feedrates.outer_wall,    s.feedrates.inner_wall   ),
+                };
+                let infill_feedrate = match self.n_layer == 0 {
+                    true => s.feedrates.initial_layer_infill,
+                    false => s.feedrates.infill,
+                };
+
+
+                let end = path.points.last().clone().unwrap();
+                let mut points = path.points.iter();
+                let start = points.next().unwrap();
+
+                let should_retract = match self.end_of_previous_layer {
+                    Some(prev_end) => { (start-prev_end).magnitude() > s.max_staydown_distance },
+                    None => true, // <- first path in new layer no need for retraction
+                };
+
+                let (start_x, start_y, start_z) = (start.x+x_offset, start.y+y_offset ,start.z);
+                self.safe_z = self.safe_z.max( start_z );
+
+                if should_retract {
+                    writeln!(f,"G1 E-{} F{} ; Retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // Retraction
+                    writeln!(f,"G1 Z{:.3} F{:.3}",self.safe_z+0.3,s.feedrates.z_max)?;
+                    writeln!(f,"G1 X{start_x:.3} Y{start_y:.3} F{:.3}", s.feedrates.travel)?;
+                    writeln!(f,"G1 Z{start_z:.3} F{:.3}",s.feedrates.z_max)?;
+                    writeln!(f,"G1 E{} F{} ; De-retract",(s.retract_distance as f32)/1000.,s.feedrates.retract)?;  // De-Retraction
+                    writeln!(f,"G92 E0.0 ; Reset extruder distance")?;
+                } else {
+                    writeln!(f,"G1 X{start_x:.3} Y{start_y:.3} Z{start_z:.3} F{:.3}", s.feedrates.travel)?;
+                }
+
+                let feedrate = match path.path_type {
+                    PathType::OuterWall => outer_wall_feedrate,
+                    PathType::InnerWall => inner_wall_feedrate,
+                    PathType::Infill    => infill_feedrate,
+                    PathType::LayerChange => panic!(),
+                };
+                let line_width = match path.path_type {
+                    PathType::OuterWall => s.perimeter_line_width,
+                    PathType::InnerWall => s.perimeter_line_width,
+                    PathType::Infill    => s.infill_line_width,
+                    PathType::LayerChange => panic!(),
+                };
+                writeln!(f,";TYPE:{}",path.path_type)?;
+                writeln!(f,";WIDTH:{line_width}")?;
+                writeln!(f,";HEIGHT:{}",s.layer_height)?;
+                writeln!(f,"G1 F{feedrate}")?;
+
+                let extrusion_area = PI*(s.filament_diameter/2.).powi(2); 
+                let line_area = s.layer_height * line_width;
+                let extrusion_multiplier = line_area/extrusion_area;
+
+                let mut prev_point = start;
+                for point in points{
+                    self.safe_z = self.safe_z.max( point.z );
+                    // let line_length = (point.xy() - prev_point.xy()).magnitude();
+                    let line_length = (point - prev_point).magnitude();
+                    let extrusion_length = line_length*extrusion_multiplier;
+
+                    let (x,y,z) = (point.x+x_offset, point.y+y_offset, point.z);
+
+                    writeln!(f,"G1 X{x:.3} Y{y:.3} Z{z:.3} E{extrusion_length:.5}")?;
+
+                    prev_point = point;
+                    }
+                self.end_of_previous_layer = Some(*prev_point);
+            }
+        }
+        Ok(())
+    }
+    pub fn stream(&mut self, paths: impl Iterator<Item = Path>) -> Result<(),io::Error>{
+        let f = &mut self.file;
+        let s = self.settings;
+        let [x_offset,y_offset] = s.translate_xy;
+        let mut end_of_previous_layer:Option<Point3<f32>> = None; 
+
+        for path in paths{
+            self.path(path)?
+        }
+        return Ok(())
+    }
     pub fn layer(&mut self,mut paths: impl Iterator<Item = Path>) -> Result<(),io::Error> {
         let f = &mut self.file;
         let s = self.settings;
@@ -83,11 +200,13 @@ impl GcodeFile<'_> {
                 PathType::OuterWall => outer_wall_feedrate,
                 PathType::InnerWall => inner_wall_feedrate,
                 PathType::Infill    => infill_feedrate,
+                PathType::LayerChange => panic!(),
             };
             let line_width = match path.path_type {
                 PathType::OuterWall => s.perimeter_line_width,
                 PathType::InnerWall => s.perimeter_line_width,
                 PathType::Infill    => s.infill_line_width,
+                PathType::LayerChange => panic!(),
             };
             writeln!(f,";TYPE:{}",path.path_type)?;
             writeln!(f,";WIDTH:{line_width}")?;
@@ -117,9 +236,38 @@ impl GcodeFile<'_> {
         writeln!(f,";LAYER_CHANGE")?;
         Ok(())
     }
+    fn writefotter<W: Write>(&mut self, ) -> Result<(),io::Error> {
+        let s = self.settings;
+        let f = &mut self.file;
+
+        writeln!(f,"\n;end prosedure")?;
+
+        // Wipe (set relative mode, move to X2.0, Y2.0)
+        writeln!(f,"G91 ; relative mode")?;
+        writeln!(f,"G1 X2.0 Y2.0 E-0.4 F{} ; wipe and retract",s.feedrates.travel)?;
+        writeln!(f,"G01 E-0.1 F{} ; retract some more",s.feedrates.travel)?;
+        writeln!(f,"G90 ; absolute mode")?;
+
+        // Turn off heaters and fan
+        writeln!(f,"M104 S0 ; turn off extruder")?;
+        writeln!(f,"M140 S0 ; turn off bed")?;
+        writeln!(f,"M107 ; fan off")?;
+
+        // Move up
+        writeln!(f,"G1 Z{} F{} ; move up",self.safe_z + 10.,s.feedrates.travel)?;
+
+        // Present print
+        writeln!(f,"G1 Y200 F{} ; present print",(s.feedrates.travel/2))?;
+
+        // Home x
+        writeln!(f,"G28 X ; home x")?;
+
+        // Turn off motors
+        writeln!(f,"M84 ; disable motors")
+    }
 }
 
-fn writeheader<W: Write>(f:&mut BufWriter<W>,settings:&Settings) -> Result<(),io::Error> {
+fn writeheader<W: Write>(f:&mut W,settings:&Settings) -> Result<(),io::Error> {
     writeln!(f,"; Generated by layer-gen-rs")?;
     writeln!(f,"; Layer thickness: {}",settings.layer_height)?;
     writeln!(f,"; Nozzle diameter: {}",settings.nozzle_diameter)?;
@@ -171,35 +319,12 @@ fn writeheader<W: Write>(f:&mut BufWriter<W>,settings:&Settings) -> Result<(),io
     Ok(())
 }
 
+
+
 // NOTE: Might not be a good idea to do it this way
 #[allow(unused)]
-impl Drop for GcodeFile<'_> {
+impl<F:Write> Drop for GcodeFile<'_,F> {
     fn drop(&mut self){
-        let f = &mut self.file;
-        let s = self.settings;
-        writeln!(f,"\n;end prosedure");
-
-        // Wipe (set relative mode, move to X2.0, Y2.0)
-        writeln!(f,"G91 ; relative mode");
-        writeln!(f,"G1 X2.0 Y2.0 E-0.4 F{} ; wipe and retract",s.feedrates.travel);
-        writeln!(f,"G01 E-0.1 F{} ; retract some more",s.feedrates.travel);
-        writeln!(f,"G90 ; absolute mode");
-
-        // Turn off heaters and fan
-        writeln!(f,"M104 S0 ; turn off extruder");
-        writeln!(f,"M140 S0 ; turn off bed");
-        writeln!(f,"M107 ; fan off");
-
-        // Move up
-        writeln!(f,"G1 Z{} F{} ; move up",self.safe_z + 10.,s.feedrates.travel);
-
-        // Present print
-        writeln!(f,"G1 Y200 F{} ; present print",(s.feedrates.travel/2));
-
-        // Home x
-        writeln!(f,"G28 X ; home x");
-
-        // Turn off motors
-        writeln!(f,"M84 ; disable motors");
+        let _ = self.writefotter::<F>();
     }
 }

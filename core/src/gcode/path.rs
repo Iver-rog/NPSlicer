@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 use nalgebra::Point3;
 use crate::geo::Contour3d;
@@ -8,7 +9,26 @@ pub enum PathType{
     InnerWall,
     OuterWall,
     Infill,
+    LayerChange
 }
+impl FromStr for PathType{
+    type Err = ();
+    fn from_str(s: &str) -> Result<PathType, Self::Err> {
+        let normalized: String = s
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .flat_map(|c| c.to_lowercase())
+            .collect();
+
+        match normalized.as_str() {
+            "innerwall" => Ok(PathType::InnerWall),
+            "outerwall" => Ok(PathType::OuterWall),
+            "infill" => Ok(PathType::Infill),
+            _ => panic!("could not parce PathType: {normalized}"),
+        }
+    }
+}
+
 #[derive(Debug,PartialEq)]
 pub struct Path{
     pub points:Vec<Point3<f32>>,
@@ -20,6 +40,7 @@ impl Display for PathType {
             PathType::InnerWall => write!(f,"Inner wall"),
             PathType::OuterWall => write!(f,"Outer wall"),
             PathType::Infill => write!(f,"Sparse infill"),
+            PathType::LayerChange => write!(f,"LayerChange"),
         }
     }
 }

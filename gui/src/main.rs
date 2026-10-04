@@ -244,6 +244,7 @@ impl Controls {
                 Task::none() 
             },
             Message::NewModel((object,path)) => {
+                self.gcode = None;
                 let vertex_count = object.printbed.len();
                 self.scene.new_object(object);
                 // if let Some(file_name) = path.file_stem(){
@@ -307,6 +308,7 @@ impl Controls {
                 })
             },
             Message::SliceModel => { 
+                self.gcode = None;
                 match &self.inputstl {
                     None => Task::none(),
                     Some(path) => {
@@ -454,7 +456,7 @@ impl Controls {
                         .style(container::primary),
                     iced::widget::Space::new().width(5),
                     column![
-                        text(format!("Slicing {}% complete",progress*100.0)),
+                        text(format!("Slicing {:.1}% complete",(progress*100.0) as i8 )),
                         iced::widget::progress_bar(0.0..=1.0,progress).girth(5)
                     ]
                 ])
@@ -498,7 +500,7 @@ impl Controls {
                                 if let Some(gcode) = &self.gcode{
                                     Element::from(
                                         widgets::vertical_slider(
-                                            0..=u32::try_from(gcode.nr_of_layers()-1).unwrap(),
+                                            0..=u32::try_from(gcode.nr_of_layers().saturating_sub(1)).unwrap(),
                                             self.gcode_layer_nr,
                                             |n| Message::GcodeLayerNrChanged(n.into())
                                         ).padding([50,5])
